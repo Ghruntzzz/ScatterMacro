@@ -1,0 +1,10 @@
+{
+  "macros": [
+    {
+      "id": "anime-expeditions",
+      "name": "Anime Expeditions",
+      "version": null,
+      "description": "Game automation for Anime Expeditions. Download availability will appear here when the Python macro is released."
+    }
+  ]
+}

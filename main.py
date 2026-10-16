@@ -1,8 +1,8 @@
-"""Python launcher; --dashboard opens the recovered macro interface."""
+"""ScatterMacro launcher and isolated update helper."""
 import sys
 
-if "--dashboard" in sys.argv:
-    from ui.dashboard import main
+if "--apply-update" in sys.argv:
+    from python_macro.updater import main
 else:
     from ui.launcher import main
 

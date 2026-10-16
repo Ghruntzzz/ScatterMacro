@@ -1,16 +1,20 @@
-"""Standalone library and read-only capture diagnostics for the Python rebuild."""
-import importlib.util
+"""Install-first ScatterMacro library with independent package updates."""
+from concurrent.futures import ThreadPoolExecutor
+import json
 import os
 from pathlib import Path
 import subprocess
 import sys
-import time
 
 from PySide6.QtCore import Qt, QTimer, QUrl
-from PySide6.QtGui import QDesktopServices, QFont, QFontDatabase, QIcon, QImage, QPixmap
+from PySide6.QtGui import QDesktopServices, QFont, QFontDatabase, QIcon, QPixmap
 from PySide6.QtWidgets import (
-    QApplication, QComboBox, QFrame, QHBoxLayout, QLabel, QLineEdit, QMainWindow,
-    QPushButton, QScrollArea, QSizePolicy, QVBoxLayout, QWidget,
+    QApplication, QFrame, QHBoxLayout, QLabel, QLineEdit, QMainWindow,
+    QMessageBox, QPushButton, QScrollArea, QSizeGrip, QSizePolicy, QVBoxLayout, QWidget,
+)
+from python_macro.library import (
+    Library, VERSION, CATALOG_URL, UPDATE_URL, fetch_json, validate_catalog,
+    validate_release, version_tuple,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -34,7 +38,6 @@ QLineEdit:focus,QComboBox:focus {border-color:#a74359;}
 QScrollArea {border:0;}
 """
 
-
 def label(text, name=None):
     item = QLabel(text)
     item.setWordWrap(True)
@@ -43,185 +46,320 @@ def label(text, name=None):
     return item
 
 
+class TitleBar(QFrame):
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton and self.window().windowHandle():
+            self.window().windowHandle().startSystemMove()
+        super().mousePressEvent(event)
+
+    def mouseDoubleClickEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            window = self.window()
+            window.showNormal() if window.isMaximized() else window.showMaximized()
+
+
 class Launcher(QMainWindow):
-    def __init__(self):
+    def __init__(self, library=None):
         super().__init__()
+        self.setWindowFlags(Qt.Window | Qt.FramelessWindowHint)
         self.setWindowTitle("ScatterMacro | Library")
         self.setWindowIcon(QIcon(str(ROOT / "assets/scattermacro.ico")))
         self.resize(1180, 780)
         self.setMinimumSize(850, 620)
-        self.dashboard = None
+        self.library = library or Library()
+        self.catalog = validate_catalog(json.loads((ROOT / "catalog.json").read_text(encoding="utf-8")))
+        self.release = None
+        self.processes = {}
+        self.executor = ThreadPoolExecutor(max_workers=1)
+        self.future = None
+        self.page = "Home"
         outer = QWidget()
         self.setCentralWidget(outer)
         layout = QVBoxLayout(outer)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
-        header = QFrame()
+        header = TitleBar()
         header.setObjectName("header")
         nav = QHBoxLayout(header)
-        nav.setContentsMargins(30, 20, 30, 20)
-        nav.addWidget(label("SCATTER / MACRO", "eyebrow"))
+        nav.setContentsMargins(24, 16, 16, 16)
+        brand = label("SCATTER / MACRO", "eyebrow")
+        brand.setAttribute(Qt.WA_TransparentForMouseEvents)
+        nav.addWidget(brand)
         nav.addStretch()
         self.nav = {}
-        for name in ("Home", "Installed", "Updates", "Diagnostics"):
+        for name in ("Home", "Installed", "Updates"):
             button = QPushButton(name)
             button.setCheckable(True)
             button.clicked.connect(lambda _, page=name: self.show_page(page))
             nav.addWidget(button)
             self.nav[name] = button
+        minimize = QPushButton("-")
+        minimize.setToolTip("Minimize")
+        minimize.clicked.connect(self.showMinimized)
+        nav.addWidget(minimize)
+        close = QPushButton("X")
+        close.setToolTip("Close")
+        close.clicked.connect(self.close)
+        nav.addWidget(close)
         layout.addWidget(header)
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
         layout.addWidget(self.scroll, 1)
         footer = QHBoxLayout()
-        footer.setContentsMargins(34, 12, 34, 18)
-        footer.addWidget(label("LOCAL WORKSPACE  /  PYTHON EDITION", "eyebrow"))
-        footer.addStretch()
-        folder = QPushButton("Project folder")
-        folder.clicked.connect(lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(str(ROOT))))
+        footer.setContentsMargins(24, 12, 16, 16)
+        self.status = label("ScatterMacro " + VERSION, "muted")
+        footer.addWidget(self.status, 1)
+        folder = QPushButton("Macro configs")
+        folder.clicked.connect(lambda: self.open_folder(self.library.root))
         footer.addWidget(folder)
+        footer.addWidget(QSizeGrip(self))
         layout.addLayout(footer)
+        self.timer = QTimer(self)
+        self.timer.setInterval(100)
+        self.timer.timeout.connect(self.poll_job)
         self.show_page("Home")
 
+    def open_folder(self, path):
+        try:
+            path.mkdir(parents=True, exist_ok=True)
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
+        except OSError as error:
+            self.status.setText("Could not open config folder: " + str(error))
+
+    def has_update(self, macro):
+        state = self.library.installed(macro["id"])
+        return bool(state and macro.get("version") and
+                    version_tuple(macro["version"]) > version_tuple(state["version"]))
+
     def show_page(self, page):
+        self.page = page
+        updates = sum(self.has_update(m) for m in self.catalog)
+        launcher_update = bool(self.release and version_tuple(self.release["version"]) > version_tuple(VERSION))
         for name, button in self.nav.items():
             button.setChecked(name == page)
+            button.setText(f"Updates ({updates + int(launcher_update)})" if name == "Updates" and updates + int(launcher_update) else name)
         content = QWidget()
         column = QVBoxLayout(content)
         column.setContentsMargins(34, 30, 34, 30)
         column.setSpacing(18)
-        column.addWidget(label("YOUR WORKSPACE", "eyebrow"))
+        column.addWidget(label("YOUR LIBRARY", "eyebrow"))
         column.addWidget(label("Choose your next session." if page == "Home" else page, "title"))
-        if page == "Home":
-            column.addWidget(label("Your games, configurations, and tools. One place to begin.", "muted"))
-            search = QLineEdit()
-            search.setPlaceholderText("Search macros by name or game")
-            column.addWidget(search)
-            hero = QFrame()
-            hero.setObjectName("hero")
-            hero_layout = QHBoxLayout(hero)
-            hero_layout.setContentsMargins(28, 28, 28, 28)
-            copy = QVBoxLayout()
-            copy.addWidget(label("01 / ROBLOX", "eyebrow"))
-            copy.addWidget(label("Anime Expeditions", "title"))
-            copy.addWidget(label("Your saved setup, ready for the next chapter.\nAutomation is being rebuilt in Python.", "muted"))
-            copy.addSpacing(22)
-            preview = QPushButton("Preview dashboard")
-            preview.setObjectName("primary")
-            preview.clicked.connect(self.open_dashboard)
-            copy.addWidget(preview, alignment=Qt.AlignLeft)
-            art = QLabel()
-            art.setPixmap(QPixmap(str(ROOT / "assets/anime-expeditions.png")).scaled(400, 225, Qt.KeepAspectRatio, Qt.SmoothTransformation))
-            art.setAlignment(Qt.AlignCenter)
-            art.setMinimumWidth(0)
-            art.setScaledContents(False)
-            art.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
-            hero_layout.addWidget(art, 2)
-            hero_layout.addLayout(copy, 3)
-            install = QPushButton("Install available after release")
-            install.setEnabled(False)
-            copy.addWidget(install, alignment=Qt.AlignLeft)
-            column.addWidget(hero)
-            tools = QHBoxLayout()
-            tools.addWidget(label("CHECK BEFORE YOU START\nVerify the Roblox window in Diagnostics.", "muted"), 1)
-            diagnostics = QPushButton("Open Diagnostics")
-            diagnostics.clicked.connect(lambda: self.show_page("Diagnostics"))
-            tools.addWidget(diagnostics)
-            column.addLayout(tools)
-            empty = label("No matching macros.", "muted")
-            empty.hide()
-            column.addWidget(empty)
-            def filter_cards(text):
-                match = text.lower().strip() in "anime expeditions roblox strategy automation"
-                hero.setVisible(match)
-                empty.setVisible(not match)
-            search.textChanged.connect(filter_cards)
-        elif page in ("Installed", "Updates"):
-            column.addWidget(label("No released macros installed yet." if page == "Installed" else "No installed packages to update.", "muted"))
-            column.addWidget(label("The dashboard preview is a development tool, not an installed macro. Your saved settings and unit configurations are preserved."))
+        if page == "Updates":
+            column.addWidget(label("Launcher and macro updates are independent. Your saved configurations stay in place.", "muted"))
+            row = QHBoxLayout()
+            for text, scope in (("Check launcher updates", "launcher"), ("Check macro updates", "macros")):
+                button = QPushButton(text)
+                button.clicked.connect(lambda _, s=scope: self.check_updates(s))
+                row.addWidget(button)
+            column.addLayout(row)
+            column.addWidget(label("Launcher " + VERSION, "eyebrow"))
+            if launcher_update:
+                button = QPushButton("Install launcher " + self.release["version"])
+                button.setObjectName("primary")
+                button.clicked.connect(self.update_launcher)
+                column.addWidget(button)
+            else:
+                column.addWidget(label("Use Check launcher updates to check for a newer version.", "muted"))
         else:
-            self.build_diagnostics(column)
+            row = QHBoxLayout()
+            row.addWidget(label("Install the macros you want. Each has its own saved configuration.", "muted"), 1)
+            check = QPushButton("Check for updates")
+            check.clicked.connect(lambda: self.check_updates("all"))
+            row.addWidget(check)
+            column.addLayout(row)
+        search = QLineEdit()
+        search.setPlaceholderText("Search your macros")
+        column.addWidget(search)
+        cards = []
+        for macro in self.catalog:
+            state = self.library.installed(macro["id"])
+            if page == "Installed" and not state:
+                continue
+            if page == "Updates" and not self.has_update(macro):
+                continue
+            card = QFrame()
+            card.setObjectName("hero")
+            row = QHBoxLayout(card)
+            row.setContentsMargins(26, 26, 26, 26)
+            if macro["id"] == "anime-expeditions":
+                art = QLabel()
+                art.setPixmap(QPixmap(str(ROOT / "assets/anime-expeditions.png")).scaled(400, 225, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+                art.setAlignment(Qt.AlignCenter)
+                art.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+                row.addWidget(art, 2)
+            copy = QVBoxLayout()
+            copy.addWidget(label(macro["name"], "title"))
+            copy.addWidget(label(macro.get("description", ""), "muted"))
+            copy.addWidget(label("Installed: " + state["version"] if state else "Not installed", "eyebrow"))
+            if self.has_update(macro):
+                copy.addWidget(label("Update available: " + macro["version"], "eyebrow"))
+            action = QPushButton("Update" if self.has_update(macro) else "Open" if state else "Install" if macro.get("version") else "Not released yet")
+            action.setObjectName("primary")
+            action.setEnabled(bool(state or macro.get("version")))
+            action.clicked.connect(lambda _, m=macro: self.macro_action(m))
+            copy.addWidget(action, alignment=Qt.AlignLeft)
+            if state:
+                configs = QPushButton("Open configs")
+                configs.clicked.connect(lambda _, mid=macro["id"]: self.open_folder(self.library.config_dir(mid)))
+                copy.addWidget(configs, alignment=Qt.AlignLeft)
+            row.addLayout(copy, 3)
+            column.addWidget(card)
+            cards.append((macro["name"].lower(), card))
+        empty = label("No matching macros." if cards else "No macro updates available." if page == "Updates" else "No macros installed yet.", "muted")
+        empty.setVisible(not cards)
+        column.addWidget(empty)
+        def filter_cards(text):
+            found = False
+            for name, card in cards:
+                match = text.lower().strip() in name
+                card.setVisible(match)
+                found = found or match
+            empty.setVisible(not found)
+        search.textChanged.connect(filter_cards)
         column.addStretch()
         old = self.scroll.takeWidget()
         if old:
             old.deleteLater()
         self.scroll.setWidget(content)
 
-    def open_dashboard(self):
-        if self.dashboard and self.dashboard.poll() is None:
+    def start_job(self, message, work, done, failed=None):
+        if self.future is not None:
+            self.status.setText("Please wait for the current operation to finish.")
             return
-        command = ([sys.executable, "--dashboard"] if getattr(sys, "frozen", False)
-                   else [sys.executable, str(ROOT / "main.py"), "--dashboard"])
-        self.dashboard = subprocess.Popen(command, cwd=Path(sys.executable).parent if getattr(sys, "frozen", False) else ROOT)
+        self.status.setText(message)
+        self.on_done, self.on_failed = done, failed
+        self.future = self.executor.submit(work)
+        self.timer.start()
 
-    def build_diagnostics(self, column):
-        import cv2
-        column.addWidget(label("Read-only capture. No clicks, key presses, or process-memory access.", "muted"))
-        ocr = "available; integration pending" if importlib.util.find_spec("rapidocr_onnxruntime") else "not installed"
-        column.addWidget(label(f"OpenCV {cv2.__version__}  /  OCR: {ocr}", "eyebrow"))
-        row = QHBoxLayout()
-        windows = QComboBox()
-        row.addWidget(windows, 1)
-        refresh = QPushButton("Find Roblox")
-        capture = QPushButton("Capture client")
-        row.addWidget(refresh)
-        row.addWidget(capture)
-        column.addLayout(row)
-        status = label("Keep Roblox visible and unobstructed. This captures desktop pixels inside its client area.", "muted")
-        column.addWidget(status)
-        preview = QLabel("Your Roblox capture will appear here")
-        preview.setAlignment(Qt.AlignCenter)
-        preview.setMinimumHeight(270)
-        preview.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Expanding)
-        preview.setStyleSheet("background:#100d0f;border:1px dashed #642238;border-radius:12px;")
-        column.addWidget(preview, 1)
-        def discover():
-            from python_macro.capture import roblox_windows
-            windows.clear()
-            for hwnd, title in roblox_windows():
-                windows.addItem(f"{title} / {hwnd}", hwnd)
-            capture.setEnabled(windows.count() > 0)
-            if not windows.count():
-                status.setText("No visible Roblox window found. Open Roblox, then choose Find Roblox.")
-        def snapshot():
-            from python_macro.capture import capture_client
-            try:
-                started = time.perf_counter()
-                frame = capture_client(windows.currentData())
-                rgb = cv2.cvtColor(frame, cv2.COLOR_BGRA2RGB)
-                image = QImage(rgb.data, rgb.shape[1], rgb.shape[0], rgb.strides[0], QImage.Format_RGB888).copy()
-                preview.setPixmap(QPixmap.fromImage(image).scaled(preview.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation))
-                status.setText(f"Captured {rgb.shape[1]} × {rgb.shape[0]} pixels in {(time.perf_counter()-started)*1000:.0f} ms. No input sent.")
-            except Exception as error:
-                status.setText(str(error))
-        refresh.clicked.connect(discover)
-        capture.clicked.connect(snapshot)
-        discover()
+    def poll_job(self):
+        if self.future is None or not self.future.done():
+            return
+        future, done, failed = self.future, self.on_done, self.on_failed
+        self.future = None
+        self.timer.stop()
+        try:
+            done(future.result())
+        except Exception as error:
+            self.status.setText("Could not finish: " + str(error))
+            if failed:
+                failed(error)
+
+    def check_updates(self, scope="all"):
+        def work():
+            result, errors = {}, []
+            if scope in ("all", "macros"):
+                try:
+                    result["catalog"] = validate_catalog(fetch_json(CATALOG_URL))
+                except Exception as error:
+                    errors.append("Macro check failed: " + str(error))
+            if scope in ("all", "launcher"):
+                try:
+                    release = fetch_json(UPDATE_URL)
+                    validate_release(release)
+                    result["release"] = release
+                except Exception as error:
+                    errors.append("Launcher check failed: " + str(error))
+            return result, errors
+        def done(value):
+            result, errors = value
+            self.catalog = result.get("catalog", self.catalog)
+            self.release = result.get("release", self.release)
+            self.show_page(self.page)
+            self.status.setText(" | ".join(errors) if errors else "Update check complete. Available updates are shown in Updates.")
+        self.start_job("Checking for updates...", work, done)
+
+    def macro_action(self, macro):
+        if self.future is not None:
+            self.status.setText("Please wait for the current operation to finish.")
+            return
+        process = self.processes.get(macro["id"])
+        if process and process.poll() is None:
+            self.status.setText("This macro is already running. Close it before updating.")
+            return
+        if not self.library.installed(macro["id"]):
+            self.install_macro(macro)
+            return
+        def checked(catalog):
+            self.catalog = catalog
+            latest = next((m for m in catalog if m["id"] == macro["id"]), None)
+            self.show_page(self.page)
+            if latest and self.has_update(latest):
+                answer = QMessageBox.question(self, "Macro update", latest["name"] + " has an update. Install it before opening?")
+                if answer == QMessageBox.Yes:
+                    self.install_macro(latest, launch=True)
+                else:
+                    self.launch_macro(macro)
+            else:
+                self.launch_macro(macro)
+        def failed(error):
+            if QMessageBox.question(self, "Update check unavailable", "Could not check for updates. Open the installed version anyway?") == QMessageBox.Yes:
+                self.launch_macro(macro)
+        self.start_job("Checking this macro for updates...", lambda: validate_catalog(fetch_json(CATALOG_URL)), checked, failed)
+
+    def install_macro(self, macro, launch=False):
+        def done(_):
+            self.show_page(self.page)
+            self.status.setText(macro["name"] + " installed. Your configurations are preserved.")
+            if launch:
+                self.launch_macro(macro)
+        self.start_job("Downloading " + macro["name"] + "...", lambda: self.library.download_install(macro), done)
+
+    def launch_macro(self, macro):
+        executable = self.library.executable(macro["id"])
+        self.processes[macro["id"]] = subprocess.Popen(
+            [str(executable), "--config-dir", str(self.library.config_dir(macro["id"]))],
+            cwd=executable.parent)
+        self.status.setText(macro["name"] + " opened.")
+
+    def update_launcher(self):
+        if not getattr(sys, "frozen", False):
+            self.status.setText("Launcher installation updates are available in the packaged Windows app.")
+            return
+        from python_macro.updater import prepare_update
+        target = Path(sys.executable).parent
+        def ready(package):
+            # Probe installation access before closing the current launcher.
+            import tempfile
+            with tempfile.TemporaryFile(dir=target.parent):
+                pass
+            subprocess.Popen([str(package / "ScatterLauncher.exe"), "--apply-update",
+                              "--target", str(target), "--pid", str(os.getpid())], cwd=package)
+            self.close()
+        self.start_job("Downloading launcher update. The launcher will restart...", lambda: prepare_update(self.release), ready)
+
+    def closeEvent(self, event):
+        if self.future is not None:
+            self.status.setText("Please wait for the current operation to finish before closing.")
+            event.ignore()
+            return
+        self.executor.shutdown(wait=False)
+        event.accept()
 
 
 def main():
     app = QApplication(sys.argv)
     from ui.loading import LoadingScreen
-    splash = LoadingScreen(ROOT / "assets/scattermacro.ico")
-    splash.show()
-    app.processEvents()
     for font in ("segoeui.ttf", "segoeuib.ttf"):
         path = Path(os.environ.get("WINDIR", "C:/Windows")) / "Fonts" / font
         if path.exists():
             QFontDatabase.addApplicationFont(str(path))
     app.setFont(QFont("Segoe UI", 10))
     app.setStyleSheet(STYLE)
-    try:
-        window = Launcher()
-    except Exception:
-        splash.close()
-        raise
-    splash.finish(window)
-    if "--render-preview" in sys.argv:
-        path = Path(sys.argv[sys.argv.index("--render-preview") + 1]).resolve()
-        path.parent.mkdir(parents=True, exist_ok=True)
-        def render():
-            window.grab().save(str(path))
-            app.quit()
-        QTimer.singleShot(300, render)
+    splash = LoadingScreen(ROOT / "assets/scattermacro.ico")
+    splash.show()
+    window = Launcher()
+    def ready():
+        splash.finish(window)
+        if "--render-preview" in sys.argv:
+            path = Path(sys.argv[sys.argv.index("--render-preview") + 1]).resolve()
+            path.parent.mkdir(parents=True, exist_ok=True)
+            def render():
+                window.grab().save(str(path))
+                app.quit()
+            QTimer.singleShot(300, render)
+        else:
+            window.check_updates()
+    # Let the event loop paint and animate the splash, rather than hiding it
+    # within the same startup call before users can see it.
+    QTimer.singleShot(900, ready)
     return app.exec()

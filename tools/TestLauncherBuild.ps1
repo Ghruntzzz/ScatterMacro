@@ -4,7 +4,7 @@ $exe = Join-Path $root 'dist\ScatterLauncher\ScatterLauncher.exe'
 $previousPlatform = $env:QT_QPA_PLATFORM
 try {
     $env:QT_QPA_PLATFORM = 'offscreen'
-    foreach ($screen in @('launcher', 'dashboard')) {
+    foreach ($screen in @('launcher')) {
         $preview = Join-Path $root ('dist\smoke-' + $screen + '.png')
         if (Test-Path -LiteralPath $preview) { Remove-Item -LiteralPath $preview }
         $arguments = '--render-preview "' + $preview + '"'

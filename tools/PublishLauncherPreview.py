@@ -8,9 +8,9 @@ import urllib.parse
 import urllib.request
 
 ROOT = Path(__file__).resolve().parents[1]
-ARCHIVE = ROOT / "dist/ScatterLauncher-0.1.1-windows.zip"
+ARCHIVE = ROOT / "dist/ScatterLauncher-0.2.0-windows.zip"
 REPO = "Ghruntz/ScatterMacro"
-TAG = "launcher-v0.1.1"
+TAG = "launcher-v0.2.0"
 
 
 def main():
@@ -41,9 +41,9 @@ def main():
             raise SystemExit(f"Release lookup failed: HTTP {error.code}") from None
         release = request(api, json.dumps({
             "tag_name": TAG,
-            "name": "ScatterLauncher 0.1.1",
-            "prerelease": True,
-            "body": "Download and extract the entire ZIP, then open ScatterLauncher.exe inside the ScatterLauncher folder. Keep the _internal folder beside the executable. No Python installation is needed.\n\nAdds a compact black-and-wine-red loading screen that closes when the library is ready, without an artificial delay. Defers OpenCV loading until diagnostics are opened.\n\nThis remains an early launcher build: the existing dashboard preview and diagnostics are still present. Macro automation, install-first UI, and independent launcher/macro updates are not implemented in this release. Existing installations must download this ZIP manually.",
+            "name": "ScatterLauncher 0.2.0",
+            "prerelease": False,
+            "body": "Download and extract the entire ZIP, then open ScatterLauncher.exe. Keep _internal beside it. Users on 0.1.x must download this update manually once.\n\nRemoves Diagnostics and the dashboard preview. Adds visible loading screen, custom minimize/close controls, per-macro config folders, catalog refresh, separate macro/launcher update checks, macro update checks before launch, verified downloads, and a launcher update helper with rollback. Configurations are kept outside application files.\n\nAnime Expeditions automation is still being rebuilt and is not released for installation. This release does not claim to provide a working game macro. Future released macros will appear in the library without replacing the launcher.",
         }).encode())
     assets = release.get("assets", [])
     if any(asset["name"] == ARCHIVE.name for asset in assets):
