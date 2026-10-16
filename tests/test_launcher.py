@@ -5,6 +5,7 @@ import unittest
 from unittest.mock import patch
 from PySide6.QtWidgets import QApplication, QLabel, QLineEdit, QPushButton
 from ui.launcher import Launcher
+from ui.loading import LoadingScreen
 
 
 class LauncherTests(unittest.TestCase):
@@ -24,6 +25,16 @@ class LauncherTests(unittest.TestCase):
         install = next(button for button in self.window.findChildren(QPushButton)
                        if button.text() == "Install available after release")
         self.assertFalse(install.isEnabled())
+
+    def test_loading_screen_closes_when_launcher_ready(self):
+        splash = LoadingScreen("")
+        splash.show()
+        self.app.processEvents()
+        self.assertTrue(splash.isVisible())
+        splash.finish(self.window)
+        self.assertFalse(splash.isVisible())
+        self.assertTrue(self.window.isVisible())
+        splash.deleteLater()
 
     def test_search_and_navigation(self):
         search = self.window.findChild(QLineEdit)

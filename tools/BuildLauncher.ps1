@@ -17,7 +17,7 @@ try {
     $icu = Join-Path $root 'dist\ScatterLauncher\_internal\icuuc.dll'
     if (Test-Path -LiteralPath $icu) { Remove-Item -LiteralPath $icu }
     & (Join-Path $PSScriptRoot 'TestLauncherBuild.ps1')
-    Compress-Archive -Path dist/ScatterLauncher -DestinationPath dist/ScatterLauncher-0.1.0-preview-windows.zip -Force
+    Compress-Archive -Path dist/ScatterLauncher -DestinationPath dist/ScatterLauncher-0.1.1-windows.zip -Force
 } finally {
     Pop-Location
 }

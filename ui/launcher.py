@@ -6,7 +6,6 @@ import subprocess
 import sys
 import time
 
-import cv2
 from PySide6.QtCore import Qt, QTimer, QUrl
 from PySide6.QtGui import QDesktopServices, QFont, QFontDatabase, QIcon, QImage, QPixmap
 from PySide6.QtWidgets import (
@@ -156,6 +155,7 @@ class Launcher(QMainWindow):
         self.dashboard = subprocess.Popen(command, cwd=Path(sys.executable).parent if getattr(sys, "frozen", False) else ROOT)
 
     def build_diagnostics(self, column):
+        import cv2
         column.addWidget(label("Read-only capture. No clicks, key presses, or process-memory access.", "muted"))
         ocr = "available; integration pending" if importlib.util.find_spec("rapidocr_onnxruntime") else "not installed"
         column.addWidget(label(f"OpenCV {cv2.__version__}  /  OCR: {ocr}", "eyebrow"))
@@ -201,14 +201,22 @@ class Launcher(QMainWindow):
 
 def main():
     app = QApplication(sys.argv)
+    from ui.loading import LoadingScreen
+    splash = LoadingScreen(ROOT / "assets/scattermacro.ico")
+    splash.show()
+    app.processEvents()
     for font in ("segoeui.ttf", "segoeuib.ttf"):
         path = Path(os.environ.get("WINDIR", "C:/Windows")) / "Fonts" / font
         if path.exists():
             QFontDatabase.addApplicationFont(str(path))
     app.setFont(QFont("Segoe UI", 10))
     app.setStyleSheet(STYLE)
-    window = Launcher()
-    window.show()
+    try:
+        window = Launcher()
+    except Exception:
+        splash.close()
+        raise
+    splash.finish(window)
     if "--render-preview" in sys.argv:
         path = Path(sys.argv[sys.argv.index("--render-preview") + 1]).resolve()
         path.parent.mkdir(parents=True, exist_ok=True)

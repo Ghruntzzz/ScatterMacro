@@ -8,9 +8,9 @@ import urllib.parse
 import urllib.request
 
 ROOT = Path(__file__).resolve().parents[1]
-ARCHIVE = ROOT / "dist/ScatterLauncher-0.1.0-preview-windows.zip"
+ARCHIVE = ROOT / "dist/ScatterLauncher-0.1.1-windows.zip"
 REPO = "Ghruntz/ScatterMacro"
-TAG = "launcher-v0.1.0-preview"
+TAG = "launcher-v0.1.1"
 
 
 def main():
@@ -41,9 +41,9 @@ def main():
             raise SystemExit(f"Release lookup failed: HTTP {error.code}") from None
         release = request(api, json.dumps({
             "tag_name": TAG,
-            "name": "ScatterLauncher 0.1.0 - Python preview",
+            "name": "ScatterLauncher 0.1.1",
             "prerelease": True,
-            "body": "Windows launcher preview. Download and extract the entire ZIP, then open ScatterLauncher.exe inside the ScatterLauncher folder. No Python installation is needed.\n\nIncludes the wine-red/black launcher, Anime Expeditions artwork, recovered dashboard preview, and read-only Roblox capture diagnostics. Game automation modes, macro installation/updating, and OCR diagnostics are NOT ready. This is not a replacement for the existing macro release. The public macro update feed is unchanged.",
+            "body": "Download and extract the entire ZIP, then open ScatterLauncher.exe inside the ScatterLauncher folder. Keep the _internal folder beside the executable. No Python installation is needed.\n\nAdds a compact black-and-wine-red loading screen that closes when the library is ready, without an artificial delay. Defers OpenCV loading until diagnostics are opened.\n\nThis remains an early launcher build: the existing dashboard preview and diagnostics are still present. Macro automation, install-first UI, and independent launcher/macro updates are not implemented in this release. Existing installations must download this ZIP manually.",
         }).encode())
     assets = release.get("assets", [])
     if any(asset["name"] == ARCHIVE.name for asset in assets):
