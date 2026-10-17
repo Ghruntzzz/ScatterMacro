@@ -1,0 +1,52 @@
+import os
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+from pathlib import Path
+import tempfile
+import unittest
+from unittest.mock import patch
+
+from PySide6.QtWidgets import QApplication
+from ui import dashboard
+
+
+class DashboardSetupTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.app = QApplication.instance() or QApplication([])
+
+    def setUp(self):
+        self.folder = tempfile.TemporaryDirectory()
+        self.config = Path(self.folder.name) / "dashboard_config.ini"
+        self.override = patch.object(dashboard, "CONFIG_PATH", self.config)
+        self.override.start()
+        dashboard.update_config("Dashboard", {"Mode": "Expeditions", "Map": "School Grounds", "ExpeditionDifficulty": "3"})
+
+    def tearDown(self):
+        self.override.stop()
+        self.folder.cleanup()
+
+    def test_route_and_urls_persist_without_automation(self):
+        window = dashboard.DashboardWindow()
+        with patch.object(dashboard, "send_command") as command:
+            window.map_box.setCurrentText("Flower Forest")
+            window.difficulty_box.setCurrentText("2")
+            window.private_server.setText("https://example.com/?code=a%20b")
+            window._start_macro()
+            command.assert_not_called()
+        values = dashboard.read_dashboard_values()
+        self.assertEqual(values["map"], "Flower Forest")
+        self.assertEqual(values["difficulty"], "2")
+        self.assertIn("%20", values["private_server"])
+        window.close()
+
+    def test_unit_indexes_saved_only_for_selected_route(self):
+        values = dashboard.read_dashboard_values()
+        dialog = dashboard.UnitSetupDialog(values)
+        dialog.table.cellWidget(0, 0).setCurrentText("2")
+        dialog.table.cellWidget(0, 1).setCurrentText("Weakest")
+        dialog.table.cellWidget(0, 4).setValue(300)
+        dialog.table.cellWidget(0, 5).setValue(200)
+        dialog.save()
+        index = dashboard.load_unit_indexes(values)[0]
+        self.assertEqual((index["unit"], index["priority"], index["x"], index["y"]), ("2", "Weakest", "300", "200"))
+        self.assertEqual(dashboard.load_unit_indexes(dict(values, map="Flower Forest"))[0]["unit"], "None")

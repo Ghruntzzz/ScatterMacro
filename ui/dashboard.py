@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import configparser
 import ctypes
+import os
 import sys
 from pathlib import Path
 
 from PySide6.QtCore import QPoint, QRect, QTimer, Qt
-from PySide6.QtGui import QColor, QFont, QKeySequence, QLinearGradient, QPainter, QPainterPath, QPixmap, QRadialGradient, QRegion
-from PySide6.QtWidgets import QApplication, QComboBox, QFrame, QLabel, QLineEdit, QMessageBox, QPlainTextEdit, QPushButton, QWidget
+from PySide6.QtGui import QColor, QFont, QFontDatabase, QKeySequence, QLinearGradient, QPainter, QPainterPath, QPixmap, QRadialGradient, QRegion
+from PySide6.QtWidgets import QApplication, QComboBox, QDialog, QDialogButtonBox, QFrame, QHeaderView, QLabel, QLineEdit, QMessageBox, QPlainTextEdit, QPushButton, QSpinBox, QTableWidget, QVBoxLayout, QWidget
 
 
 ROOT = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parents[1]
@@ -98,7 +99,7 @@ def apply_theme_palette(primary: str, accent: str) -> None:
 
 
 def read_dashboard_values() -> dict[str, str]:
-    parser = configparser.ConfigParser()
+    parser = configparser.ConfigParser(interpolation=None)
     read_ini(parser, CONFIG_PATH)
     dashboard = parser["Dashboard"] if parser.has_section("Dashboard") else {}
     updates = parser["Updates"] if parser.has_section("Updates") else {}
@@ -168,7 +169,7 @@ def write_runtime_status(hwnd: int, viewport: QRect, window: QWidget) -> None:
 
 
 def update_config(section: str, values: dict[str, str]) -> None:
-    parser = configparser.ConfigParser()
+    parser = configparser.ConfigParser(interpolation=None)
     read_ini(parser, CONFIG_PATH)
     if not parser.has_section(section):
         parser.add_section(section)
@@ -255,12 +256,59 @@ def load_unit_indexes_from_path(config_path: Path, count: int = 6) -> list[dict[
     return indexes
 
 
+class UnitSetupDialog(QDialog):
+    def __init__(self, values, parent=None):
+        super().__init__(parent)
+        self.path = active_unit_config(values)
+        self.setWindowTitle("Unit indexes | " + values["map"])
+        self.resize(850, 400)
+        self.setStyleSheet("QWidget {background:#100c0e;color:#f3eff0;} QComboBox,QSpinBox {background:#24131a;padding:6px;} QPushButton {background:#7e1726;padding:8px;}")
+        layout = QVBoxLayout(self)
+        layout.addWidget(QLabel("Saved setup only. Coordinates are relative to the Roblox client; no clicks are sent."))
+        self.table = QTableWidget(6, 6)
+        self.table.setHorizontalHeaderLabels(["Unit slot", "Target", "Upgrade", "Auto upgrade", "X", "Y"])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        layout.addWidget(self.table)
+        for row, entry in enumerate(load_unit_indexes(values)):
+            for col, key in enumerate(("unit", "priority", "upgrade", "auto_upgrade", "x", "y")):
+                if col < 2:
+                    widget = QComboBox()
+                    widget.addItems(["None"] + [str(i) for i in range(1, 11)] if col == 0 else ["First", "Last", "Closest", "Strongest", "Weakest", "Flying"])
+                    if entry[key] not in [widget.itemText(i) for i in range(widget.count())]:
+                        widget.addItem(entry[key])
+                    widget.setCurrentText(entry[key])
+                else:
+                    widget = QSpinBox()
+                    widget.setRange(-1 if col >= 4 else 0, 10000 if col >= 4 else 100)
+                    if col >= 4:
+                        widget.setSpecialValueText("Not set")
+                    widget.setValue(int(entry[key]) if entry[key] else -1 if col >= 4 else 0)
+                self.table.setCellWidget(row, col, widget)
+        buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.save)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def save(self):
+        parser = configparser.ConfigParser(interpolation=None)
+        read_ini(parser, self.path)
+        if not parser.has_section("UnitIndexes"):
+            parser.add_section("UnitIndexes")
+        for row in range(6):
+            for col, key in enumerate(("Unit", "Priority", "Upgrade", "AutoUpgrade", "X", "Y")):
+                widget = self.table.cellWidget(row, col)
+                value = widget.currentText() if col < 2 else "" if widget.value() < 0 else str(widget.value())
+                parser.set("UnitIndexes", f"Index{row + 1}{key}", value)
+        write_ini(parser, self.path)
+        self.accept()
+
+
 class DashboardWindow(QWidget):
     def __init__(self) -> None:
         super().__init__()
         self.values = read_dashboard_values()
         self.drag_origin: QPoint | None = None
-        self.setWindowTitle("ScatterMacro")
+        self.setWindowTitle("Anime Expeditions | Setup")
         self.setFixedSize(1200, 720)
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.Window)
         self.setAttribute(Qt.WA_TranslucentBackground)
@@ -306,7 +354,7 @@ class DashboardWindow(QWidget):
         self._label(header, "SCATTERMACRO", 132, 28, 180, 16, f"color: {WINE}; font: 700 8px 'Bahnschrift';")
         self._label(header, "ANIME EXPEDITION", 132, 46, 470, 42, f"color: {TEXT}; font: 700 28px 'Bahnschrift';")
         self._label(header, "\u25cf", 783, 30, 16, 18, "color: #47e887; font: 700 14px 'Segoe UI';")
-        self._label(header, "ACTIVE USERS  --", 803, 30, 180, 18, f"color: {TEXT}; font: 700 9px 'Bahnschrift';")
+        self._label(header, "SETUP MODE", 803, 30, 180, 18, f"color: {TEXT}; font: 700 9px 'Bahnschrift';")
         discord_card = self._card(1040, 20, 90, 84, 7)
         discord_card.setParent(header)
         discord_card.move(1040, 20)
@@ -353,13 +401,14 @@ class DashboardWindow(QWidget):
     def _deployment(self) -> None:
         deploy = self._card(18, 540, 1164, 140, 8)
         self._label(deploy, "DEPLOYMENT", 22, 20, 150, 18, f"color: {WINE}; font: 700 9px 'Bahnschrift';")
-        self._label(deploy, "Ready to run your selected route.", 22, 48, 360, 20, f"color: {TEXT}; font: 700 10px 'Bahnschrift';")
+        self._label(deploy, "Configure your route. Automation is not connected yet.", 22, 48, 530, 20, f"color: {TEXT}; font: 700 10px 'Bahnschrift';")
         self._label(deploy, "Match and Discord settings save automatically.", 22, 73, 360, 18, f"color: {MUTED}; font: 9px 'Segoe UI';")
-        self._label(deploy, "Runtime controls: ", 22, 96, 110, 18, f"color: {MUTED}; font: 9px 'Segoe UI';")
-        self._label(deploy, "Start F1   Stop F2", 132, 96, 155, 18, f"color: {WINE}; font: 700 9px 'Bahnschrift';")
-        start = self._button(deploy, "\u25b6  START MACRO", 578, 37, 214, True)
-        settings = self._button(deploy, "\u2699  SETTINGS", 812, 37, 164)
-        exit_button = self._button(deploy, "\u21aa  EXIT", 996, 37, 154)
+        units = self._button(deploy, "UNIT INDEXES", 22, 94, 180)
+        units.setFixedHeight(30)
+        units.clicked.connect(self._open_unit_setup)
+        start = self._button(deploy, "SAVE SETUP", 578, 37, 214, True)
+        settings = self._button(deploy, "SETTINGS", 812, 37, 164)
+        exit_button = self._button(deploy, "EXIT", 996, 37, 154)
         start.clicked.connect(self._start_macro)
         settings.clicked.connect(self._open_settings)
         exit_button.clicked.connect(self._exit_macro)
@@ -523,7 +572,11 @@ class DashboardWindow(QWidget):
 
     def _start_macro(self) -> None:
         self._save_dashboard()
-        send_command("Start")
+        self._set_status("Setup saved. Navigation and game automation are not connected yet.")
+
+    def _open_unit_setup(self) -> None:
+        self._save_dashboard()
+        UnitSetupDialog(read_dashboard_values(), self).exec()
 
     def _open_settings(self) -> None:
         self._save_dashboard()
@@ -604,8 +657,8 @@ class SettingsWindow(DashboardWindow):
         self._label(header, "SETTINGS", 124, 45, 350, 38, f"color: {TEXT}; font: 700 26px 'Bahnschrift';")
         self._label(header, "Personalize controls, behavior, and notifications.", 126, 80, 480, 18, f"color: {MUTED}; font: 9px 'Segoe UI';")
         self._label(header, "\u25cf", 940, 34, 16, 18, "color: #47e887; font: 700 14px 'Segoe UI';")
-        self._label(header, "LICENSE ACTIVE | PERMANENT", 960, 35, 200, 18, f"color: {TEXT}; font: 700 9px 'Bahnschrift';")
-        self._label(header, "Discord account linked to this license", 940, 61, 220, 18, f"color: {MUTED}; font: 8px 'Segoe UI';")
+        self._label(header, "SETUP MODE", 960, 35, 200, 18, f"color: {TEXT}; font: 700 9px 'Bahnschrift';")
+        self._label(header, "Settings are saved locally", 940, 61, 220, 18, f"color: {MUTED}; font: 8px 'Segoe UI';")
 
         appearance = self._card(18, 140, 680, 274, 8)
         self._section_title(appearance, "APPEARANCE", 20)
@@ -651,11 +704,11 @@ class SettingsWindow(DashboardWindow):
 
         updates = self._card(820, 430, 362, 250, 8)
         self._section_title(updates, "UPDATES", 20)
-        self._label(updates, "\u25cf  ScatterMacro is up to date.", 22, 62, 280, 20, "color: #47e887; font: 700 10px 'Bahnschrift';")
-        self._label(updates, "Automatic update checks are enabled.", 22, 92, 300, 18, f"color: {MUTED}; font: 9px 'Segoe UI';")
+        self._label(updates, "Updates are managed by the launcher.", 22, 62, 300, 20, f"color: {TEXT}; font: 700 10px 'Bahnschrift';")
+        self._label(updates, "Check Updates in ScatterMacro to install new versions.", 22, 92, 320, 18, f"color: {MUTED}; font: 9px 'Segoe UI';")
         self.automatic_check_toggle = self._toggle(updates, "Automatic update checks", 22, 126, self.values["automatic_check"] == "1")
         check_updates = self._small_button(updates, "CHECK FOR UPDATES", 22, 176, 188)
-        check_updates.clicked.connect(lambda: send_command("CheckForUpdates"))
+        check_updates.setEnabled(False)
         save = self._button(updates, "SAVE SETTINGS", 222, 162, 118, True)
         save.setFixedHeight(50)
         save.clicked.connect(self._save_settings)
@@ -900,6 +953,14 @@ class RuntimeWindow(DashboardWindow):
 
 def main() -> int:
     global CONFIG_PATH, COMMAND_PATH, STATUS_PATH, LOG_PATH
+    if "--config-dir" in sys.argv:
+        index = sys.argv.index("--config-dir")
+        if index + 1 >= len(sys.argv):
+            raise SystemExit("--config-dir requires a folder")
+        CONFIG_PATH = Path(sys.argv[index + 1]).resolve() / "dashboard_config.ini"
+        CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        if not CONFIG_PATH.exists():
+            update_config("Dashboard", {"Mode": "Expeditions", "Map": "School Grounds", "ExpeditionDifficulty": "1"})
     if "--config" in sys.argv:
         index = sys.argv.index("--config")
         if index + 1 >= len(sys.argv):
@@ -927,6 +988,8 @@ def main() -> int:
     else:
         LOG_PATH = CONFIG_PATH.with_name("python_ui_runtime.log")
     app = QApplication(sys.argv)
+    for font in ("segoeui.ttf", "segoeuib.ttf", "bahnschrift.ttf"):
+        QFontDatabase.addApplicationFont(str(Path(os.environ.get("WINDIR", "C:/Windows")) / "Fonts" / font))
     app.setFont(QFont("Segoe UI", 10))
     # Standalone Python dashboard. Mode runners are intentionally unavailable
     # until they are rebuilt; never silently fall back to a legacy executable.

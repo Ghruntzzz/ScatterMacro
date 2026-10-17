@@ -17,7 +17,13 @@ try {
     $icu = Join-Path $root 'dist\ScatterLauncher\_internal\icuuc.dll'
     if (Test-Path -LiteralPath $icu) { Remove-Item -LiteralPath $icu }
     & (Join-Path $PSScriptRoot 'TestLauncherBuild.ps1')
-    Compress-Archive -Path dist/ScatterLauncher -DestinationPath dist/ScatterLauncher-0.2.0-windows.zip -Force
+    Compress-Archive -Path dist/ScatterLauncher -DestinationPath dist/ScatterLauncher-0.3.0-windows.zip -Force
+    $archive = Join-Path $root 'dist\ScatterLauncher-0.3.0-windows.zip'
+    $hashFile = Join-Path $root 'dist\payload.sha256'
+    [IO.File]::WriteAllText($hashFile, (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant())
+    $compiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+    & $compiler /nologo /target:winexe /platform:anycpu /reference:System.Windows.Forms.dll /reference:System.IO.Compression.dll /reference:System.IO.Compression.FileSystem.dll "/win32icon:$root\assets\scattermacro.ico" "/resource:$archive,payload.zip" "/resource:$hashFile,payload.sha256" "/out:$root\dist\ScatterMacro.exe" "$root\tools\LauncherBootstrap.cs"
+    if ($LASTEXITCODE -ne 0) { throw 'Standalone launcher build failed' }
 } finally {
     Pop-Location
 }

@@ -10,7 +10,7 @@ import sys
 import tempfile
 import uuid
 
-from python_macro.library import download_release, extract_package, library_root
+from python_macro.library import VERSION, download_release, extract_package, library_root
 
 
 def prepare_update(release):
@@ -85,8 +85,27 @@ def main():
     args = parser.parse_args()
     try:
         wait_for_exit(args.pid)
-        replace_install(Path(sys.executable).parent, args.target)
-        subprocess.Popen([str(Path(args.target) / "ScatterLauncher.exe")], cwd=args.target)
+        target = Path(args.target).resolve()
+        managed = library_root().parent / "launcher"
+        if target.parent == managed.resolve() and target.name != VERSION:
+            destination = managed / VERSION
+            if destination.exists():
+                raise ValueError("The new launcher version is already installed")
+            stage = managed / (".update-" + uuid.uuid4().hex)
+            try:
+                shutil.copytree(Path(sys.executable).parent, stage)
+                stage.rename(destination)
+                pointer = managed / ("current-" + uuid.uuid4().hex + ".tmp")
+                pointer.write_text(VERSION, encoding="ascii")
+                os.replace(pointer, managed / "current.txt")
+                target = destination
+            finally:
+                if stage.exists():
+                    shutil.rmtree(stage)
+        else:
+            replace_install(Path(sys.executable).parent, target)
+        subprocess.Popen([str(target / "ScatterLauncher.exe")], cwd=target,
+                         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         return 0
     except Exception as error:
         ctypes.windll.user32.MessageBoxW(None, "Update could not finish. Your previous installation was preserved.\n\n" + str(error), "ScatterMacro update", 0x10)

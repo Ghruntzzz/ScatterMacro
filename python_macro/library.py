@@ -10,7 +10,7 @@ import tempfile
 import urllib.request
 import zipfile
 
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 UPDATE_URL = "https://raw.githubusercontent.com/Ghruntz/ScatterMacro/main/launcher-update.json"
 
 CATALOG_URL = "https://raw.githubusercontent.com/Ghruntz/ScatterMacro/main/catalog.json"

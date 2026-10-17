@@ -2,12 +2,15 @@ import os
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import unittest
+import tempfile
+import time
 from unittest.mock import patch
 from PySide6.QtWidgets import QApplication, QLabel, QLineEdit, QPushButton
 from ui.launcher import Launcher
 from ui.loading import LoadingScreen
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QMessageBox
+from python_macro.library import Library, VERSION
 
 
 class LauncherTests(unittest.TestCase):
@@ -16,17 +19,41 @@ class LauncherTests(unittest.TestCase):
         cls.app = QApplication.instance() or QApplication([])
 
     def setUp(self):
-        self.window = Launcher()
+        self.folder = tempfile.TemporaryDirectory()
+        self.window = Launcher(Library(self.folder.name))
 
     def tearDown(self):
         self.window.close()
         self.window.deleteLater()
         self.app.processEvents()
+        self.folder.cleanup()
 
-    def test_unreleased_macro_cannot_be_installed(self):
-        install = next(button for button in self.window.findChildren(QPushButton)
-                       if button.text() == "Not released yet")
-        self.assertFalse(install.isEnabled())
+    def test_setup_macro_install_is_enabled(self):
+        macro = self.window.catalog[0]
+        self.assertTrue(macro["setup_only"])
+        install = next(button for button in self.window.findChildren(QPushButton) if button.text() == "Install")
+        self.assertTrue(install.isEnabled())
+
+    def test_update_checks_never_open_windows_or_processes(self):
+        self.window.show()
+        baseline = {w for w in self.app.topLevelWidgets() if w.isVisible()}
+        catalog = {"macros": self.window.catalog}
+        release = {"version": VERSION, "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/test/a.zip", "sha256": "0" * 64}
+        with patch("ui.launcher.fetch_json", side_effect=[catalog, release]), \
+             patch("ui.launcher.subprocess.Popen") as spawn, \
+             patch.object(QMessageBox, "information") as info, \
+             patch.object(QMessageBox, "question") as question:
+            self.window.check_updates()
+            deadline = time.monotonic() + 2
+            while self.window.future is not None and time.monotonic() < deadline:
+                self.app.processEvents()
+                self.window.poll_job()
+                self.assertEqual({w for w in self.app.topLevelWidgets() if w.isVisible()}, baseline)
+                time.sleep(0.005)
+            self.assertIsNone(self.window.future)
+            spawn.assert_not_called()
+            info.assert_not_called()
+            question.assert_not_called()
 
     def test_loading_screen_closes_when_launcher_ready(self):
         splash = LoadingScreen("")

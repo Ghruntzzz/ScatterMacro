@@ -2,53 +2,64 @@
 
 A black-and-wine-red Python launcher with independent macro installation and updates.
 
-## Windows
+## Open the launcher
 
-Download the ZIP from [Releases](https://github.com/Ghruntz/ScatterMacro/releases),
-extract the whole archive, and run ScatterLauncher.exe inside ScatterLauncher.
-Keep _internal beside the executable. Python is not required.
-Users on 0.1.x need to download 0.2.0 manually once.
+Download **ScatterMacro.exe** from [Releases](https://github.com/Ghruntz/ScatterMacro/releases)
+and open it. No ZIP extraction, Python installation, or neighboring _internal
+folder is required. The EXE installs its embedded runtime under
+%LOCALAPPDATA%/ScatterMacro/launcher/<version> and reuses it. Keep the downloaded
+EXE wherever you prefer; it opens the latest installed managed runtime.
 
-Includes a visible loading screen, custom window controls, Home, Installed, and
-Updates. There is no Diagnostics page or preview dashboard.
+The launcher has a rounded animated loading screen, custom window controls,
+Home, Installed, and Updates. Update checks report inline and never spawn a
+window or a helper process. Only installing a launcher update restarts it.
 
-Anime Expeditions is not released yet. Its automation is still being rebuilt;
-the launcher does not install an unfinished dashboard as a working macro.
+## Anime Expeditions setup
+
+Select Install on Anime Expeditions, then Open. The installed setup app provides:
+- Mode, map, act, and difficulty configuration.
+- Private-server and Discord settings, saved locally.
+- Per-route unit indexes: unit slot, target mode, upgrade counts, and coordinates.
+- Saved keybind preferences and other settings.
+
+Current flow: Install -> Open -> choose route -> configure unit indexes and
+settings -> Save Setup. Nothing is sent to Roblox. Navigation, detection, camera
+setup, placing/upgrading units, card selection, rewards, repeat stage, global
+hotkeys, and webhook delivery are not connected yet. Settings for those features
+are preparation, not a claim that automation is running.
 
 ## Installation and updates
 
-The launcher checks this repository's catalog and launcher update feed at startup.
-Updates has separate manual checks for macros and the launcher. Opening an
-installed macro checks its latest version first and offers an update. If offline,
-users can explicitly choose to open the installed version.
+Catalog and launcher update checks run at startup. Updates has separate manual
+checks for macros and the launcher. Opening an installed macro checks for a newer
+version and offers installation first. Offline opening requires confirmation.
 
-Released macros install into %LOCALAPPDATA%/ScatterMacro/macros/<macro-id>.
-Each has a persistent config folder and separate versioned program folders.
-Macro configs and Open configs open these folders. Updates preserve settings.
-Macros launch with --config-dir followed by their absolute configuration path.
+Macros install into %LOCALAPPDATA%/ScatterMacro/macros/<macro-id>. Each has a
+persistent config folder and separate versioned program folders. Macro configs
+and Open configs open those folders. Updates preserve settings. Macro programs
+receive --config-dir followed by their absolute configuration path.
 
-Launcher updates download a checksum-verified package, close the old launcher,
-replace it with an isolated helper, retain a backup, and reopen it. Copy failures
-restore the previous installation. Running macro processes are not terminated.
-New catalog entries can appear without updating the launcher.
+Launcher updates verify SHA-256 before extraction. Managed installs stage the
+new runtime alongside the old one and atomically change current.txt. The
+standalone EXE follows that pointer on subsequent opens. Existing legacy folder
+installations use a backup-and-replace updater. Running macros are not killed.
 
-## Publishing packages
+The ZIP assets are internal updater packages; regular users download the EXE.
 
-catalog.json contains macro IDs, names, descriptions, and nullable versions.
-Released entries also require url, sha256, and a root-level .exe entrypoint.
-Macro ZIPs contain the executable at the archive root. Include all required OCR,
-OpenCV and runtime dependencies in the macro package, not the launcher.
+## Publishing and development
 
-launcher-update.json contains version, url, and sha256. Publish the verified
-release asset before updating this feed. Launcher ZIPs contain a ScatterLauncher
-folder. Never overwrite existing release archives with different contents.
+catalog.json requires id, name, version, url, sha256 and a root-level .exe
+entrypoint for released macro packages. setup_only marks configuration-only
+packages. Macros provide their own dependencies, independent of the launcher.
 
-## Development
+Build the macro first with tools/BuildAnimeExpeditions.ps1, then update its
+checksum in catalog.json and build the launcher with tools/BuildLauncher.ps1.
+Publish both verified assets before exposing catalog/update feeds.
+launcher-update.json identifies the runtime ZIP and its checksum.
 
-Use Python 3.12 and install ui/requirements-python.txt, then run python main.py.
-Run python -m unittest discover -s tests. Build with tools/BuildLauncher.ps1.
-The recovered dashboard source is retained for future macro development but is
-not reachable from or bundled into this launcher.
+Use Python 3.12, install ui/requirements-python.txt, then run python main.py.
+Run python -m unittest discover -s tests. Run the setup source with
+python anime_main.py --config-dir <your-config-folder>.
 
-Never commit webhook URLs, private server links, or user configurations. Previous
-macro installations are not migrated or removed by this launcher.
+Never commit webhook URLs, private server links, or personal configurations.
+Previous AHK installations are not migrated or removed.

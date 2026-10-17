@@ -87,6 +87,7 @@ class Launcher(QMainWindow):
         nav.addWidget(brand)
         nav.addStretch()
         self.nav = {}
+        self.check_buttons = []
         for name in ("Home", "Installed", "Updates"):
             button = QPushButton(name)
             button.setCheckable(True)
@@ -133,6 +134,7 @@ class Launcher(QMainWindow):
 
     def show_page(self, page):
         self.page = page
+        self.check_buttons = []
         updates = sum(self.has_update(m) for m in self.catalog)
         launcher_update = bool(self.release and version_tuple(self.release["version"]) > version_tuple(VERSION))
         for name, button in self.nav.items():
@@ -150,6 +152,7 @@ class Launcher(QMainWindow):
             for text, scope in (("Check launcher updates", "launcher"), ("Check macro updates", "macros")):
                 button = QPushButton(text)
                 button.clicked.connect(lambda _, s=scope: self.check_updates(s))
+                self.check_buttons.append(button)
                 row.addWidget(button)
             column.addLayout(row)
             column.addWidget(label("Launcher " + VERSION, "eyebrow"))
@@ -165,6 +168,7 @@ class Launcher(QMainWindow):
             row.addWidget(label("Install the macros you want. Each has its own saved configuration.", "muted"), 1)
             check = QPushButton("Check for updates")
             check.clicked.connect(lambda: self.check_updates("all"))
+            self.check_buttons.append(check)
             row.addWidget(check)
             column.addLayout(row)
         search = QLineEdit()
@@ -190,6 +194,8 @@ class Launcher(QMainWindow):
             copy = QVBoxLayout()
             copy.addWidget(label(macro["name"], "title"))
             copy.addWidget(label(macro.get("description", ""), "muted"))
+            if macro.get("setup_only"):
+                copy.addWidget(label("Setup available / automation not connected", "eyebrow"))
             copy.addWidget(label("Installed: " + state["version"] if state else "Not installed", "eyebrow"))
             if self.has_update(macro):
                 copy.addWidget(label("Update available: " + macro["version"], "eyebrow"))
@@ -227,6 +233,8 @@ class Launcher(QMainWindow):
             self.status.setText("Please wait for the current operation to finish.")
             return
         self.status.setText(message)
+        for button in self.check_buttons:
+            button.setEnabled(False)
         self.on_done, self.on_failed = done, failed
         self.future = self.executor.submit(work)
         self.timer.start()
@@ -237,6 +245,8 @@ class Launcher(QMainWindow):
         future, done, failed = self.future, self.on_done, self.on_failed
         self.future = None
         self.timer.stop()
+        for button in self.check_buttons:
+            button.setEnabled(True)
         try:
             done(future.result())
         except Exception as error:
@@ -308,7 +318,7 @@ class Launcher(QMainWindow):
         executable = self.library.executable(macro["id"])
         self.processes[macro["id"]] = subprocess.Popen(
             [str(executable), "--config-dir", str(self.library.config_dir(macro["id"]))],
-            cwd=executable.parent)
+            cwd=executable.parent, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         self.status.setText(macro["name"] + " opened.")
 
     def update_launcher(self):
@@ -323,7 +333,8 @@ class Launcher(QMainWindow):
             with tempfile.TemporaryFile(dir=target.parent):
                 pass
             subprocess.Popen([str(package / "ScatterLauncher.exe"), "--apply-update",
-                              "--target", str(target), "--pid", str(os.getpid())], cwd=package)
+                              "--target", str(target), "--pid", str(os.getpid())], cwd=package,
+                             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
             self.close()
         self.start_job("Downloading launcher update. The launcher will restart...", lambda: prepare_update(self.release), ready)
 

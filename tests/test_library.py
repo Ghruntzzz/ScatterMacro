@@ -8,6 +8,7 @@ import zipfile
 
 from python_macro.library import Library, extract_package
 from python_macro.updater import replace_install
+from python_macro import updater
 
 
 class PackageTests(unittest.TestCase):
@@ -71,3 +72,24 @@ class PackageTests(unittest.TestCase):
                 replace_install(new, old)
         self.assertEqual((old / "ScatterLauncher.exe").read_text(), "old")
         self.assertEqual((old / "settings.ini").read_text(), "keep")
+
+    def test_managed_update_switches_pointer_and_keeps_old_version(self):
+        managed = self.root / "launcher"
+        old = managed / "0.2.0"
+        old.mkdir(parents=True)
+        (old / "ScatterLauncher.exe").write_text("old")
+        (managed / "current.txt").write_text("0.2.0")
+        package = self.root / "package"
+        package.mkdir()
+        executable = package / "ScatterLauncher.exe"
+        executable.write_text("new")
+        with patch.object(updater, "library_root", return_value=self.root / "macros"), \
+             patch.object(updater.sys, "argv", ["app", "--apply-update", "--target", str(old), "--pid", "123"]), \
+             patch.object(updater.sys, "executable", str(executable)), \
+             patch.object(updater, "wait_for_exit"), \
+             patch.object(updater.subprocess, "Popen") as launch:
+            self.assertEqual(updater.main(), 0)
+        self.assertEqual((managed / "current.txt").read_text(), updater.VERSION)
+        self.assertEqual((old / "ScatterLauncher.exe").read_text(), "old")
+        self.assertEqual((managed / updater.VERSION / "ScatterLauncher.exe").read_text(), "new")
+        self.assertEqual(Path(launch.call_args.args[0][0]).parent, managed / updater.VERSION)
