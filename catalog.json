@@ -8,12 +8,12 @@
     {
       "id": "anime-expeditions",
       "name": "Anime Expeditions",
-      "version": "0.1.18",
+      "version": "0.1.19",
       "setup_only": false,
       "entrypoint": "AnimeExpeditions.exe",
-      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.18/AnimeExpeditions-0.1.18-windows.zip",
-      "sha256": "ce0272316a2385e9266e86b18aac2a467a0b19f1516a14ff420c9ce23f5e7531",
-      "description": "Story navigation using the confirmed SendInput click method, faster quiet map scrolling, saved Act 1-5/Mastery/Infinite selection, optional Hard difficulty, Select Stage and Start. Unit Manager supports 104 indexes with positions and Place at wave. Unit placement/upgrades are not yet automated."
+      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.19/AnimeExpeditions-0.1.19-windows.zip",
+      "sha256": "290207514135410635a9e86cfa4db2cda32faca62fd6b6e13701ea04cad8f8ec",
+      "description": "Compact runtime with Session Stats above Action Output, taller Roblox viewport, faster Story navigation and image-based act label recognition (1-5, infinity, M) without stars. Uses confirmed SendInput hover/wiggle clicking. Unit placement/upgrades not yet automated."
     }
   ]
 }
