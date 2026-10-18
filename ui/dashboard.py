@@ -1104,7 +1104,8 @@ class RuntimeWindow(DashboardWindow):
             return
         from ui.story_navigation import StoryWorker
         self._align_roblox()
-        self.worker = StoryWorker(self.values["map"], self, act_name=self.values["act"])
+        self.worker = StoryWorker(self.values["map"], self, act_name=self.values["act"],
+                                  difficulty=self.values["difficulty"])
         self.worker.message.connect(self.log.appendPlainText)
         self.worker.finished.connect(self._story_finished)
         self.runtime_status.setText("RUNNING")

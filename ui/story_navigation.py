@@ -15,10 +15,11 @@ from python_macro.vision import PlayIconLocator
 class StoryWorker(QThread):
     message = Signal(str)
 
-    def __init__(self, map_name, parent, act_name="Act 1"):
+    def __init__(self, map_name, parent, act_name="Act 1", difficulty="Normal"):
         super().__init__(parent)
         self.map_name = map_name
         self.act_name = act_name
+        self.difficulty = difficulty
         self.stop = Event()
 
     def run(self):
@@ -36,7 +37,8 @@ class StoryWorker(QThread):
             play_icon = PlayIconLocator(root / "assets" / "play-button-template.png")
             navigate_story(self.map_name, client.capture, TextReader(), client.direct_click,
                            self.stop, self.message.emit, scroll=client.scroll,
-                           find_play=play_icon, act_name=self.act_name)
+                           find_play=play_icon, act_name=self.act_name,
+                           difficulty=self.difficulty)
         except Exception as exc:
             self.message.emit(f"Navigation stopped: {exc}")
         finally:
