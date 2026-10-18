@@ -49,33 +49,31 @@ class PlayIconLocator:
     """Locate the bundled teal Play icon, never relying on its small OCR text."""
 
     def __init__(self, path, min_score=0.86):
-        self.template = cv2.imread(str(path), cv2.IMREAD_COLOR)
-        if self.template is None:
-            raise RuntimeError("The Play icon reference image is missing.")
+        from python_macro.play_reference import play_template
+        self.template = play_template()
         self.min_score = min_score
 
     def __call__(self, frame):
         if frame.ndim != 3 or frame.shape[2] not in (3, 4):
             raise ValueError("Expected BGR or BGRA Roblox screenshot")
-        image = np.ascontiguousarray(frame[:, :, :3])
+        image = cv2.cvtColor(frame, cv2.COLOR_BGRA2GRAY if frame.shape[2] == 4 else cv2.COLOR_BGR2GRAY)
         height, width = image.shape[:2]
         best = None
-        for scale in (0.70, 0.775, 0.85, 0.925, 1.0, 1.075, 1.15,
-                      1.225, 1.30, 1.375, 1.45, 1.525, 1.60):
-            tw, th = (round(self.template.shape[1] * scale),
-                      round(self.template.shape[0] * scale))
+        for scale in (0.65, 0.70, 0.775, 0.85, 0.925, 1.0, 1.075, 1.15,
+                      1.225, 1.30, 1.375, 1.45, 1.525, 1.60, 1.75, 1.90):
+            tw, th = round(self.template.shape[1] * scale), round(self.template.shape[0] * scale)
             if tw >= width or th >= height:
                 continue
-            method = cv2.INTER_AREA if scale < 1 else cv2.INTER_LINEAR
-            template = cv2.resize(self.template, (tw, th), interpolation=method)
-            scores = cv2.matchTemplate(image, template, cv2.TM_CCOEFF_NORMED)
-            _, score, _, origin = cv2.minMaxLoc(scores)
+            interpolation = cv2.INTER_AREA if scale < 1 else cv2.INTER_LINEAR
+            template = cv2.resize(self.template, (tw, th), interpolation=interpolation)
+            _, score, _, origin = cv2.minMaxLoc(cv2.matchTemplate(image, template, cv2.TM_CCOEFF_NORMED))
             if best is None or score > best[0]:
-                best = (float(score), origin, tw, th)
+                best = (score, origin, tw, th)
         if best is None or best[0] < self.min_score:
             return None
-        confidence, (left, top), tw, th = best
-        return left + tw // 2, top + round(th * 0.43), confidence
+        score, (left, top), tw, th = best
+        # The caption is at the bottom of the reference. Click the icon face.
+        return left + tw // 2, top + round(th * 0.43), float(score)
 
 class StartButtonLocator:
     """Recognize the supplied green Start button and click inside its center."""

@@ -30,7 +30,8 @@ class PythonVisionTests(unittest.TestCase):
     def test_visual_template_targets_icon_above_its_caption(self):
         path = Path(__file__).resolve().parents[1] / "assets" / "play-button-template.png"
         locator = PlayIconLocator(path)
-        template = cv2.imread(str(path))
+        from python_macro.play_reference import play_template
+        template = cv2.cvtColor(play_template(), cv2.COLOR_GRAY2BGR)
         for factor in (1.0, 1.3, 0.85):
             scaled = cv2.resize(template, None, fx=factor, fy=factor)
             h, w = scaled.shape[:2]
