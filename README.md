@@ -120,3 +120,15 @@ detected target center, mouse down, then up) without hovering or jittering.
 The first attempt uses checked SendInput, and an unconfirmed Play click can
 retry in AHK-style Event mode. If Windows refuses foreground focus, the macro
 reports an error rather than sending input to a different application.
+
+## Play click-method tester
+
+On the runtime dashboard, press **TEST PLAY CLICK METHODS** in Action Output
+while Roblox is on the lobby screen. The worker searches for the supplied Play
+icon and attempts, in order, direct SendInput, AHK-style mouse_event, virtual
+desktop absolute-position SendInput, and window-message mouse click. After
+each attempt it checks the screen for the Story menu, logs success or failure,
+and **stops testing immediately after a verified success**. F2 stops the test.
+The regular Story run uses this same check before proceeding to Story/map
+navigation. The widget logs which click method worked; window messages can
+be ignored by Roblox, and acceptance by Windows alone is not proof of success.

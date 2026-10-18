@@ -15,7 +15,7 @@ def normalize(text):
 
 def navigate_story(map_name, capture, reader, click, stop, log, timeout=30,
                    scroll=None, max_map_scrolls=MAX_MAP_SCROLLS, find_play=None,
-                   alternate_click=None):
+                   alternate_click=None, skip_play=False):
     """Find Play -> Story -> chosen map, scrolling only when the map is absent.
 
     No unit placement follows this navigation yet. All clicking is delegated to
@@ -23,8 +23,8 @@ def navigate_story(map_name, capture, reader, click, stop, log, timeout=30,
     """
     if not normalize(map_name):
         raise ValueError("Choose a Story map first")
-    stages = ("Play", "Story", map_name)
-    if find_play is not None:
+    stages = ("Story", map_name) if skip_play else ("Play", "Story", map_name)
+    if find_play is not None and not skip_play:
         stages = ("Story", map_name)
         deadline = time.monotonic() + timeout
         attempts = 0

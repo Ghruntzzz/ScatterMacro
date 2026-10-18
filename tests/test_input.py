@@ -5,7 +5,9 @@ from ctypes import wintypes
 from python_macro.input import (
     RobloxClient, HOVER_SECONDS, JITTER_SECONDS, JITTER_OFFSETS,
     POST_JITTER_SECONDS, CLICK_HOLD_SECONDS,
-    MOUSE_MOVE, MOUSE_LEFT_DOWN, MOUSE_LEFT_UP, MOUSE_WHEEL, WHEEL_DELTA,
+    MOUSE_MOVE, MOUSE_ABSOLUTE, MOUSE_VIRTUAL_DESKTOP,
+    WM_MOUSEMOVE, WM_LBUTTONDOWN, WM_LBUTTONUP,
+    MOUSE_LEFT_DOWN, MOUSE_LEFT_UP, MOUSE_WHEEL, WHEEL_DELTA,
     INPUT, MOUSEINPUT, MAX_FOCUS_ATTEMPTS,
 )
 
@@ -222,3 +224,36 @@ class ClickTests(unittest.TestCase):
         client.stop.is_set.return_value = True
         client.scroll(-2, 50, 67, (80, 100, 4))
         client.user.SendInput.assert_not_called()
+
+    def test_absolute_click_normalizes_coordinates_and_releases(self):
+        client = self.client()
+        # Virtual desktop starting at (-100, -50) with two monitors.
+        client.user.GetSystemMetrics.side_effect = lambda index: {
+            76: -100, 77: -50, 78: 1600, 79: 1000,
+        }[index]
+        seen = []
+        client.user.SendInput.side_effect = lambda n, p, s: (
+            seen.append((p._obj.data.mi.dwFlags, p._obj.data.mi.dx,
+                         p._obj.data.mi.dy)) or 1
+        )
+        self.assertTrue(client.direct_click_absolute(20, 30, (80, 100, 4)))
+        self.assertEqual(seen[0][0], MOUSE_MOVE | MOUSE_ABSOLUTE | MOUSE_VIRTUAL_DESKTOP)
+        self.assertEqual(seen[0][1], round(120 * 65535 / 1599))
+        self.assertEqual(seen[0][2], round(80 * 65535 / 999))
+        self.assertEqual([s[0] for s in seen[1:]], [MOUSE_LEFT_DOWN, MOUSE_LEFT_UP])
+
+    def test_message_click_uses_client_coords_and_releases(self):
+        client = self.client()
+        client.user.PostMessageW.return_value = True
+        self.assertTrue(client.direct_click_message(40, 50, (80, 100, 4)))
+        sent = [c.args for c in client.user.PostMessageW.call_args_list]
+        self.assertEqual([item[1] for item in sent],
+                         [WM_MOUSEMOVE, WM_LBUTTONDOWN, WM_LBUTTONUP])
+        self.assertEqual([item[3] for item in sent], [((50 << 16) | 40)] * 3)
+        client.user.SendInput.assert_not_called()
+
+    def test_message_fail_down_does_not_falsely_succeed(self):
+        client = self.client()
+        client.user.PostMessageW.side_effect = [True, False]
+        with self.assertRaisesRegex(RuntimeError, "button-down window message"):
+            client.direct_click_message(40, 50, (80, 100, 4))

@@ -18,6 +18,14 @@ def label(text):
 
 
 class StoryTests(unittest.TestCase):
+    def test_skip_play_starts_at_story_when_play_menu_already_verified(self):
+        reader = Mock()
+        reader.read.side_effect = [[label("Story")], [label("School Grounds")]]
+        click = Mock()
+        navigate_story("School Grounds", lambda: np.zeros((50, 80, 4)),
+                       reader, click, FastStop(), Mock(), skip_play=True)
+        self.assertEqual(click.call_count, 2)
+
     def test_click_order_without_scrolling_when_map_visible(self):
         reader = Mock()
         reader.read.side_effect = [[label(t)] for t in ("PLAY", "Story", "School Grounds")]
