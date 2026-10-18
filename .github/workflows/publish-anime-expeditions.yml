@@ -49,6 +49,13 @@ jobs:
       - name: Build Windows macro and validate installer
         shell: pwsh
         run: ./tools/BuildAnimeExpeditions.ps1
+      - name: Upload tested Windows build
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnimeExpeditions-0.1.29-windows
+          path: dist/AnimeExpeditions-0.1.29-windows.zip
+          if-no-files-found: error
+          retention-days: 7
       - name: Publish and verify macro archive
         shell: pwsh
         env:
