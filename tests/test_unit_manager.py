@@ -2,8 +2,9 @@ import os
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 import unittest
 from unittest.mock import Mock
-from PySide6.QtWidgets import QApplication
-from ui.unit_manager import UnitManager
+from PySide6.QtWidgets import QApplication, QAbstractSpinBox, QComboBox, QSpinBox
+from ui.unit_manager import UnitManager, PositionImage, configured_positions
+import numpy as np
 
 
 class UnitManagerTests(unittest.TestCase):
@@ -28,9 +29,9 @@ class UnitManagerTests(unittest.TestCase):
 
     def test_busy_prevents_save(self):
         self.busy.return_value = True
-        self.widget.fields['upgrade'].setValue(5)
+        self.widget.fields['upgrade'].setCurrentText('5')
         self.save.assert_not_called()
-        self.assertEqual(self.widget.fields['upgrade'].value(), 0)
+        self.assertEqual(self.widget.fields['upgrade'].currentText(), '0')
 
     def test_last_page_and_clear(self):
         self.widget.select(103)
@@ -41,12 +42,12 @@ class UnitManagerTests(unittest.TestCase):
         self.widget.clear_index()
         self.assertEqual(self.entries[103]['x'], '')
 
-    def test_jump_and_copy_paste_between_pages(self):
+    def test_copy_paste_between_pages(self):
         self.widget.select(4)
         self.widget.fields["unit"].setCurrentText("4")
-        self.widget.fields["upgrade"].setValue(6)
+        self.widget.fields["upgrade"].setCurrentText("6")
         self.widget.copy_index()
-        self.widget.index_picker.setValue(104)
+        self.widget.select(103)
         self.assertEqual(self.widget.selected, 103)
         self.assertEqual(self.widget.page_indicator.text(), "PAGE 18 / 18")
         self.widget.paste_index()
@@ -56,7 +57,7 @@ class UnitManagerTests(unittest.TestCase):
 
     def test_clear_position_keeps_upgrade_and_busy_prevents_paste(self):
         self.widget.fields["unit"].setCurrentText("2")
-        self.widget.fields["upgrade"].setValue(5)
+        self.widget.fields["upgrade"].setCurrentText("5")
         self.widget.fields["x"].setValue(0)
         self.widget.fields["y"].setValue(50)
         self.widget.clear_position()
@@ -75,7 +76,7 @@ class UnitManagerTests(unittest.TestCase):
         self.assertIn("POS  0, 90", self.widget.cards[0].text())
         self.widget.cards[5].click()
         self.assertEqual(self.widget.selected, 5)
-        self.assertEqual(self.widget.index_picker.value(), 6)
+        self.assertEqual(self.widget.heading.text(), 'Index 006')
 
     def test_modern_panel_keeps_index_selection(self):
         self.assertEqual(self.widget.editor_card.objectName(), "editor-card")
@@ -87,6 +88,39 @@ class UnitManagerTests(unittest.TestCase):
 
     def test_save_failure_restores_values(self):
         self.save.side_effect = OSError('locked')
-        self.widget.fields['upgrade'].setValue(4)
+        self.widget.fields['upgrade'].setCurrentText('4')
         self.assertEqual(self.entries[0]['upgrade'], '0')
-        self.assertEqual(self.widget.fields['upgrade'].value(), 0)
+        self.assertEqual(self.widget.fields['upgrade'].currentText(), '0')
+
+    def test_position_fields_no_arrows_and_jump_removed(self):
+        self.assertFalse(hasattr(self.widget, "index_picker"))
+        for key in ("x", "y"):
+            self.assertIsInstance(self.widget.fields[key], QSpinBox)
+            self.assertEqual(self.widget.fields[key].buttonSymbols(), QAbstractSpinBox.NoButtons)
+
+    def test_upgrade_dropdowns_save_values(self):
+        for key in ("upgrade", "auto_upgrade"):
+            self.assertIsInstance(self.widget.fields[key], QComboBox)
+        self.assertEqual(self.widget.fields["upgrade"].itemText(15), "15")
+        self.assertEqual(self.widget.fields["auto_upgrade"].itemText(6), "6")
+        self.widget.fields["auto_upgrade"].setCurrentText("4")
+        self.assertEqual(self.entries[0]["auto_upgrade"], "4")
+
+    def test_existing_high_upgrade_levels_are_preserved(self):
+        self.entries[9]["upgrade"] = "22"
+        self.entries[9]["auto_upgrade"] = "9"
+        self.widget.select(9)
+        self.assertEqual(self.widget.fields["upgrade"].currentText(), "22")
+        self.assertEqual(self.widget.fields["auto_upgrade"].currentText(), "9")
+        self.save.assert_not_called()
+
+    def test_saved_position_markers_include_zero_and_skip_invalid(self):
+        entries = [dict(x="", y=""), dict(x="0", y="90"), dict(x="30", y="45"),
+                   dict(x="5000", y="10"), dict(x="abc", y="40")]
+        expected = [(2, 0, 90), (3, 30, 45)]
+        self.assertEqual(configured_positions(entries, 100, 100), expected)
+        image = PositionImage(np.zeros((100, 100, 4), dtype=np.uint8),
+                              entries, selected=1, read_only=True)
+        self.assertEqual(image.markers, expected)
+        self.assertTrue(image.read_only)
+        self.assertFalse(image.pixmap().isNull())
