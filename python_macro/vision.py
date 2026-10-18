@@ -76,3 +76,32 @@ class PlayIconLocator:
             return None
         confidence, (left, top), tw, th = best
         return left + tw // 2, top + round(th * 0.43), confidence
+
+class StartButtonLocator:
+    """Recognize the supplied green Start button and click inside its center."""
+
+    def __init__(self, path, min_score=0.84):
+        self.template = cv2.imread(str(path), cv2.IMREAD_COLOR)
+        if self.template is None:
+            raise RuntimeError("Start button reference image is missing.")
+        self.min_score = min_score
+
+    def __call__(self, frame):
+        if frame.ndim != 3 or frame.shape[2] not in (3, 4):
+            raise ValueError("Expected color screenshot.")
+        image = np.ascontiguousarray(frame[:, :, :3])
+        best = None
+        for scale in (0.70, 0.80, 0.90, 1.0, 1.10, 1.20, 1.30, 1.45, 1.60):
+            tw = round(self.template.shape[1] * scale)
+            th = round(self.template.shape[0] * scale)
+            if tw >= image.shape[1] or th >= image.shape[0]:
+                continue
+            method = cv2.INTER_AREA if scale < 1 else cv2.INTER_LINEAR
+            tile = cv2.resize(self.template, (tw, th), interpolation=method)
+            _, score, _, origin = cv2.minMaxLoc(cv2.matchTemplate(image, tile, cv2.TM_CCOEFF_NORMED))
+            if best is None or score > best[0]:
+                best = (score, origin, tw, th)
+        if best is None or best[0] < self.min_score:
+            return None
+        score, (x, y), tw, th = best
+        return x + tw // 2, y + th // 2, score

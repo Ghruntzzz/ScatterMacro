@@ -862,8 +862,8 @@ class RuntimeWindow(DashboardWindow):
         self._section_title(stats_panel, "SESSION STATS", 20)
         self._label(stats_panel, "Current macro session", 22, 58, 226, 18,
                     f"color: {MUTED}; font: 9px 'Segoe UI';")
-        stats = [("TOTAL", "--:--:--"), ("RUNS", "0"),
-                 ("AVG RUN", "--:--:--"), ("CURRENT RUN", "WAITING")]
+        stats = [("RUNS", "0"), ("AVG RUN", "--:--:--"),
+                 ("CURRENT RUN", "WAITING")]
         self.stat_values: dict[str, QLabel] = {}
         for index, (label, value) in enumerate(stats):
             x = 22 + (index % 2) * 116

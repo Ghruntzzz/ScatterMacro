@@ -9,7 +9,7 @@ from python_macro.capture import roblox_windows
 from python_macro.input import RobloxClient
 from python_macro.ocr import TextReader
 from python_macro.story import navigate_story
-from python_macro.vision import PlayIconLocator
+from python_macro.vision import PlayIconLocator, StartButtonLocator
 from python_macro.act_labels import ActLabelLocator
 
 
@@ -39,7 +39,8 @@ class StoryWorker(QThread):
             navigate_story(self.map_name, client.capture, TextReader(), client.direct_click,
                            self.stop, self.message.emit, scroll=client.scroll,
                            find_play=play_icon, act_name=self.act_name,
-                           difficulty=self.difficulty, find_act=ActLabelLocator())
+                           difficulty=self.difficulty, find_act=ActLabelLocator(),
+                           find_start=StartButtonLocator(root / "assets" / "start-button-template.png"))
         except Exception as exc:
             self.message.emit(f"Navigation stopped: {exc}")
         finally:

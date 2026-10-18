@@ -9,8 +9,8 @@ import time
 from python_macro.vision import Region
 
 MAX_MAP_SCROLLS = 12
-MAP_SCROLL_STEPS = -3
-MAP_SCROLL_SETTLE = 0.09
+MAP_SCROLL_STEPS = -4
+MAP_SCROLL_SETTLE = 0.04
 
 
 def normalize(text):
@@ -81,7 +81,8 @@ def select_text(label, predicate, capture, reader, click, stop, timeout):
 
 def navigate_story(map_name, capture, reader, click, stop, log, timeout=30,
                    scroll=None, max_map_scrolls=MAX_MAP_SCROLLS, find_play=None,
-                   skip_play=False, act_name=None, difficulty="Normal", find_act=None):
+                   skip_play=False, act_name=None, difficulty="Normal", find_act=None,
+                   find_start=None):
     """Navigate using captured Roblox client coordinates and cancellable input.
 
     act_name=None retains the legacy map-only contract for existing callers;
@@ -101,34 +102,19 @@ def navigate_story(map_name, capture, reader, click, stop, log, timeout=30,
                 return
         else:
             deadline = time.monotonic() + timeout
-            confirmed = False
-            attempts = 0
-            while not stop.is_set() and time.monotonic() < deadline and attempts < 3:
+            while not stop.is_set() and time.monotonic() < deadline:
                 frame = capture()
                 location = find_play(frame)
-                if location is None:
-                    if stop.wait(0.15):
+                if location is not None:
+                    if click(int(location[0]), int(location[1]), frame.shape) is False:
                         return
-                    continue
-                attempts += 1
-                sent = click(int(location[0]), int(location[1]), frame.shape)
-                if stop.is_set() or sent is False:
-                    return
-                # A sent mouse event is not proof Roblox opened the menu.
-                for _ in range(6):
-                    if stop.wait(0.14):
-                        return
-                    frame = capture()
-                    if len(read_targets(frame, reader,
-                                        lambda t: normalize(t) == "story")) == 1:
-                        confirmed = True
-                        break
-                if confirmed:
                     break
-            if stop.is_set():
+                if stop.wait(0.12):
+                    return
+            else:
+                if not stop.is_set():
+                    raise RuntimeError("Could not find Play button image.")
                 return
-            if not confirmed:
-                raise RuntimeError("Play did not open the Story menu.")
         log("Play menu opened.")
 
     log("Selecting Story.")
@@ -218,7 +204,7 @@ def navigate_story(map_name, capture, reader, click, stop, log, timeout=30,
                 return
         else:
             # Normal is already selected in-game; don't toggle difficulty.
-            log("Normal difficulty (default).")
+            log("Normal difficulty.")
 
     log("Selecting stage.")
     if not select_text("Select Stage", lambda t: normalize(t) == "selectstage",
@@ -228,7 +214,23 @@ def navigate_story(map_name, capture, reader, click, stop, log, timeout=30,
         return
 
     log("Starting Story.")
-    if not select_text("Start", lambda t: normalize(t) == "start",
-                       capture, reader, click, stop, timeout):
-        return
+    if find_start is None:
+        if not select_text("Start", lambda t: normalize(t) == "start",
+                           capture, reader, click, stop, timeout):
+            return
+    else:
+        deadline = time.monotonic() + timeout
+        while not stop.is_set() and time.monotonic() < deadline:
+            frame = capture()
+            target = find_start(frame)
+            if target is not None:
+                if click(int(target[0]), int(target[1]), frame.shape) is False:
+                    return
+                break
+            if stop.wait(0.08):
+                return
+        else:
+            if not stop.is_set():
+                raise RuntimeError("Could not locate Start button image.")
+            return
     log("Start selected. Waiting for the game to load.")

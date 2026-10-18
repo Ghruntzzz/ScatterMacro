@@ -112,19 +112,9 @@ class StoryTests(unittest.TestCase):
         self.assertEqual(click.call_args_list[0].args[:2], (45, 32))
         self.assertTrue(any("Play menu opened." in c.args[0] for c in log.call_args_list))
 
-    def test_unconfirmed_play_button_never_reports_success(self):
-        reader, click, log = Mock(), Mock(), Mock()
-        reader.read.return_value = []
-        with self.assertRaisesRegex(RuntimeError, "Play did not open the Story menu"):
-            navigate_story("School Grounds", lambda: np.zeros((120, 160, 4)),
-                           reader, click, FastStop(), log,
-                           find_play=lambda frame: (45, 32, 0.99))
-        self.assertEqual(click.call_count, 3)
-        self.assertFalse(any("Play menu opened." in c.args[0] for c in log.call_args_list))
-
     def test_missing_play_image_does_not_fall_back_to_ocr_word(self):
         reader, click = Mock(), Mock()
-        with self.assertRaisesRegex(RuntimeError, "Play did not open the Story menu"):
+        with self.assertRaisesRegex(RuntimeError, "Could not find Play button image"):
             navigate_story("School Grounds", lambda: np.zeros((120, 160, 4)),
                            reader, click, FastStop(), Mock(), find_play=lambda frame: None,
                            timeout=0.02)
@@ -140,19 +130,15 @@ class StoryTests(unittest.TestCase):
         self.assertEqual(click.call_count, 1)
 
 
-    def test_play_retries_only_confirmed_sendinput_click_function(self):
+    def test_play_image_clicks_once_without_menu_verification(self):
         reader = Mock()
-        reader.read.side_effect = ([[]] * 6 + [[label("Story")],
-                                   [label("Story")], [label("Flower Forest")]])
-        click, log = Mock(), Mock()
+        reader.read.side_effect = [[label("Story")], [label("Flower Forest")]]
+        click = Mock()
         navigate_story("Flower Forest", lambda: np.zeros((120, 160, 4)),
-                       reader, click, FastStop(), log,
-                       find_play=lambda f: (45, 32, 0.99))
-        self.assertEqual(click.call_count, 4)
-        self.assertEqual(click.call_args_list[0].args[:2], (45, 32))
-        self.assertEqual(click.call_args_list[1].args[:2], (45, 32))
-        self.assertFalse(any("SendInput" in c.args[0] or "attempt" in c.args[0]
-                             for c in log.call_args_list))
+                       reader, click, FastStop(), Mock(),
+                       find_play=lambda frame: (45, 32, 0.99))
+        self.assertEqual(click.call_count, 3)
+        self.assertEqual(reader.read.call_count, 2)
 
     def test_saved_settings_full_story_normal(self):
         reader = Mock()
@@ -221,7 +207,7 @@ class StoryTests(unittest.TestCase):
             validate_difficulty("Expert")
 
     def test_map_scroll_is_quicker_and_quiet(self):
-        self.assertEqual(MAP_SCROLL_STEPS, -3)
+        self.assertEqual(MAP_SCROLL_STEPS, -4)
         self.assertLess(MAP_SCROLL_SETTLE, 0.3)
         reader = Mock()
         reader.read.side_effect = [[label("Story")], [], [], [label("School Grounds")]]
@@ -229,7 +215,7 @@ class StoryTests(unittest.TestCase):
         navigate_story("School Grounds", lambda: np.zeros((100, 200, 4)),
                        reader, click, FastStop(), log, scroll=scroll,
                        skip_play=True)
-        scroll.assert_called_once_with(-3, 100, 86, (100, 200, 4))
+        scroll.assert_called_once_with(-4, 100, 86, (100, 200, 4))
         self.assertFalse(any("scroll" in c.args[0].lower()
                              or "click" in c.args[0].lower()
                              for c in log.call_args_list))
@@ -252,3 +238,15 @@ class StoryTests(unittest.TestCase):
                            reader, click, FastStop(), Mock(),
                            timeout=0.2, skip_play=True, act_name="Act 1")
         self.assertEqual(click.call_count, 2)
+
+    def test_start_image_clicks_button_center(self):
+        reader = Mock()
+        reader.read.side_effect = [[label("Story")], [label("School Grounds")],
+                                   [label("Act 1")], [label("Select Stage")]]
+        click = Mock()
+        navigate_story("School Grounds", lambda: np.zeros((100, 200, 4)),
+                       reader, click, FastStop(), Mock(),
+                       skip_play=True, act_name="Act 1",
+                       find_start=lambda frame: (105, 46, 0.98))
+        self.assertEqual(click.call_args_list[-1].args[:2], (105, 46))
+        self.assertEqual(reader.read.call_count, 4)

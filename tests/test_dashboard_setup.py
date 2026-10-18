@@ -97,7 +97,7 @@ class DashboardSetupTests(unittest.TestCase):
             self.assertIn("ACTION OUTPUT", labels)
             self.assertNotIn("MACRO RUNTIME", labels)
             self.assertEqual(set(window.stat_values),
-                             {"TOTAL", "RUNS", "AVG RUN", "CURRENT RUN"})
+                             {"RUNS", "AVG RUN", "CURRENT RUN"})
             self.assertEqual((window.log.parentWidget().x(), window.log.parentWidget().y()), (18, 406))
             self.assertLess(window.log.height(), 430)
             self.assertEqual(window.index_editor.height(), 894)
