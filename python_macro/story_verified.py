@@ -56,14 +56,19 @@ def click_and_confirm(label, locate, advanced, capture, click, stop, log,
         log(f"{label}: click attempt {attempt}/{attempts} at ({x}, {y}).")
         if stop.is_set() or click(x, y, before.shape) is False:
             return False
+        # Check once immediately, including in very short test/retry windows.
+        after = capture()
+        if advanced(after, before):
+            log(f"{label}: navigation confirmed.")
+            return True
         until = min(deadline, time.monotonic() + settle_seconds)
         while not stop.is_set() and time.monotonic() < until:
+            if stop.wait(0.10):
+                return False
             after = capture()
             if advanced(after, before):
                 log(f"{label}: navigation confirmed.")
                 return True
-            if stop.wait(0.10):
-                return False
         if stop.is_set():
             return False
         log(f"{label}: no confirmed transition; searching again before retry.")
