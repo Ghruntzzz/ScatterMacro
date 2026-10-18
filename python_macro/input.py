@@ -80,7 +80,7 @@ class RobloxClient:
         self.user.PostMessageW.restype = wintypes.BOOL
 
     def check_focus(self):
-        if self.selected_pid is not None:
+        if getattr(self, "selected_pid", None) is not None:
             from python_macro.capture import selected_roblox_window
             selected_roblox_window(self.hwnd, self.selected_pid)
         if self.user.GetForegroundWindow() != self.hwnd:
@@ -94,7 +94,7 @@ class RobloxClient:
         """
         if self.stop.is_set():
             return False
-        if self.selected_pid is not None:
+        if getattr(self, "selected_pid", None) is not None:
             from python_macro.capture import selected_roblox_window
             selected_roblox_window(self.hwnd, self.selected_pid)
         if self.user.GetForegroundWindow() == self.hwnd:
