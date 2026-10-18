@@ -53,12 +53,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '0.1.16'
+          $version = '0.1.17'
           $tag = "anime-expeditions-v$version"
           $name = "AnimeExpeditions-$version-windows.zip"
           $archive = "dist/$name"
           if (!(Test-Path $archive)) { throw "Missing macro ZIP: $archive" }
-          gh release create $tag $archive --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Anime Expeditions $version - Click Method Diagnostics" --notes "Added a runtime TEST PLAY CLICK METHODS button. Attempts four distinct approaches (SendInput direct, mouse_event direct, SendInput absolute cursor movement, window-message click), reporting the method and whether Story actually appeared. Stops at first verified success; F2 cancels and Roblox foreground focus is required. Normal Story navigation now uses the same method checks before continuing. Existing unit-index editor, Play icon visual detection, and saved settings are preserved. Unit placement/upgrade execution remains unavailable."
+          gh release create $tag $archive --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Anime Expeditions $version - Hover, Wiggle and Click" --notes "Every Play click now hovers, wiggles with real Win32 mouse movement, recenters and waits before mouse down to avoid clicking stale Roblox pointer positions. Runtime TEST PLAY CLICK METHODS attempts four approaches (SendInput direct, mouse_event direct, SendInput absolute cursor movement, window-message click), reporting the method and whether Story actually appeared. Stops at first verified success; F2 cancels and Roblox foreground focus is required. Normal Story navigation now uses the same method checks before continuing. Existing unit-index editor, Play icon visual detection, and saved settings are preserved. Unit placement/upgrade execution remains unavailable."
           if ($LASTEXITCODE -ne 0) { throw 'Macro release upload failed' }
           New-Item -ItemType Directory -Force 'dist/verified' | Out-Null
           gh release download $tag --repo $env:GITHUB_REPOSITORY --pattern $name --dir 'dist/verified'
@@ -70,7 +70,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '0.1.16'
+          $version = '0.1.17'
           $archive = "dist/AnimeExpeditions-$version-windows.zip"
           $sha256 = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
           $url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/anime-expeditions-v$version/AnimeExpeditions-$version-windows.zip"
@@ -83,7 +83,7 @@ jobs:
           $macro[0].version = $version
           $macro[0].url = $url
           $macro[0].sha256 = $sha256
-          $macro[0].description = "Includes an interactive Play click-method tester with four Win32 approaches and verified Story menu detection; modern PySide6 Unit Manager with indexed positions and Place at wave. Unit placement and upgrades are not yet automated."
+          $macro[0].description = "Play click tester with hover, native Win32 mouse wiggle, recenter and pointer settle before clicking using four methods, with verified Story menu detection; modern PySide6 Unit Manager with indexed positions and Place at wave. Unit placement and upgrades are not yet automated."
           $catalog | ConvertTo-Json -Depth 20 | Set-Content catalog.json -Encoding utf8
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

@@ -9,6 +9,8 @@ from python_macro.input import (
     WM_MOUSEMOVE, WM_LBUTTONDOWN, WM_LBUTTONUP,
     MOUSE_LEFT_DOWN, MOUSE_LEFT_UP, MOUSE_WHEEL, WHEEL_DELTA,
     INPUT, MOUSEINPUT, MAX_FOCUS_ATTEMPTS,
+    PRECLICK_HOVER_SECONDS, PRECLICK_WIGGLE_SECONDS,
+    PRECLICK_SETTLE_SECONDS, PRECLICK_WIGGLE_OFFSETS,
 )
 
 
@@ -46,18 +48,39 @@ class ClickTests(unittest.TestCase):
         return client
 
 
-    def test_direct_click_focuses_and_skips_hover_jitter(self):
+    def test_direct_click_hovers_wiggles_recenters_then_clicks(self):
         client = self.client()
-        client.focus_roblox = Mock(return_value=True)
         events = []
+        old_move = client.user.SetCursorPos.side_effect
+        client.user.SetCursorPos.side_effect = lambda x, y: (
+            events.append(("pos", x, y)) or old_move(x, y)
+        )
+        client.stop.wait.side_effect = lambda duration: (
+            events.append(("wait", duration)) or False
+        )
         client.user.SendInput.side_effect = lambda n, packet, size: (
-            events.append(packet._obj.data.mi.dwFlags) or 1
+            events.append(("input", packet._obj.data.mi.dwFlags)) or 1
         )
         self.assertTrue(client.direct_click(20, 30, (80, 100, 4)))
-        client.focus_roblox.assert_called_once()
-        self.assertEqual(events, [MOUSE_LEFT_DOWN, MOUSE_LEFT_UP])
-        self.assertEqual(client.user.SetCursorPos.call_count, 1)
-        self.assertEqual(client.stop.wait.call_args.args, (CLICK_HOLD_SECONDS,))
+        self.assertEqual(events[0:3], [
+            ("pos", 20, 30), ("input", MOUSE_MOVE),
+            ("wait", PRECLICK_HOVER_SECONDS),
+        ])
+        moves = [event for event in events if event[0] == "pos"]
+        self.assertEqual(moves, [
+            ("pos", 20, 30), ("pos", 17, 30), ("pos", 23, 30),
+            ("pos", 20, 33), ("pos", 20, 27), ("pos", 20, 30),
+            ("pos", 20, 30),
+        ])
+        self.assertEqual(
+            [e[1] for e in events if e[0] == "input"],
+            [MOUSE_MOVE] * (2 + len(PRECLICK_WIGGLE_OFFSETS)) +
+            [MOUSE_LEFT_DOWN, MOUSE_LEFT_UP],
+        )
+        self.assertLess(events.index(("wait", PRECLICK_SETTLE_SECONDS)),
+                        events.index(("input", MOUSE_LEFT_DOWN)))
+        self.assertEqual(events[-2:], [("wait", CLICK_HOLD_SECONDS),
+                                       ("input", MOUSE_LEFT_UP)])
 
     def test_direct_event_click_focuses_and_releases(self):
         client = self.client()
@@ -65,7 +88,8 @@ class ClickTests(unittest.TestCase):
         self.assertTrue(client.direct_click_event(20, 30, (80, 100, 4)))
         self.assertEqual([c.args[0] for c in client.user.mouse_event.call_args_list],
                          [MOUSE_LEFT_DOWN, MOUSE_LEFT_UP])
-        client.user.SendInput.assert_not_called()
+        self.assertTrue(all(c.args[1]._obj.data.mi.dwFlags == MOUSE_MOVE
+                            for c in client.user.SendInput.call_args_list))
 
     def test_focus_restores_minimized_roblox_then_clicks(self):
         client = self.client()
@@ -74,7 +98,11 @@ class ClickTests(unittest.TestCase):
         self.assertTrue(client.direct_click(20, 30, (80, 100, 4)))
         client.user.ShowWindow.assert_called_once_with(123, 9)
         client.user.SetForegroundWindow.assert_called_once_with(123)
-        self.assertEqual(client.user.SendInput.call_count, 2)
+        self.assertEqual(
+            [c.args[1]._obj.data.mi.dwFlags
+             for c in client.user.SendInput.call_args_list[-2:]],
+            [MOUSE_LEFT_DOWN, MOUSE_LEFT_UP],
+        )
 
     def test_direct_click_never_sends_input_if_focus_denied(self):
         client = self.client()
@@ -98,6 +126,66 @@ class ClickTests(unittest.TestCase):
         client = self.client()
         self.assertTrue(client.focus_roblox())
         client.user.SetForegroundWindow.assert_not_called()
+
+
+    def test_all_four_methods_wait_to_settle_before_button_down(self):
+        methods = ("direct_click", "direct_click_event",
+                   "direct_click_absolute", "direct_click_message")
+        for name in methods:
+            with self.subTest(name=name):
+                client = self.client()
+                client.user.PostMessageW.return_value = True
+                client.user.GetSystemMetrics.side_effect = lambda idx: {
+                    76: 0, 77: 0, 78: 1920, 79: 1080,
+                }[idx]
+                events = []
+                client.stop.wait.side_effect = lambda duration: (
+                    events.append(("wait", duration)) or False
+                )
+                client.user.SendInput.side_effect = lambda n, pointer, size: (
+                    events.append(("send", pointer._obj.data.mi.dwFlags)) or 1
+                )
+                client.user.mouse_event.side_effect = lambda flags, *a: (
+                    events.append(("event", flags))
+                )
+                client.user.PostMessageW.side_effect = lambda hwnd, msg, *a: (
+                    events.append(("post", msg)) or True
+                )
+                self.assertTrue(getattr(client, name)(20, 30, (80, 100, 4)))
+                settle_index = events.index(("wait", PRECLICK_SETTLE_SECONDS))
+                if name == "direct_click_event":
+                    down = events.index(("event", MOUSE_LEFT_DOWN))
+                elif name == "direct_click_message":
+                    down = events.index(("post", WM_LBUTTONDOWN))
+                else:
+                    down = events.index(("send", MOUSE_LEFT_DOWN))
+                self.assertLess(settle_index, down)
+                self.assertGreaterEqual(
+                    events.count(("wait", PRECLICK_WIGGLE_SECONDS)),
+                    len(PRECLICK_WIGGLE_OFFSETS),
+                )
+
+    def test_stop_during_preclick_wiggle_never_presses_button(self):
+        client = self.client()
+        client.stop.wait.side_effect = [False, True]
+        self.assertFalse(client.direct_click(20, 30, (80, 100, 4)))
+        self.assertFalse(
+            any(c.args[1]._obj.data.mi.dwFlags in (MOUSE_LEFT_DOWN, MOUSE_LEFT_UP)
+                for c in client.user.SendInput.call_args_list)
+        )
+
+    def test_cursor_drift_after_settle_blocks_click(self):
+        client = self.client()
+        client.user.GetCursorPos.side_effect = lambda pointer: (
+            setattr(pointer._obj, "x", 15) or
+            setattr(pointer._obj, "y", 20) or True
+        )
+        with self.assertRaisesRegex(RuntimeError, "Cursor missed"):
+            client.direct_click(20, 30, (80, 100, 4))
+        self.assertFalse(
+            any(c.args[1]._obj.data.mi.dwFlags in (MOUSE_LEFT_DOWN, MOUSE_LEFT_UP)
+                for c in client.user.SendInput.call_args_list)
+        )
 
     def test_hover_then_native_motion_jitter_then_checked_down_up(self):
         client = self.client()
@@ -240,7 +328,8 @@ class ClickTests(unittest.TestCase):
         self.assertEqual(seen[0][0], MOUSE_MOVE | MOUSE_ABSOLUTE | MOUSE_VIRTUAL_DESKTOP)
         self.assertEqual(seen[0][1], round(120 * 65535 / 1599))
         self.assertEqual(seen[0][2], round(80 * 65535 / 999))
-        self.assertEqual([s[0] for s in seen[1:]], [MOUSE_LEFT_DOWN, MOUSE_LEFT_UP])
+        self.assertIn(MOUSE_MOVE, [s[0] for s in seen[1:-2]])
+        self.assertEqual([s[0] for s in seen[-2:]], [MOUSE_LEFT_DOWN, MOUSE_LEFT_UP])
 
     def test_message_click_uses_client_coords_and_releases(self):
         client = self.client()
@@ -250,7 +339,8 @@ class ClickTests(unittest.TestCase):
         self.assertEqual([item[1] for item in sent],
                          [WM_MOUSEMOVE, WM_LBUTTONDOWN, WM_LBUTTONUP])
         self.assertEqual([item[3] for item in sent], [((50 << 16) | 40)] * 3)
-        client.user.SendInput.assert_not_called()
+        self.assertTrue(all(c.args[1]._obj.data.mi.dwFlags == MOUSE_MOVE
+                            for c in client.user.SendInput.call_args_list))
 
     def test_message_fail_down_does_not_falsely_succeed(self):
         client = self.client()

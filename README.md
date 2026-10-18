@@ -132,3 +132,13 @@ and **stops testing immediately after a verified success**. F2 stops the test.
 The regular Story run uses this same check before proceeding to Story/map
 navigation. The widget logs which click method worked; window messages can
 be ignored by Roblox, and acceptance by Windows alone is not proof of success.
+
+## Hover, native wiggle and stale-position protection
+
+Every Play click method now uses the same preparation sequence: bring Roblox
+to the foreground, move to the detected icon, hover briefly, wiggle a few pixels
+with genuine Win32 mouse-move events, return to the detected center, pause to
+allow Roblox to process the updated pointer position, verify the foreground and
+cursor coordinates, and only then send mouse-down/up. The four-method tester
+continues to verify the actual Story menu, not merely Windows accepting input.
+F2 cancels before button-down, even when triggered during the wiggle.

@@ -9,6 +9,10 @@ POST_JITTER_SECONDS = 0.045
 CLICK_HOLD_SECONDS = 0.12
 FOCUS_SETTLE_SECONDS = 0.10
 MAX_FOCUS_ATTEMPTS = 3
+PRECLICK_HOVER_SECONDS = 0.18
+PRECLICK_WIGGLE_SECONDS = 0.035
+PRECLICK_SETTLE_SECONDS = 0.13
+PRECLICK_WIGGLE_OFFSETS = ((-3, 0), (3, 0), (0, 3), (0, -3), (0, 0))
 WHEEL_DELTA = 120
 
 MOUSE_MOVE = 0x0001
@@ -171,14 +175,60 @@ class RobloxClient:
         """Direct AHK-style Event fallback, also without hover/jitter."""
         return self._direct_click(x, y, shape, method="event")
 
-    def _direct_click(self, x, y, shape, method):
+    def _prepare_click_target(self, x, y, shape, absolute=False):
+        """Hover, inject actual mouse-motion wiggle, then settle on target.
+
+        A moved visible cursor does not prove that a game has processed the
+        pointer's new location. Emit native MOUSE_MOVE events BEFORE button
+        down, wait for dispatch, and revalidate both position and foreground.
+        """
         if not self.focus_roblox():
-            return False
-        point, _ = self._validated_point(x, y, shape)
+            return None
+        point, rect = self._validated_point(x, y, shape)
+        if absolute:
+            left = self.user.GetSystemMetrics(76)  # SM_XVIRTUALSCREEN
+            top = self.user.GetSystemMetrics(77)  # SM_YVIRTUALSCREEN
+            width = self.user.GetSystemMetrics(78)  # SM_CXVIRTUALSCREEN
+            height = self.user.GetSystemMetrics(79)  # SM_CYVIRTUALSCREEN
+            if width < 2 or height < 2:
+                raise RuntimeError("Windows returned an invalid virtual desktop size.")
+            nx = round((point.x - left) * 65535 / (width - 1))
+            ny = round((point.y - top) * 65535 / (height - 1))
+            if not (0 <= nx <= 65535 and 0 <= ny <= 65535):
+                raise RuntimeError("Play click is outside the Windows virtual desktop.")
+            self._send_mouse(MOUSE_MOVE | MOUSE_ABSOLUTE | MOUSE_VIRTUAL_DESKTOP,
+                             dx=nx, dy=ny)
         self._move(point.x, point.y)
+        self._send_mouse(MOUSE_MOVE)  # Notify games of the new cursor location.
+        if self.stop.wait(PRECLICK_HOVER_SECONDS):
+            return None
+
+        for dx, dy in PRECLICK_WIGGLE_OFFSETS:
+            if self.stop.is_set():
+                return None
+            self.check_focus()
+            px = point.x + max(-x, min(dx, rect.right - 1 - x))
+            py = point.y + max(-y, min(dy, rect.bottom - 1 - y))
+            self._move(px, py)
+            # Real Win32 movement, not only a visual SetCursorPos jump.
+            self._send_mouse(MOUSE_MOVE)
+            if self.stop.wait(PRECLICK_WIGGLE_SECONDS):
+                return None
+
+        self._move(point.x, point.y)
+        self._send_mouse(MOUSE_MOVE)
+        if self.stop.wait(PRECLICK_SETTLE_SECONDS):
+            return None
+        new_point, _ = self._validated_point(x, y, shape)
+        if (new_point.x, new_point.y) != (point.x, point.y):
+            raise RuntimeError("Roblox client shifted while preparing the click.")
         self._check_cursor(point.x, point.y)
         self.check_focus()
-        if self.stop.is_set():
+        return point
+
+    def _direct_click(self, x, y, shape, method):
+        point = self._prepare_click_target(x, y, shape)
+        if point is None or self.stop.is_set():
             return False
         self._button_event(MOUSE_LEFT_DOWN, method)
         try:
@@ -251,29 +301,9 @@ class RobloxClient:
         self._send_mouse(MOUSE_WHEEL, int(steps) * WHEEL_DELTA)
 
     def direct_click_absolute(self, x, y, shape):
-        """Send a Windows virtual-desktop absolute mouse move, then click."""
-        if not self.focus_roblox():
-            return False
-        point, _ = self._validated_point(x, y, shape)
-        # Coordinates must be based on the virtual desktop, including negative
-        # X origins for secondary monitors left of the primary screen.
-        left = self.user.GetSystemMetrics(76)  # SM_XVIRTUALSCREEN
-        top = self.user.GetSystemMetrics(77)  # SM_YVIRTUALSCREEN
-        width = self.user.GetSystemMetrics(78)  # SM_CXVIRTUALSCREEN
-        height = self.user.GetSystemMetrics(79)  # SM_CYVIRTUALSCREEN
-        if width < 2 or height < 2:
-            raise RuntimeError("Windows returned an invalid virtual desktop size.")
-        nx = round((point.x - left) * 65535 / (width - 1))
-        ny = round((point.y - top) * 65535 / (height - 1))
-        if not (0 <= nx <= 65535 and 0 <= ny <= 65535):
-            raise RuntimeError("Play click is outside the Windows virtual desktop.")
-        self._send_mouse(MOUSE_MOVE | MOUSE_ABSOLUTE | MOUSE_VIRTUAL_DESKTOP,
-                         dx=nx, dy=ny)
-        # Input normalization can shift by 1 pixel. Center precisely before down.
-        self._move(point.x, point.y)
-        self._check_cursor(point.x, point.y)
-        self.check_focus()
-        if self.stop.is_set():
+        """Absolute SendInput move, hover and native wiggle, then click."""
+        point = self._prepare_click_target(x, y, shape, absolute=True)
+        if point is None or self.stop.is_set():
             return False
         self._button_event(MOUSE_LEFT_DOWN, "input")
         try:
@@ -288,13 +318,8 @@ class RobloxClient:
         Some games ignore window messages and rely on raw device input; that is
         why this is a fallback, not a claim that messages bypass game controls.
         """
-        if not self.focus_roblox():
-            return False
-        point, _ = self._validated_point(x, y, shape)
-        self._move(point.x, point.y)
-        self._check_cursor(point.x, point.y)
-        self.check_focus()
-        if self.stop.is_set():
+        point = self._prepare_click_target(x, y, shape)
+        if point is None or self.stop.is_set():
             return False
         coordinate = ((int(y) & 0xffff) << 16) | (int(x) & 0xffff)
         if not self.user.PostMessageW(self.hwnd, WM_MOUSEMOVE, 0, coordinate):
