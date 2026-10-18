@@ -69,8 +69,10 @@ class ClickDiagnosticsTests(unittest.TestCase):
         stop = FastStop()
         client = self.client()
         client.direct_click.side_effect = lambda *args: stop.set() or False
+        reader = Mock()
+        reader.read.return_value = []
         result = test_play_methods(client, lambda f: (48, 60, 0.94),
-                                   Mock(), stop, Mock())
+                                   reader, stop, Mock())
         self.assertIsNone(result)
         client.direct_click_event.assert_not_called()
 
