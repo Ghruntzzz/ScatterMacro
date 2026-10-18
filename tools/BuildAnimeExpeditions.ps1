@@ -16,7 +16,8 @@ try {
     $process = Start-Process -FilePath (Join-Path $root 'dist\AnimeExpeditions\AnimeExpeditions.exe') -ArgumentList $arguments -WindowStyle Hidden -PassThru
     if (!$process.WaitForExit(20000)) { Stop-Process -Id $process.Id; throw 'Macro startup timed out' }
     if ($process.ExitCode -ne 0 -or !(Test-Path 'dist\macro-smoke.png')) { throw 'Macro startup failed' }
-    Compress-Archive -Path dist/AnimeExpeditions/* -DestinationPath dist/AnimeExpeditions-0.1.1-windows.zip -Force
+    & $python tools/PackageMacro.py
+    if ($LASTEXITCODE -ne 0) { throw 'Macro package validation failed' }
 } finally {
     Remove-Item Env:QT_QPA_PLATFORM -ErrorAction SilentlyContinue
     Pop-Location

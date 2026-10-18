@@ -18,8 +18,8 @@ def main():
     parser.add_argument("--macro", action="store_true")
     args = parser.parse_args()
     if args.macro:
-        tag, name = "anime-expeditions-v0.1.1", "Anime Expeditions 0.1.1 - Story Navigation Test"
-        paths = [ROOT / "dist/AnimeExpeditions-0.1.1-windows.zip"]
+        tag, name = "anime-expeditions-v0.1.2", "Anime Expeditions 0.1.2 - Installer Fix"
+        paths = [ROOT / "dist/AnimeExpeditions-0.1.2-windows.zip"]
         notes = "Update Anime Expeditions through ScatterMacro. Story opens the runtime dashboard with Start/Stop and Action Output. RapidOCR and OpenCV detect Play, Story, then the selected visible map. Navigation stops after the map click. Unit indexes are edited in the runtime Unit Manager. Other modes remain setup-only. Global hotkeys, act/difficulty selection and in-game automation are not connected. Keep Roblox foreground; allow three seconds after Start to switch to it. Live game validation is still required."
     else:
         tag, name = "launcher-v0.3.0", "ScatterMacro 0.3.0"
