@@ -17,7 +17,7 @@ class StoryWorker(QThread):
     message = Signal(str)
 
     def __init__(self, map_name, parent, act_name="Act 1", difficulty="Normal",
-                 selected_hwnd="", selected_pid=""):
+                 selected_hwnd="", selected_pid="", reader=None):
         super().__init__(parent)
         self.map_name = map_name
         self.act_name = act_name
@@ -25,6 +25,7 @@ class StoryWorker(QThread):
         self.selected_hwnd = selected_hwnd
         self.selected_pid = selected_pid
         self.stop = Event()
+        self.reader = reader if reader is not None else TextReader()
 
     def run(self):
         try:
@@ -38,7 +39,7 @@ class StoryWorker(QThread):
                 return
             root = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[1]))
             play_icon = PlayIconLocator(root / "assets" / "play-button-template.png")
-            navigate_story(self.map_name, client.capture, TextReader(), client.direct_click,
+            navigate_story(self.map_name, client.capture, self.reader, client.direct_click,
                            self.stop, self.message.emit, scroll=client.scroll,
                            find_play=play_icon, act_name=self.act_name,
                            difficulty=self.difficulty, find_act=ActLabelLocator(),

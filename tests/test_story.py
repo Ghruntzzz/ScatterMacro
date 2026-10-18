@@ -21,6 +21,14 @@ def label(text):
 
 
 class StoryTests(unittest.TestCase):
+    def test_text_retries_include_periodic_thorough_pass(self):
+        from python_macro.story import select_text
+        reader = Mock()
+        reader.read.side_effect = [[], [], [label('Story')]]
+        select_text('Story', lambda text: text == 'Story', lambda: np.zeros((100, 200, 4)),
+                    reader, Mock(), FastStop(), 1)
+        self.assertEqual([c.kwargs['max_variants'] for c in reader.read.call_args_list], [1, 1, 3])
+
     def test_skip_play_starts_at_story_when_play_menu_already_verified(self):
         reader = Mock()
         reader.read.side_effect = [[label("Story")], [label("School Grounds")]]

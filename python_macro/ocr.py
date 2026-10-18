@@ -26,19 +26,26 @@ class TextReader:
         self._lock = Lock()
 
     def read(self, frame, region: Region, *, scale=3, min_confidence=0.65,
-             accept=None) -> list[TextMatch]:
+             accept=None, max_variants=3, cancelled=None) -> list[TextMatch]:
         if not 0 <= min_confidence <= 1:
             raise ValueError("Confidence must be between zero and one")
+        if max_variants not in (1, 2, 3):
+            raise ValueError("Expected one to three OCR passes")
         crop, (left, top) = region.crop(frame)
         best = []
         with self._lock:
+            if cancelled is not None and cancelled():
+                return []
             if self._engine is None:
                 try:
                     from rapidocr import RapidOCR
                 except ImportError as exc:
                     raise RuntimeError("Install the macro OCR requirements first") from exc
                 self._engine = RapidOCR()
-            for image in text_variants(crop, scale):
+            from itertools import islice
+            for image in islice(text_variants(crop, scale), max_variants):
+                if cancelled is not None and cancelled():
+                    return []
                 result = self._engine(image)
                 matches = []
                 if result is not None and result.txts is not None:

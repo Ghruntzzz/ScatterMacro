@@ -37,3 +37,20 @@ class OCRTests(unittest.TestCase):
     def test_invalid_confidence(self):
         with self.assertRaises(ValueError):
             TextReader(Mock()).read(self.frame, self.region, min_confidence=2)
+
+    def test_fast_pass_stops_without_extra_preprocessing(self):
+        engine = Mock(return_value=None)
+        TextReader(engine).read(self.frame, self.region, max_variants=1)
+        self.assertEqual(engine.call_count, 1)
+
+    def test_cancellation_skips_engine(self):
+        engine = Mock()
+        self.assertEqual(TextReader(engine).read(self.frame, self.region, cancelled=lambda: True), [])
+        engine.assert_not_called()
+
+    def test_engine_is_reused(self):
+        engine = Mock(return_value=result())
+        reader = TextReader(engine)
+        for _ in range(2):
+            reader.read(self.frame, self.region, max_variants=1)
+        self.assertEqual(engine.call_count, 2)

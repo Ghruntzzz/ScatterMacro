@@ -57,7 +57,7 @@ class PythonVisionTests(unittest.TestCase):
         path = Path(__file__).resolve().parents[1] / "assets" / "start-button-template.png"
         locator = StartButtonLocator(path)
         template = cv2.imread(str(path))
-        self.assertEqual(template.shape[:2], (38, 142))
+        self.assertEqual(template.shape[:2], (44, 150))
         for factor in (1.0, 1.2, 0.85):
             scaled = cv2.resize(template, None, fx=factor, fy=factor)
             h, w = scaled.shape[:2]
@@ -73,3 +73,30 @@ class PythonVisionTests(unittest.TestCase):
         path = Path(__file__).resolve().parents[1] / "assets" / "start-button-template.png"
         locator = StartButtonLocator(path)
         self.assertIsNone(locator(np.zeros((220, 350, 4), dtype=np.uint8)))
+
+    def test_start_reuses_scaled_tiles(self):
+        from unittest.mock import patch
+        from python_macro.vision import StartButtonLocator
+        path = Path(__file__).resolve().parents[1] / 'assets/start-button-template.png'
+        locator = StartButtonLocator(path)
+        canvas = np.full((250, 350, 3), 20, np.uint8)
+        h, w = locator.template.shape[:2]
+        canvas[50:50+h, 60:60+w] = locator.template
+        with patch('python_macro.vision.cv2.resize', side_effect=AssertionError('Unexpected per-frame resize')):
+            self.assertIsNotNone(locator(canvas))
+            self.assertIsNotNone(locator(canvas))
+
+    def test_start_fallback_handles_connected_green_background(self):
+        from python_macro.vision import StartButtonLocator
+        path = Path(__file__).resolve().parents[1] / 'assets/start-button-template.png'
+        locator = StartButtonLocator(path)
+        canvas = np.full((300, 700, 3), (0, 180, 0), np.uint8)
+        h, w = locator.template.shape[:2]
+        canvas[70:70+h, 90:90+w] = locator.template
+        result = None
+        for _ in range(4):
+            result = locator(canvas)
+            if result is not None:
+                break
+        self.assertIsNotNone(result)
+        self.assertLessEqual(abs(result[0] - (90 + w // 2)), 2)

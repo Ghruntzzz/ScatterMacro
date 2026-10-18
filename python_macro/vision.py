@@ -52,6 +52,12 @@ class PlayIconLocator:
         from python_macro.play_reference import play_template
         self.template = play_template()
         self.min_score = min_score
+        self.tiles = []
+        for scale in (0.65, 0.70, 0.775, 0.85, 0.925, 1.0, 1.075, 1.15,
+                      1.225, 1.30, 1.375, 1.45, 1.525, 1.60, 1.75, 1.90):
+            size = (round(self.template.shape[1] * scale), round(self.template.shape[0] * scale))
+            self.tiles.append(cv2.resize(self.template, size,
+                              interpolation=cv2.INTER_AREA if scale < 1 else cv2.INTER_LINEAR))
 
     def __call__(self, frame):
         if frame.ndim != 3 or frame.shape[2] not in (3, 4):
@@ -59,13 +65,10 @@ class PlayIconLocator:
         image = cv2.cvtColor(frame, cv2.COLOR_BGRA2GRAY if frame.shape[2] == 4 else cv2.COLOR_BGR2GRAY)
         height, width = image.shape[:2]
         best = None
-        for scale in (0.65, 0.70, 0.775, 0.85, 0.925, 1.0, 1.075, 1.15,
-                      1.225, 1.30, 1.375, 1.45, 1.525, 1.60, 1.75, 1.90):
-            tw, th = round(self.template.shape[1] * scale), round(self.template.shape[0] * scale)
+        for template in self.tiles:
+            th, tw = template.shape[:2]
             if tw >= width or th >= height:
                 continue
-            interpolation = cv2.INTER_AREA if scale < 1 else cv2.INTER_LINEAR
-            template = cv2.resize(self.template, (tw, th), interpolation=interpolation)
             _, score, _, origin = cv2.minMaxLoc(cv2.matchTemplate(image, template, cv2.TM_CCOEFF_NORMED))
             if best is None or score > best[0]:
                 best = (score, origin, tw, th)
@@ -83,24 +86,53 @@ class StartButtonLocator:
         if self.template is None:
             raise RuntimeError("Start button reference image is missing.")
         self.min_score = min_score
+        self.misses = 0
+        self.tiles = []
+        for scale in (0.70, 0.80, 0.85, 0.90, 1.0, 1.10, 1.20, 1.30, 1.45, 1.60):
+            size = (round(self.template.shape[1] * scale), round(self.template.shape[0] * scale))
+            self.tiles.append(cv2.resize(self.template, size,
+                              interpolation=cv2.INTER_AREA if scale < 1 else cv2.INTER_LINEAR))
 
     def __call__(self, frame):
         if frame.ndim != 3 or frame.shape[2] not in (3, 4):
             raise ValueError("Expected color screenshot.")
         image = np.ascontiguousarray(frame[:, :, :3])
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        mask = cv2.inRange(hsv, (28, 65, 65), (94, 255, 255))
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         best = None
-        for scale in (0.70, 0.80, 0.85, 0.90, 1.0, 1.10, 1.20, 1.30, 1.45, 1.60):
-            tw = round(self.template.shape[1] * scale)
-            th = round(self.template.shape[0] * scale)
-            if tw >= image.shape[1] or th >= image.shape[0]:
+        for contour in contours:
+            x, y, w, h = cv2.boundingRect(contour)
+            if not (self.template.shape[1] * 0.5 <= w <= self.template.shape[1] * 2
+                    and self.template.shape[0] * 0.5 <= h <= self.template.shape[0] * 2):
                 continue
-            method = cv2.INTER_AREA if scale < 1 else cv2.INTER_LINEAR
-            tile = cv2.resize(self.template, (tw, th), interpolation=method)
-            _, score, _, origin = cv2.minMaxLoc(cv2.matchTemplate(image, tile, cv2.TM_CCOEFF_NORMED))
-            if best is None or score > best[0]:
-                best = (score, origin, tw, th)
+            # Only search green button-sized regions, with a margin for borders.
+            pad = max(8, round(h * 0.3))
+            left, top = max(0, x - pad), max(0, y - pad)
+            roi = image[top:min(image.shape[0], y+h+pad), left:min(image.shape[1], x+w+pad)]
+            for tile in self.tiles:
+                th, tw = tile.shape[:2]
+                if tw > roi.shape[1] or th > roi.shape[0]:
+                    continue
+                _, score, _, origin = cv2.minMaxLoc(cv2.matchTemplate(roi, tile, cv2.TM_CCOEFF_NORMED))
+                if best is None or score > best[0]:
+                    best = (score, (left + origin[0], top + origin[1]), tw, th)
         if best is None or best[0] < self.min_score:
-            return None
+            self.misses += 1
+            if self.misses % 4:
+                return None
+            # Preserve recovery if green artwork touches the button and merges
+            # contours. This expensive fallback is not run on every frame.
+            for tile in self.tiles:
+                th, tw = tile.shape[:2]
+                if tw > image.shape[1] or th > image.shape[0]:
+                    continue
+                _, score, _, origin = cv2.minMaxLoc(cv2.matchTemplate(image, tile, cv2.TM_CCOEFF_NORMED))
+                if best is None or score > best[0]:
+                    best = (score, origin, tw, th)
+            if best is None or best[0] < self.min_score:
+                return None
         score, (x, y), tw, th = best
         # Check that the full candidate is actually green, rather than a
         # high-correlating text label or another dark element on screen.
@@ -109,4 +141,5 @@ class StartButtonLocator:
         green = cv2.inRange(hsv, (28, 65, 65), (94, 255, 255))
         if cv2.countNonZero(green) < 0.45 * tw * th:
             return None
+        self.misses = 0
         return x + tw // 2, y + th // 2, float(score)

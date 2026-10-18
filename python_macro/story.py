@@ -43,11 +43,13 @@ def is_act_label(text, act):
     return clean in (number, "act" + number)
 
 
-def read_targets(frame, reader, predicate):
+def read_targets(frame, reader, predicate, *, thorough=True, stop=None):
     matches = reader.read(
         frame, Region(0, 0, frame.shape[1], frame.shape[0]),
         scale=2, min_confidence=0.65,
-        accept=lambda found: any(predicate(match.text) for match in found),
+        max_variants=3 if thorough else 1,
+        cancelled=stop.is_set if stop is not None else None,
+        accept=lambda found: sum(predicate(match.text) for match in found) == 1,
     )
     return [match for match in matches if predicate(match.text)]
 
@@ -62,9 +64,11 @@ def click_match(candidate, frame, click, stop):
 def select_text(label, predicate, capture, reader, click, stop, timeout):
     """Wait for exactly one matching UI label and click its center."""
     deadline = time.monotonic() + timeout
+    scans = 0
     while not stop.is_set() and time.monotonic() < deadline:
         frame = capture()
-        options = read_targets(frame, reader, predicate)
+        options = read_targets(frame, reader, predicate, thorough=scans % 3 == 2, stop=stop)
+        scans += 1
         if stop.is_set():
             return False
         if len(options) == 1:
@@ -133,7 +137,7 @@ def navigate_story(map_name, capture, reader, click, stop, log, timeout=30,
     while not stop.is_set() and time.monotonic() < deadline:
         frame = capture()
         options = read_targets(frame, reader,
-                               lambda t: normalize(t) == normalize(map_name))
+                               lambda t: normalize(t) == normalize(map_name), stop=stop)
         if stop.is_set():
             return
         if len(options) == 1:

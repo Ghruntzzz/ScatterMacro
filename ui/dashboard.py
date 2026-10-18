@@ -1183,10 +1183,13 @@ class RuntimeWindow(DashboardWindow):
             return
         from ui.story_navigation import StoryWorker
         self._align_roblox()
+        if not hasattr(self, "story_reader"):
+            from python_macro.ocr import TextReader
+            self.story_reader = TextReader()
         self.worker = StoryWorker(self.values["map"], self, act_name=self.values["act"],
                                   difficulty=self.values["difficulty"],
                                   selected_hwnd=self.values.get("roblox_hwnd", ""),
-                                  selected_pid=self.values.get("roblox_pid", ""))
+                                  selected_pid=self.values.get("roblox_pid", ""), reader=self.story_reader)
         self.worker.message.connect(self.log.appendPlainText)
         self.worker.finished.connect(self._story_finished)
         self.runtime_status.setText("RUNNING")
