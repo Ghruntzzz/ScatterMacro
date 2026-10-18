@@ -44,3 +44,35 @@ def text_variants(crop: np.ndarray, scale: int = 4):
     yield contrast
     _, binary = cv2.threshold(contrast, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)
     yield binary
+
+class PlayIconLocator:
+    """Locate the bundled teal Play icon, never relying on its small OCR text."""
+
+    def __init__(self, path, min_score=0.86):
+        self.template = cv2.imread(str(path), cv2.IMREAD_COLOR)
+        if self.template is None:
+            raise RuntimeError("The Play icon reference image is missing.")
+        self.min_score = min_score
+
+    def __call__(self, frame):
+        if frame.ndim != 3 or frame.shape[2] not in (3, 4):
+            raise ValueError("Expected BGR or BGRA Roblox screenshot")
+        image = np.ascontiguousarray(frame[:, :, :3])
+        height, width = image.shape[:2]
+        best = None
+        for scale in (0.70, 0.775, 0.85, 0.925, 1.0, 1.075, 1.15,
+                      1.225, 1.30, 1.375, 1.45, 1.525, 1.60):
+            tw, th = (round(self.template.shape[1] * scale),
+                      round(self.template.shape[0] * scale))
+            if tw >= width or th >= height:
+                continue
+            method = cv2.INTER_AREA if scale < 1 else cv2.INTER_LINEAR
+            template = cv2.resize(self.template, (tw, th), interpolation=method)
+            scores = cv2.matchTemplate(image, template, cv2.TM_CCOEFF_NORMED)
+            _, score, _, origin = cv2.minMaxLoc(scores)
+            if best is None or score > best[0]:
+                best = (float(score), origin, tw, th)
+        if best is None or best[0] < self.min_score:
+            return None
+        confidence, (left, top), tw, th = best
+        return left + tw // 2, top + round(th * 0.43), confidence
