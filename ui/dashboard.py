@@ -245,7 +245,7 @@ def load_unit_indexes_from_path(config_path: Path, count: int = 6) -> list[dict[
         prefix = f"Index{index}"
         indexes.append(
             {
-                "unit": section.get(f"{prefix}Unit", "None"),
+                "unit": section.get(f"{prefix}Unit", "0"),
                 "priority": section.get(f"{prefix}Priority", "First"),
                 "upgrade": section.get(f"{prefix}Upgrade", "0"),
                 "auto_upgrade": section.get(f"{prefix}AutoUpgrade", "0"),
@@ -276,10 +276,15 @@ class UnitSetupDialog(QDialog):
             for col, key in enumerate(("unit", "priority", "upgrade", "auto_upgrade", "x", "y")):
                 if col < 2:
                     widget = QComboBox()
-                    widget.addItems(["None"] + [str(i) for i in range(1, 11)] if col == 0 else ["First", "Last", "Closest", "Strongest", "Weakest", "Flying"])
-                    if entry[key] not in [widget.itemText(i) for i in range(widget.count())]:
-                        widget.addItem(entry[key])
-                    widget.setCurrentText(entry[key])
+                    widget.addItems([str(i) for i in range(7)] if col == 0 else ["First", "Last", "Closest", "Strongest", "Weakest", "Flying"])
+                    value = entry[key]
+                    if key == "unit":
+                        value = value.removeprefix("Unit ")
+                        if value not in [str(n) for n in range(7)]:
+                            value = "0"
+                    if value not in [widget.itemText(i) for i in range(widget.count())]:
+                        widget.addItem(value)
+                    widget.setCurrentText(value)
                 else:
                     widget = QSpinBox()
                     widget.setRange(-1 if col >= 4 else 0, 10000 if col >= 4 else 100)
@@ -903,11 +908,11 @@ class RuntimeWindow(DashboardWindow):
             child.deleteLater()
         first_index = (self.unit_page - 1) * 6
         indexes = self.unit_indexes[first_index:first_index + 6]
-        selected = indexes[0] if indexes else {"unit": "None", "priority": "First", "upgrade": "0", "auto_upgrade": "0", "x": "", "y": ""}
+        selected = indexes[0] if indexes else {"unit": "0", "priority": "First", "upgrade": "0", "auto_upgrade": "0", "x": "", "y": ""}
         self._section_title(self.unit_manager, "UNIT MANAGER", 20)
         self._label(self.unit_manager, "Configure unit indexes.", 22, 58, 200, 18, f"color: {MUTED}; font: 9px 'Segoe UI';")
         self._label(self.unit_manager, f"SELECTED: INDEX {first_index + 1}", 22, 92, 220, 18, f"color: {TEXT}; font: 700 9px 'Bahnschrift';")
-        unit_options = ["None", "Unit 1", "Unit 2", "Unit 3", "Unit 4", "Unit 5", "Unit 6"]
+        unit_options = [str(i) for i in range(7)]
         self._combo(self.unit_manager, "UNIT", unit_options, selected["unit"], 22, 122, 175)
         self._combo(self.unit_manager, "TARGET", ["First", "Last", "Closest", "Strongest", "Boss", "Weakest", "Shielded", "Fastest"], selected["priority"], 218, 122, 175)
         self._combo(self.unit_manager, "UPGRADE", [str(level) for level in range(16)], selected["upgrade"], 22, 196, 175)
@@ -925,7 +930,7 @@ class RuntimeWindow(DashboardWindow):
             self._label(card, f"INDEX {index}", 10, 10, 160, 15, f"color: {TEXT}; font: 700 8px 'Bahnschrift';")
             self._label(card, f"UNIT: {data['unit']}", 10, 29, 166, 12, f"color: {MUTED}; font: 7px 'Segoe UI';")
             self._label(card, f"TARGET: {data['priority']}", 10, 45, 166, 12, f"color: {MUTED}; font: 7px 'Segoe UI';")
-            self._label(card, f"UPG: {data['upgrade']}  AUTO: {data['auto_upgrade']}", 10, 62, 166, 12, "color: #47e887; font: 700 7px 'Bahnschrift';" if data["unit"] != "None" else f"color: {MUTED}; font: 7px 'Segoe UI';")
+            self._label(card, f"UPG: {data['upgrade']}  AUTO: {data['auto_upgrade']}", 10, 62, 166, 12, "color: #47e887; font: 700 7px 'Bahnschrift';" if data["unit"] not in ("None", "0") else f"color: {MUTED}; font: 7px 'Segoe UI';")
             self._label(card, f"POSITION: {data['x']},{data['y']}" if data["x"] else "POSITION: --", 10, 78, 166, 12, f"color: {MUTED}; font: 7px 'Segoe UI';")
         previous = self._small_button(self.unit_manager, "PREVIOUS", 22, 768, 175)
         next_button = self._small_button(self.unit_manager, "NEXT", 218, 768, 175)

@@ -13,19 +13,39 @@ class UnitManagerTests(unittest.TestCase):
         cls.app = QApplication.instance() or QApplication([])
 
     def setUp(self):
-        self.entries = [dict(unit="None", priority="First", upgrade="0", auto_upgrade="0", x="", y="") for _ in range(104)]
+        self.entries = [dict(unit="0", priority="First", upgrade="0", auto_upgrade="0", x="", y="") for _ in range(104)]
         self.save, self.busy = Mock(), Mock(return_value=False)
         self.widget = UnitManager(self.entries, self.save, self.busy, Mock())
 
     def tearDown(self):
         self.widget.close()
 
+    def test_unit_slot_range_zero_through_six(self):
+        picker = self.widget.fields["unit"]
+        self.assertEqual([picker.itemText(i) for i in range(picker.count())],
+                         [str(i) for i in range(7)])
+        self.assertEqual(picker.currentText(), "0")
+        picker.setCurrentText("6")
+        self.assertEqual(self.entries[0]["unit"], "6")
+        self.widget.clear_index()
+        self.assertEqual(self.entries[0]["unit"], "0")
+
+    def test_legacy_none_and_prefixed_slots_load_as_valid_choices(self):
+        self.entries[7]["unit"] = "None"
+        self.widget.select(7)
+        self.assertEqual(self.widget.fields["unit"].currentText(), "0")
+        self.entries[8]["unit"] = "Unit 5"
+        self.widget.select(8)
+        self.assertEqual(self.widget.fields["unit"].currentText(), "5")
+        self.assertEqual(self.widget.fields["unit"].count(), 7)
+        self.save.assert_not_called()
+
     def test_edits_only_selected_index(self):
         self.widget.select(7)
         self.widget.fields['unit'].setCurrentText('3')
         self.assertEqual(self.save.call_args.args[0], 7)
         self.assertEqual(self.entries[7]['unit'], '3')
-        self.assertEqual(self.entries[0]['unit'], 'None')
+        self.assertEqual(self.entries[0]['unit'], '0')
 
     def test_busy_prevents_save(self):
         self.busy.return_value = True
@@ -68,7 +88,7 @@ class UnitManagerTests(unittest.TestCase):
         self.widget.select(2)
         self.busy.return_value = True
         self.widget.paste_index()
-        self.assertEqual(self.entries[2]["unit"], "None")
+        self.assertEqual(self.entries[2]["unit"], "0")
 
     def test_cards_select_real_index_and_show_coordinates_at_zero(self):
         self.widget.fields["x"].setValue(0)

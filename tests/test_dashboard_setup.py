@@ -39,6 +39,16 @@ class DashboardSetupTests(unittest.TestCase):
         self.assertIn("%20", values["private_server"])
         window.close()
 
+    def test_setup_unit_slots_are_zero_through_six(self):
+        values = dashboard.read_dashboard_values()
+        dialog = dashboard.UnitSetupDialog(values)
+        unit = dialog.table.cellWidget(0, 0)
+        self.assertEqual([unit.itemText(i) for i in range(unit.count())],
+                         [str(i) for i in range(7)])
+        unit.setCurrentText("6")
+        dialog.save()
+        self.assertEqual(dashboard.load_unit_indexes(values)[0]["unit"], "6")
+
     def test_unit_indexes_saved_only_for_selected_route(self):
         values = dashboard.read_dashboard_values()
         dialog = dashboard.UnitSetupDialog(values)
@@ -49,7 +59,7 @@ class DashboardSetupTests(unittest.TestCase):
         dialog.save()
         index = dashboard.load_unit_indexes(values)[0]
         self.assertEqual((index["unit"], index["priority"], index["x"], index["y"]), ("2", "Weakest", "300", "200"))
-        self.assertEqual(dashboard.load_unit_indexes(dict(values, map="Flower Forest"))[0]["unit"], "None")
+        self.assertEqual(dashboard.load_unit_indexes(dict(values, map="Flower Forest"))[0]["unit"], "0")
 
     def test_runtime_has_no_stop_button_but_keeps_stop_hotkey_hint(self):
         from PySide6.QtWidgets import QPushButton, QLabel

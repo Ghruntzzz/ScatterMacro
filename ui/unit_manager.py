@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
 
 
 EMPTY_INDEX = {
-    "unit": "None", "priority": "First", "upgrade": "0",
+    "unit": "0", "priority": "First", "upgrade": "0",
     "auto_upgrade": "0", "x": "", "y": "",
 }
 PAGE_SIZE = 6
@@ -159,7 +159,7 @@ class UnitManager(QWidget):
             col, row = i % 2, (i // 2) * 2
             grid.addWidget(self._text(name, "subtitle"), row, col)
             if key in ("unit", "priority", "upgrade", "auto_upgrade"):
-                options = {"unit": ["None"] + [str(n) for n in range(1, 11)],
+                options = {"unit": [str(n) for n in range(7)],
                            "priority": TARGETS,
                            "upgrade": [str(n) for n in range(16)],
                            "auto_upgrade": [str(n) for n in range(7)]}
@@ -253,8 +253,12 @@ class UnitManager(QWidget):
             value = str(entry.get(key, EMPTY_INDEX[key]))
             if isinstance(field, QComboBox):
                 if key == "unit":
+                    # Older profiles used None or Unit N; 0 is the empty slot.
                     value = value.removeprefix("Unit ")
+                    if value not in {str(n) for n in range(7)}:
+                        value = "0"
                 if field.findText(value) < 0:
+                    # Retain historical upgrade or target choices.
                     field.addItem(value)
                 field.setCurrentText(value)
             else:

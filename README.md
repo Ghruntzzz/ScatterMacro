@@ -19,7 +19,7 @@ window or a helper process. Only installing a launcher update restarts it.
 Select Install on Anime Expeditions, then Open. The installed setup app provides:
 - Mode, map, act, and difficulty configuration.
 - Private-server and Discord settings, saved locally.
-- Per-route modern PySide6 Unit Manager in the runtime dashboard: 104 selectable indexes,\n  unit/target/upgrade editing, copy/paste, reset, and client-relative position capture.\n  Numbered placement markers appear on the Roblox screenshot through Set position\n  or the read-only View markers control. Upgrade and auto-upgrade are dropdowns;\n  X/Y fields have no spinner arrows. The runtime omits the extra Stop button,\n  but the F2 stop hotkey remains available. Changes auto-save to the route's INI.
+- Per-route modern PySide6 Unit Manager in the runtime dashboard: 104 selectable indexes,\n  unit slots 0–6, target/upgrade editing, copy/paste, reset, and client-relative position capture.\n  Numbered placement markers appear on the Roblox screenshot through Set position\n  or the read-only View markers control. Upgrade and auto-upgrade are dropdowns;\n  X/Y fields have no spinner arrows. The runtime omits the extra Stop button,\n  but the F2 stop hotkey remains available. Changes auto-save to the route's INI.
 - Saved keybind preferences and other settings.
 
 Current flow: Install -> Open -> choose route -> configure unit indexes and
