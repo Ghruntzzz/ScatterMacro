@@ -10,7 +10,7 @@ from python_macro.vision import Region
 
 MAX_MAP_SCROLLS = 12
 MAP_SCROLL_STEPS = -3
-MAP_SCROLL_SETTLE = 0.15
+MAP_SCROLL_SETTLE = 0.09
 
 
 def normalize(text):
@@ -69,7 +69,7 @@ def select_text(label, predicate, capture, reader, click, stop, timeout):
             return False
         if len(options) == 1:
             return click_match(options[0], frame, click, stop)
-        if stop.wait(0.12):
+        if stop.wait(0.08):
             return False
     if stop.is_set():
         return False
@@ -116,7 +116,7 @@ def navigate_story(map_name, capture, reader, click, stop, log, timeout=30,
                     return
                 # A sent mouse event is not proof Roblox opened the menu.
                 for _ in range(6):
-                    if stop.wait(0.20):
+                    if stop.wait(0.14):
                         return
                     frame = capture()
                     if len(read_targets(frame, reader,
@@ -135,7 +135,7 @@ def navigate_story(map_name, capture, reader, click, stop, log, timeout=30,
     if not select_text("Story", lambda t: normalize(t) == "story",
                        capture, reader, click, stop, timeout):
         return
-    if stop.wait(0.25):
+    if stop.wait(0.10):
         return
 
     log(f"Finding map: {map_name}.")
@@ -184,13 +184,13 @@ def navigate_story(map_name, capture, reader, click, stop, log, timeout=30,
         log("Story map selected. Ready for act selection.")
         return
 
-    if stop.wait(0.25):
+    if stop.wait(0.10):
         return
     log(f"Selecting {act}.")
     if not select_text(act, lambda t: is_act_label(t, act),
                        capture, reader, click, stop, timeout):
         return
-    if stop.wait(0.25):
+    if stop.wait(0.10):
         return
 
     if act not in ("Mastery", "Infinite"):
@@ -199,7 +199,7 @@ def navigate_story(map_name, capture, reader, click, stop, log, timeout=30,
             if not select_text("Hard difficulty", lambda t: normalize(t) == "hard",
                                capture, reader, click, stop, timeout):
                 return
-            if stop.wait(0.20):
+            if stop.wait(0.14):
                 return
         else:
             # Normal is already selected in-game; don't toggle difficulty.
@@ -209,7 +209,7 @@ def navigate_story(map_name, capture, reader, click, stop, log, timeout=30,
     if not select_text("Select Stage", lambda t: normalize(t) == "selectstage",
                        capture, reader, click, stop, timeout):
         return
-    if stop.wait(0.25):
+    if stop.wait(0.10):
         return
 
     log("Starting Story.")

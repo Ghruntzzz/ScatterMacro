@@ -832,9 +832,9 @@ class SettingsWindow(DashboardWindow):
 
 class RuntimeWindow(DashboardWindow):
     VIEWPORT_X = 305
-    VIEWPORT_Y = 160
+    VIEWPORT_Y = 60
     VIEWPORT_W = 1060
-    VIEWPORT_H = 760
+    VIEWPORT_H = 860
 
     def __init__(self) -> None:
         super().__init__()
@@ -858,34 +858,48 @@ class RuntimeWindow(DashboardWindow):
         return button
 
     def _build(self) -> None:
-        header = self._card(18, 16, 1799, 84, 9)
-        self._label(header, "SCATTERMACRO", 22, 16, 170, 16, f"color: {WINE}; font: 700 8px 'Bahnschrift';")
-        self._label(header, "MACRO RUNTIME", 22, 32, 330, 34, f"color: {TEXT}; font: 700 22px 'Bahnschrift';")
-        self._label(header, "Live control center", 23, 61, 220, 16, f"color: {MUTED}; font: 8px 'Segoe UI';")
-        stats = [("TOTAL", "--:--:--"), ("RUNS", "0"), ("AVG RUN", "--:--:--"), ("CURRENT RUN", "WAITING")]
+        stats_panel = self._card(18, 16, 270, 378, 8)
+        self._section_title(stats_panel, "SESSION STATS", 20)
+        self._label(stats_panel, "Current macro session", 22, 58, 226, 18,
+                    f"color: {MUTED}; font: 9px 'Segoe UI';")
+        stats = [("TOTAL", "--:--:--"), ("RUNS", "0"),
+                 ("AVG RUN", "--:--:--"), ("CURRENT RUN", "WAITING")]
         self.stat_values: dict[str, QLabel] = {}
         for index, (label, value) in enumerate(stats):
-            tile = self._card(0, 0, 188, 52, 6)
-            tile.setParent(header)
-            tile.move(470 + index * 210, 16)
-            self._label(tile, label, 10, 8, 168, 14, f"color: {MUTED}; font: 700 8px 'Bahnschrift';")
-            self.stat_values[label] = self._label(tile, value, 10, 25, 168, 18, f"color: {TEXT}; font: 700 11px 'Bahnschrift';")
-        self.runtime_status = self._label(header, "\u25cf  READY", 1570, 27, 180, 20, "color: #47e887; font: 700 10px 'Bahnschrift';")
-        self.session_value = self._label(header, "Session  --:--:--", 1570, 52, 190, 16, f"color: {MUTED}; font: 9px 'Segoe UI';")
+            x = 22 + (index % 2) * 116
+            y = 91 + (index // 2) * 98
+            tile = self._card(0, 0, 110, 86, 6)
+            tile.setParent(stats_panel)
+            tile.move(x, y)
+            self._label(tile, label, 9, 12, 94, 18,
+                        f"color: {MUTED}; font: 700 8px 'Bahnschrift';")
+            self.stat_values[label] = self._label(
+                tile, value, 9, 40, 95, 21,
+                f"color: {TEXT}; font: 700 11px 'Bahnschrift';")
+        self.runtime_status = self._label(
+            stats_panel, "●  READY", 22, 301, 226, 22,
+            "color: #47e887; font: 700 10px 'Bahnschrift';")
+        self.session_value = self._label(
+            stats_panel, "Session  --:--:--", 22, 329, 226, 18,
+            f"color: {MUTED}; font: 9px 'Segoe UI';")
 
-        action = self._card(18, 116, 270, 818, 8)
+        action = self._card(18, 406, 270, 528, 8)
         self._section_title(action, "ACTION OUTPUT", 20)
-        self._label(action, "Live macro activity", 22, 58, 200, 18, f"color: {MUTED}; font: 9px 'Segoe UI';")
+        self._label(action, "Live macro activity", 22, 58, 200, 18,
+                    f"color: {MUTED}; font: 9px 'Segoe UI';")
         self.log = QPlainTextEdit(action)
-        self.log.setGeometry(22, 88, 226, 430)
+        self.log.setGeometry(22, 88, 226, 303)
         self.log.setReadOnly(True)
         self.log.setPlainText("Runtime is ready.\n\nWaiting for macro activity...")
-        self.log.setStyleSheet(f"background: {blend_color(PANEL, '#000000', 0.45)}; border: 1px solid {OUTLINE}; border-radius: 6px; color: {TEXT}; padding: 8px; font: 9px 'Consolas';")
+        self.log.setStyleSheet(
+            f"background: {blend_color(PANEL, '#000000', 0.45)}; "
+            f"border: 1px solid {OUTLINE}; border-radius: 6px; "
+            f"color: {TEXT}; padding: 8px; font: 9px 'Consolas';")
         self.worker = None
         self.return_pending = False
-        self._label(action, "F1: START   |   F2: STOP", 22, 525, 226, 18, f"color: {TEXT}; font: 700 10px 'Bahnschrift';")
+        self._label(action, "F1: START   |   F2: STOP", 22, 409, 226, 18, f"color: {TEXT}; font: 700 10px 'Bahnschrift';")
         # The F2 emergency stop remains active via RuntimeHotkeys; no extra button.
-        return_button = self._small_button(action, "RETURN TO DASHBOARD", 22, 550, 226)
+        return_button = self._small_button(action, "RETURN TO DASHBOARD", 22, 449, 226)
         return_button.clicked.connect(self._return_to_dashboard)
         self.log_timer = QTimer(self)
         self.log_timer.timeout.connect(self._refresh_log)
@@ -894,13 +908,13 @@ class RuntimeWindow(DashboardWindow):
         self.state_timer.timeout.connect(self._refresh_state)
         self.state_timer.start(500)
 
-        live = self._card(300, 116, 1075, 818, 8)
+        live = self._card(300, 16, 1075, 918, 8)
         viewport = QFrame(live)
         viewport.setGeometry(5, 44, self.VIEWPORT_W, self.VIEWPORT_H)
         viewport.setStyleSheet(f"background: transparent; border: 1px solid {WINE_DARK}; border-radius: 8px;")
         # Keep the Roblox client aligned with this transparent viewport.
         self.viewport_rect = QRect(self.VIEWPORT_X, self.VIEWPORT_Y, self.VIEWPORT_W, self.VIEWPORT_H)
-        manager = self._card(1390, 116, 427, 818, 8)
+        manager = self._card(1390, 16, 427, 918, 8)
         self.unit_manager = manager
         self.unit_page = 1
         self.unit_indexes = load_unit_indexes(self.values, 104)
@@ -909,7 +923,7 @@ class RuntimeWindow(DashboardWindow):
         self.index_editor = UnitManager(self.unit_indexes, self._save_runtime_index,
                                        lambda: self.worker is not None and self.worker.isRunning(),
                                        self.log.appendPlainText, manager)
-        self.index_editor.setGeometry(12, 12, 403, 794)
+        self.index_editor.setGeometry(12, 12, 403, 894)
 
     def _save_runtime_index(self, index, entry):
         parser = configparser.ConfigParser(interpolation=None)

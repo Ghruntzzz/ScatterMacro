@@ -81,9 +81,26 @@ class DashboardSetupTests(unittest.TestCase):
             self.assertNotIn("STOP (F2)", buttons)
             self.assertIn("RETURN TO DASHBOARD", buttons)
             self.assertIn("F1: START   |   F2: STOP", labels)
-            self.assertEqual(window.viewport_rect.height(), 760)
+            self.assertEqual(window.viewport_rect.height(), 860)
+            self.assertEqual(window.viewport_rect.top(), 60)
             self.assertEqual(window.viewport_rect.bottom(), 919)
             self.assertEqual(window.viewport_rect.width(), 1060)
+        finally:
+            window.close()
+
+    def test_session_stats_replace_header_and_compact_action_output(self):
+        from PySide6.QtWidgets import QLabel
+        window = dashboard.RuntimeWindow()
+        try:
+            labels = [label.text() for label in window.findChildren(QLabel)]
+            self.assertIn("SESSION STATS", labels)
+            self.assertIn("ACTION OUTPUT", labels)
+            self.assertNotIn("MACRO RUNTIME", labels)
+            self.assertEqual(set(window.stat_values),
+                             {"TOTAL", "RUNS", "AVG RUN", "CURRENT RUN"})
+            self.assertEqual((window.log.parentWidget().x(), window.log.parentWidget().y()), (18, 406))
+            self.assertLess(window.log.height(), 430)
+            self.assertEqual(window.index_editor.height(), 894)
         finally:
             window.close()
 
