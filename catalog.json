@@ -8,12 +8,12 @@
     {
       "id": "anime-expeditions",
       "name": "Anime Expeditions",
-      "version": "0.1.5",
+      "version": "0.1.8",
       "setup_only": false,
       "entrypoint": "AnimeExpeditions.exe",
-      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.5/AnimeExpeditions-0.1.5-windows.zip",
-      "sha256": "3a22c03d1bd9ac6cd296050e13f85c198043edebe0ab041a7ceaae1fff4bcedf",
-      "description": "Runtime Story navigation test and modern PySide6 Unit Manager: numbered placement markers, upgrade dropdowns, arrow-free X/Y, 104 editable indexes and auto-save. Unit placement/upgrade execution and other modes are not connected."
+      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.8/AnimeExpeditions-0.1.8-windows.zip",
+      "sha256": "8ba38bc73e6728352ad63da083aa9b1a9dd162a271b3ba14bb1a024656e9e059",
+      "description": "Runtime Story navigation test and modern PySide6 Unit Manager: numbered placement markers, upgrade dropdowns, arrow-free X/Y, 104 editable indexes and auto-save, with unit slots 0-6 and a taller 760px Roblox viewport. Unit placement/upgrade execution and other modes are not connected."
     }
   ]
 }
