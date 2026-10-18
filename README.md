@@ -69,3 +69,14 @@ python anime_main.py --config-dir <your-config-folder>.
 
 Never commit webhook URLs, private server links, or personal configurations.
 Previous AHK installations are not migrated or removed.
+
+## Story click and map-list navigation
+
+Story clicks now hover, perform a short two-pixel cursor jitter, return to the
+target center, and only then click. If the chosen map is not visible after
+opening Story, the runtime checks for the map, clicks the lower map-list area,
+and scrolls downward in bounded steps, checking OCR after each step. The F2
+stop hotkey interrupts scrolling and mouse movement. This assumes the map list
+is beneath the lower-middle Roblox client area. Runtime startup retries Roblox
+client alignment so the viewport fills without manually dragging the dashboard.
+This automation still stops after selecting the Story map.

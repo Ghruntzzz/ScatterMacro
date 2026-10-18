@@ -86,3 +86,20 @@ class DashboardSetupTests(unittest.TestCase):
         entry = dashboard.load_unit_indexes(values)[0]
         self.assertEqual(entry["place_at_wave"], "9")
         self.assertEqual(dashboard.load_unit_indexes(dict(values, map="Flower Forest"))[0]["place_at_wave"], "")
+
+    def test_runtime_retries_alignment_after_opening_without_moving(self):
+        from unittest.mock import Mock
+        window = dashboard.RuntimeWindow()
+        window.show()
+        try:
+            window._embed_timer.stop()
+            window._publish_viewport = Mock(side_effect=[False] * 2 + [True] * 8)
+            window._embed_attempts = 0
+            window._embed_successes = 0
+            for _ in range(10):
+                window._align_on_launch()
+            self.assertEqual(window._publish_viewport.call_count, 10)
+            self.assertEqual(window._embed_successes, 8)
+            self.assertFalse(window._embed_timer.isActive())
+        finally:
+            window.close()

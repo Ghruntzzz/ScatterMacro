@@ -840,6 +840,13 @@ class RuntimeWindow(DashboardWindow):
         super().__init__()
         # This must match the established live Roblox viewport exactly.
         self.setFixedSize(1835, 950)
+        # The Roblox client can appear after the first Qt show event. Retry
+        # alignment briefly so dragging the runtime window is never required.
+        self._embed_attempts = 0
+        self._embed_successes = 0
+        self._embed_timer = QTimer(self)
+        self._embed_timer.setInterval(160)
+        self._embed_timer.timeout.connect(self._align_on_launch)
 
     def _small_button(self, parent: QWidget, text: str, x: int, y: int, width: int) -> QPushButton:
         button = QPushButton(text, parent)
@@ -967,9 +974,31 @@ class RuntimeWindow(DashboardWindow):
             self.hotkeys.register()
         except RuntimeError as exc:
             self.log.appendPlainText(str(exc))
-        QTimer.singleShot(50, self._publish_viewport)
+        QTimer.singleShot(0, self._start_auto_embed)
+
+    def _start_auto_embed(self) -> None:
+        if sys.platform != "win32" or not self.isVisible():
+            return
+        self._embed_attempts = 0
+        self._embed_successes = 0
+        self._embed_timer.start()
+        self._align_on_launch()
+
+    def _align_on_launch(self) -> None:
+        if not self.isVisible():
+            self._embed_timer.stop()
+            return
+        aligned = self._publish_viewport()
+        self._embed_attempts += 1
+        if aligned:
+            self._embed_successes += 1
+        # Repeated successful alignment accommodates Roblox/Windows resizing
+        # itself immediately after runtime opens. No indefinite polling.
+        if self._embed_attempts >= 40 or self._embed_successes >= 8:
+            self._embed_timer.stop()
 
     def hideEvent(self, event) -> None:
+        self._embed_timer.stop()
         if hasattr(self, "hotkeys"):
             self.hotkeys.close()
         self._stop_story()
@@ -1003,14 +1032,16 @@ class RuntimeWindow(DashboardWindow):
         shape = QRegion(self.rect()).subtracted(QRegion(self.viewport_rect))
         self.setMask(shape)
         write_runtime_status(int(self.winId()), self.viewport_rect, self)
-        self._align_roblox()
+        if not self.isVisible():
+            return False
+        return self._align_roblox()
 
     def _align_roblox(self):
         from ctypes import wintypes
         from python_macro.capture import roblox_windows
         windows = roblox_windows()
         if len(windows) != 1:
-            return
+            return False
         hwnd = windows[0][0]
         user = ctypes.windll.user32
         user.GetWindowRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
@@ -1019,22 +1050,28 @@ class RuntimeWindow(DashboardWindow):
         user.MoveWindow.argtypes = [wintypes.HWND, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, wintypes.BOOL]
         user.IsIconic.argtypes = [wintypes.HWND]
         if user.IsIconic(hwnd):
-            return
+            # The game must be restored before its client can fill the viewport.
+            user.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
+            user.ShowWindow(hwnd, 9)  # SW_RESTORE
+            return False
         outer, client, origin = wintypes.RECT(), wintypes.RECT(), wintypes.POINT()
         if not (user.GetWindowRect(hwnd, ctypes.byref(outer)) and
                 user.GetClientRect(hwnd, ctypes.byref(client)) and
                 user.ClientToScreen(hwnd, ctypes.byref(origin))):
-            return
+            return False
         ratio = self.devicePixelRatioF()
         # Qt global coordinates can be logical on scaled Windows displays.
         runtime_origin = wintypes.POINT()
         if not user.ClientToScreen(int(self.winId()), ctypes.byref(runtime_origin)):
-            return
+            return False
         x = runtime_origin.x + round(self.viewport_rect.x() * ratio)
         y = runtime_origin.y + round(self.viewport_rect.y() * ratio)
-        user.MoveWindow(hwnd, x - (origin.x - outer.left), y - (origin.y - outer.top),
-                        round(self.viewport_rect.width() * ratio) + outer.right - outer.left - client.right,
-                        round(self.viewport_rect.height() * ratio) + outer.bottom - outer.top - client.bottom, True)
+        success = user.MoveWindow(
+            hwnd, x - (origin.x - outer.left), y - (origin.y - outer.top),
+            round(self.viewport_rect.width() * ratio) + outer.right - outer.left - client.right,
+            round(self.viewport_rect.height() * ratio) + outer.bottom - outer.top - client.bottom, True,
+        )
+        return bool(success)
 
     def _refresh_log(self) -> None:
         if not LOG_PATH.exists():

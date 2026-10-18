@@ -27,7 +27,7 @@ class StoryWorker(QThread):
                 return
             client = RobloxClient(windows[0][0], self.stop)
             navigate_story(self.map_name, client.capture, TextReader(), client.click,
-                           self.stop, self.message.emit)
+                           self.stop, self.message.emit, scroll=client.scroll)
         except Exception as exc:
             self.message.emit(f"Navigation stopped: {exc}")
         finally:
