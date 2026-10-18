@@ -257,19 +257,22 @@ def load_unit_indexes_from_path(config_path: Path, count: int = 6) -> list[dict[
 
 
 class UnitSetupDialog(QDialog):
-    def __init__(self, values, parent=None):
+    def __init__(self, values, parent=None, first_index=1, count=6):
         super().__init__(parent)
+        self.first_index = first_index
+        self.count = count
         self.path = active_unit_config(values)
         self.setWindowTitle("Unit indexes | " + values["map"])
         self.resize(850, 400)
         self.setStyleSheet("QWidget {background:#100c0e;color:#f3eff0;} QComboBox,QSpinBox {background:#24131a;padding:6px;} QPushButton {background:#7e1726;padding:8px;}")
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel("Saved setup only. Coordinates are relative to the Roblox client; no clicks are sent."))
-        self.table = QTableWidget(6, 6)
+        self.table = QTableWidget(count, 6)
+        self.table.setVerticalHeaderLabels([str(i) for i in range(first_index, first_index + count)])
         self.table.setHorizontalHeaderLabels(["Unit slot", "Target", "Upgrade", "Auto upgrade", "X", "Y"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         layout.addWidget(self.table)
-        for row, entry in enumerate(load_unit_indexes(values)):
+        for row, entry in enumerate(load_unit_indexes(values, first_index + count - 1)[first_index - 1:]):
             for col, key in enumerate(("unit", "priority", "upgrade", "auto_upgrade", "x", "y")):
                 if col < 2:
                     widget = QComboBox()
@@ -294,11 +297,11 @@ class UnitSetupDialog(QDialog):
         read_ini(parser, self.path)
         if not parser.has_section("UnitIndexes"):
             parser.add_section("UnitIndexes")
-        for row in range(6):
+        for row in range(self.count):
             for col, key in enumerate(("Unit", "Priority", "Upgrade", "AutoUpgrade", "X", "Y")):
                 widget = self.table.cellWidget(row, col)
                 value = widget.currentText() if col < 2 else "" if widget.value() < 0 else str(widget.value())
-                parser.set("UnitIndexes", f"Index{row + 1}{key}", value)
+                parser.set("UnitIndexes", f"Index{self.first_index + row}{key}", value)
         write_ini(parser, self.path)
         self.accept()
 
@@ -401,12 +404,10 @@ class DashboardWindow(QWidget):
     def _deployment(self) -> None:
         deploy = self._card(18, 540, 1164, 140, 8)
         self._label(deploy, "DEPLOYMENT", 22, 20, 150, 18, f"color: {WINE}; font: 700 9px 'Bahnschrift';")
-        self._label(deploy, "Configure your route. Automation is not connected yet.", 22, 48, 530, 20, f"color: {TEXT}; font: 700 10px 'Bahnschrift';")
+        self._label(deploy, "Story test: Play > Story > selected map. Other modes: setup only.", 22, 48, 530, 20, f"color: {TEXT}; font: 700 10px 'Bahnschrift';")
         self._label(deploy, "Match and Discord settings save automatically.", 22, 73, 360, 18, f"color: {MUTED}; font: 9px 'Segoe UI';")
-        units = self._button(deploy, "UNIT INDEXES", 22, 94, 180)
-        units.setFixedHeight(30)
-        units.clicked.connect(self._open_unit_setup)
-        start = self._button(deploy, "SAVE SETUP", 578, 37, 214, True)
+        start = self._button(deploy, "START STORY" if self.mode_box.currentText() == "Story" else "SAVE SETUP", 578, 37, 214, True)
+        self.start_button = start
         settings = self._button(deploy, "SETTINGS", 812, 37, 164)
         exit_button = self._button(deploy, "EXIT", 996, 37, 154)
         start.clicked.connect(self._start_macro)
@@ -516,6 +517,8 @@ class DashboardWindow(QWidget):
     def _mode_changed(self, _mode: str) -> None:
         self._refresh_route_controls()
         self._save_dashboard()
+        if hasattr(self, "start_button"):
+            self.start_button.setText("START STORY" if _mode == "Story" else "SAVE SETUP")
 
     def _act_changed(self, _act: str) -> None:
         if self.mode_box.currentText() == "Story":
@@ -572,11 +575,24 @@ class DashboardWindow(QWidget):
 
     def _start_macro(self) -> None:
         self._save_dashboard()
-        self._set_status("Setup saved. Navigation and game automation are not connected yet.")
+        if self.mode_box.currentText() != "Story":
+            self._set_status("Setup saved. This mode's automation is not connected yet.")
+            return
+        self.runtime_window = RuntimeWindow()
+        self.runtime_window.setup_dashboard = self
+        self.runtime_window.show()
+        self.hide()
 
     def _open_unit_setup(self) -> None:
-        self._save_dashboard()
-        UnitSetupDialog(read_dashboard_values(), self).exec()
+        if not isinstance(self, RuntimeWindow):
+            return
+        if self.worker is not None and self.worker.isRunning():
+            self.log.appendPlainText("Stop the macro before editing unit indexes.")
+            return
+        first = (self.unit_page - 1) * 6 + 1
+        if UnitSetupDialog(self.values, self, first, min(6, 105 - first)).exec() == QDialog.Accepted:
+            self.unit_indexes = load_unit_indexes(self.values, 104)
+            self._render_unit_manager_page()
 
     def _open_settings(self) -> None:
         self._save_dashboard()
@@ -841,13 +857,17 @@ class RuntimeWindow(DashboardWindow):
         self.log.setReadOnly(True)
         self.log.setPlainText("Runtime is ready.\n\nWaiting for macro activity...")
         self.log.setStyleSheet(f"background: {blend_color(PANEL, '#000000', 0.45)}; border: 1px solid {OUTLINE}; border-radius: 6px; color: {TEXT}; padding: 8px; font: 9px 'Consolas';")
-        test_ping_button = self._small_button(action, "TEST DISCORD PING", 22, 544, 226)
+        self.worker = None
+        self.return_pending = False
+        self.start_runtime_button = self._small_button(action, "START STORY", 22, 544, 108)
+        self.stop_runtime_button = self._small_button(action, "STOP", 140, 544, 108)
+        self.start_runtime_button.clicked.connect(self._start_story)
+        self.stop_runtime_button.clicked.connect(self._stop_story)
         return_button = self._small_button(action, "RETURN TO DASHBOARD", 22, 592, 226)
         return_button.clicked.connect(self._return_to_dashboard)
-        test_ping_button.clicked.connect(lambda: send_command("RuntimeTestPing"))
         self.log_timer = QTimer(self)
         self.log_timer.timeout.connect(self._refresh_log)
-        self.log_timer.start(350)
+        # Worker signals own Action Output; stale file logs must not overwrite it.
         self.state_timer = QTimer(self)
         self.state_timer.timeout.connect(self._refresh_state)
         self.state_timer.start(500)
@@ -858,7 +878,7 @@ class RuntimeWindow(DashboardWindow):
         viewport = QFrame(live)
         viewport.setGeometry(5, 44, self.VIEWPORT_W, self.VIEWPORT_H)
         viewport.setStyleSheet(f"background: transparent; border: 1px solid {WINE_DARK}; border-radius: 8px;")
-        # This opening is a real window-region hole. AutoHotkey moves Roblox behind it.
+        # Keep the Roblox client aligned with this transparent viewport.
         self.viewport_rect = QRect(self.VIEWPORT_X, self.VIEWPORT_Y, self.VIEWPORT_W, self.VIEWPORT_H)
         manager = self._card(1390, 116, 427, 818, 8)
         self.unit_manager = manager
@@ -883,6 +903,8 @@ class RuntimeWindow(DashboardWindow):
         self._combo(self.unit_manager, "UPGRADE", [str(level) for level in range(16)], selected["upgrade"], 22, 196, 175)
         self._combo(self.unit_manager, "AUTO UPGRADE", [str(level) for level in range(7)], selected["auto_upgrade"], 218, 196, 175)
         self._label(self.unit_manager, "INDEXES", 22, 276, 120, 18, f"color: {TEXT}; font: 700 9px 'Bahnschrift';")
+        edit = self._small_button(self.unit_manager, "EDIT INDEXES", 22, 666, 371)
+        edit.clicked.connect(self._open_unit_setup)
         for offset, data in enumerate(indexes):
             x = 22 + (offset % 2) * 196
             y = 304 + (offset // 2) * 112
@@ -924,6 +946,38 @@ class RuntimeWindow(DashboardWindow):
         shape = QRegion(self.rect()).subtracted(QRegion(self.viewport_rect))
         self.setMask(shape)
         write_runtime_status(int(self.winId()), self.viewport_rect, self)
+        self._align_roblox()
+
+    def _align_roblox(self):
+        from ctypes import wintypes
+        from python_macro.capture import roblox_windows
+        windows = roblox_windows()
+        if len(windows) != 1:
+            return
+        hwnd = windows[0][0]
+        user = ctypes.windll.user32
+        user.GetWindowRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
+        user.GetClientRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
+        user.ClientToScreen.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.POINT)]
+        user.MoveWindow.argtypes = [wintypes.HWND, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, wintypes.BOOL]
+        user.IsIconic.argtypes = [wintypes.HWND]
+        if user.IsIconic(hwnd):
+            return
+        outer, client, origin = wintypes.RECT(), wintypes.RECT(), wintypes.POINT()
+        if not (user.GetWindowRect(hwnd, ctypes.byref(outer)) and
+                user.GetClientRect(hwnd, ctypes.byref(client)) and
+                user.ClientToScreen(hwnd, ctypes.byref(origin))):
+            return
+        ratio = self.devicePixelRatioF()
+        # Qt global coordinates can be logical on scaled Windows displays.
+        runtime_origin = wintypes.POINT()
+        if not user.ClientToScreen(int(self.winId()), ctypes.byref(runtime_origin)):
+            return
+        x = runtime_origin.x + round(self.viewport_rect.x() * ratio)
+        y = runtime_origin.y + round(self.viewport_rect.y() * ratio)
+        user.MoveWindow(hwnd, x - (origin.x - outer.left), y - (origin.y - outer.top),
+                        round(self.viewport_rect.width() * ratio) + outer.right - outer.left - client.right,
+                        round(self.viewport_rect.height() * ratio) + outer.bottom - outer.top - client.bottom, True)
 
     def _refresh_log(self) -> None:
         if not LOG_PATH.exists():
@@ -941,13 +995,55 @@ class RuntimeWindow(DashboardWindow):
         return
 
     def _return_to_dashboard(self) -> None:
-        self._runtime_close_requested = True
-        send_command("RuntimeClose")
+        self.return_pending = True
+        if self.worker is not None and self.worker.isRunning():
+            self._stop_story()
+            return
+        self._restore_setup()
         self.close()
 
+    def _start_story(self) -> None:
+        if self.values["mode"] != "Story":
+            self.log.appendPlainText("Only Story navigation is available.")
+            return
+        if self.return_pending or (self.worker is not None and self.worker.isRunning()):
+            return
+        from ui.story_navigation import StoryWorker
+        self._align_roblox()
+        self.worker = StoryWorker(self.values["map"], self)
+        self.worker.message.connect(self.log.appendPlainText)
+        self.worker.finished.connect(self._story_finished)
+        self.start_runtime_button.setEnabled(False)
+        self.runtime_status.setText("RUNNING")
+        self.worker.start()
+
+    def _stop_story(self) -> None:
+        if self.worker is not None and self.worker.isRunning():
+            self.worker.stop.set()
+            self.runtime_status.setText("STOPPING")
+
+    def _story_finished(self) -> None:
+        self.runtime_status.setText("READY")
+        self.start_runtime_button.setEnabled(True)
+        if self.worker is not None:
+            self.worker.deleteLater()
+            self.worker = None
+        if self.return_pending:
+            self._restore_setup()
+            self.close()
+
+    def _restore_setup(self) -> None:
+        if not hasattr(self, "setup_dashboard"):
+            self.setup_dashboard = DashboardWindow()
+        self.setup_dashboard.show()
+
     def closeEvent(self, event) -> None:
-        if not getattr(self, "_runtime_close_requested", False):
-            send_command("RuntimeClose")
+        if self.worker is not None and self.worker.isRunning():
+            self.return_pending = True
+            self._stop_story()
+            event.ignore()
+            return
+        self._restore_setup()
         super().closeEvent(event)
 
 
