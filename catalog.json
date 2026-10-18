@@ -8,11 +8,11 @@
     {
       "id": "anime-expeditions",
       "name": "Anime Expeditions",
-      "version": "0.1.24",
+      "version": "0.1.25",
       "setup_only": false,
       "entrypoint": "AnimeExpeditions.exe",
-      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.24/AnimeExpeditions-0.1.24-windows.zip",
-      "sha256": "56871bd63a2f478a8d16971eec538337a6082a2fdae7504243a63c41d0b5344c",
+      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.25/AnimeExpeditions-0.1.25-windows.zip",
+      "sha256": "26c4817ac8028dc5ad546cd9274da9b0c36625033db1b5e53027817195b6087e",
       "description": "Compact runtime with Session Stats above Action Output, taller Roblox viewport, faster Story navigation and image-based act label recognition (1-5, infinity, M) without stars. Uses confirmed SendInput hover/wiggle clicking. Unit placement/upgrades not yet automated."
     }
   ]
