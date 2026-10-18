@@ -1,4 +1,6 @@
 from threading import Event
+from pathlib import Path
+import sys
 
 from PySide6.QtCore import QThread, Signal
 from PySide6.QtWidgets import QDialog, QPlainTextEdit, QPushButton, QVBoxLayout
@@ -7,6 +9,7 @@ from python_macro.capture import roblox_windows
 from python_macro.input import RobloxClient
 from python_macro.ocr import TextReader
 from python_macro.story import navigate_story
+from python_macro.vision import PlayIconLocator
 
 
 class StoryWorker(QThread):
@@ -26,8 +29,11 @@ class StoryWorker(QThread):
             if self.stop.wait(3):
                 return
             client = RobloxClient(windows[0][0], self.stop)
+            root = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[1]))
+            play_icon = PlayIconLocator(root / "assets" / "play-button-template.png")
             navigate_story(self.map_name, client.capture, TextReader(), client.click,
-                           self.stop, self.message.emit, scroll=client.scroll)
+                           self.stop, self.message.emit, scroll=client.scroll,
+                           find_play=play_icon)
         except Exception as exc:
             self.message.emit(f"Navigation stopped: {exc}")
         finally:
