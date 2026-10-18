@@ -91,7 +91,7 @@ class StartButtonLocator:
             raise ValueError("Expected color screenshot.")
         image = np.ascontiguousarray(frame[:, :, :3])
         best = None
-        for scale in (0.70, 0.80, 0.90, 1.0, 1.10, 1.20, 1.30, 1.45, 1.60):
+        for scale in (0.70, 0.80, 0.85, 0.90, 1.0, 1.10, 1.20, 1.30, 1.45, 1.60):
             tw = round(self.template.shape[1] * scale)
             th = round(self.template.shape[0] * scale)
             if tw >= image.shape[1] or th >= image.shape[0]:
