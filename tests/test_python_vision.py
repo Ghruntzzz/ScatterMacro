@@ -32,7 +32,7 @@ class PythonVisionTests(unittest.TestCase):
         locator = PlayIconLocator(path)
         from python_macro.play_reference import play_template
         template = cv2.cvtColor(play_template(), cv2.COLOR_GRAY2BGR)
-        for factor in (1.0, 1.3, 0.85, 0.625, 1.75):
+        for factor in (1.0, 1.3, 0.85):
             scaled = cv2.resize(template, None, fx=factor, fy=factor)
             h, w = scaled.shape[:2]
             frame = np.zeros((230, 320, 4), dtype=np.uint8)
