@@ -11,6 +11,7 @@ on:
       - tools/BuildAnimeExpeditions.ps1
       - tools/PackageMacro.py
       - tests/test_unit_manager.py
+      - tests/test_deployment.py
       - anime_main.py
       - .github/workflows/publish-anime-expeditions.yml
   workflow_dispatch:
@@ -45,12 +46,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '0.1.8'
+          $version = '0.1.9'
           $tag = "anime-expeditions-v$version"
           $name = "AnimeExpeditions-$version-windows.zip"
           $archive = "dist/$name"
           if (!(Test-Path $archive)) { throw "Missing macro ZIP: $archive" }
-          gh release create $tag $archive --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Anime Expeditions $version - Unit Slots and Taller Viewport" --notes "Runtime dashboard: Numbered placement markers, arrow-free position fields, dropdown upgrades, no jump section, unit slots limited to 0–6 and a cleaner runtime Action Output without the extra Stop button. F2 stop remains active. Roblox viewport extends from 720 to 760 px high within the runtime, with the client aligned to the full height. Copy/paste and auto-save preserved. Preserves existing route configurations. Story navigation remains limited; unit placement and upgrades are not automated."
+          gh release create $tag $archive --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Anime Expeditions $version - Place at Wave" --notes "Runtime dashboard: Numbered placement markers, arrow-free position fields, dropdown upgrades, no jump section, unit slots 0-6, optional per-index Place at wave field, wave-gating helper and a clean runtime Action Output without the extra Stop button. F2 stop remains active. Roblox viewport extends from 720 to 760 px high within the runtime, with the client aligned to the full height. Copy/paste and auto-save preserved. Preserves existing route configurations. Story navigation remains limited; unit placement and upgrades are not automated."
           if ($LASTEXITCODE -ne 0) { throw 'Macro release upload failed' }
           New-Item -ItemType Directory -Force 'dist/verified' | Out-Null
           gh release download $tag --repo $env:GITHUB_REPOSITORY --pattern $name --dir 'dist/verified'
@@ -62,7 +63,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '0.1.8'
+          $version = '0.1.9'
           $archive = "dist/AnimeExpeditions-$version-windows.zip"
           $sha256 = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
           $url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/anime-expeditions-v$version/AnimeExpeditions-$version-windows.zip"
@@ -75,7 +76,7 @@ jobs:
           $macro[0].version = $version
           $macro[0].url = $url
           $macro[0].sha256 = $sha256
-          $macro[0].description = "Runtime Story navigation test and modern PySide6 Unit Manager: numbered placement markers, upgrade dropdowns, arrow-free X/Y, 104 editable indexes and auto-save, with unit slots 0-6 and a taller 760px Roblox viewport. Unit placement/upgrade execution and other modes are not connected."
+          $macro[0].description = "Runtime Story navigation test and modern PySide6 Unit Manager: numbered placement markers, upgrade dropdowns, arrow-free X/Y, 104 editable indexes and auto-save, with Place at wave saved per index, unit slots 0-6 and a taller 760px Roblox viewport. Automatic wave detection and unit placement are not connected. Unit placement/upgrade execution and other modes are not connected."
           $catalog | ConvertTo-Json -Depth 20 | Set-Content catalog.json -Encoding utf8
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

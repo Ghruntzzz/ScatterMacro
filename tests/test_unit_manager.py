@@ -144,3 +144,27 @@ class UnitManagerTests(unittest.TestCase):
         self.assertEqual(image.markers, expected)
         self.assertTrue(image.read_only)
         self.assertFalse(image.pixmap().isNull())
+
+    def test_place_at_wave_textbox_saves_and_appears_on_cards(self):
+        from PySide6.QtWidgets import QLineEdit
+        self.assertIsInstance(self.widget.fields["place_at_wave"], QLineEdit)
+        self.widget.wave_input.setText("12")
+        self.widget.wave_input.editingFinished.emit()
+        self.assertEqual(self.entries[0]["place_at_wave"], "12")
+        self.assertEqual(self.save.call_args.args[1]["place_at_wave"], "12")
+        self.assertIn("Wave 12", self.widget.cards[0].text())
+        self.widget.copy_index()
+        self.widget.select(3)
+        self.widget.paste_index()
+        self.assertEqual(self.entries[3]["place_at_wave"], "12")
+        self.widget.clear_index()
+        self.assertEqual(self.entries[3]["place_at_wave"], "")
+
+    def test_blank_wave_is_immediate_and_legacy_rows_read_empty(self):
+        self.assertEqual(self.widget.wave_input.text(), "")
+        self.assertIn("Any wave", self.widget.cards[0].text())
+        self.widget.select(7)
+        self.assertEqual(self.widget.wave_input.text(), "")
+        self.widget.wave_input.setText("5")
+        self.widget.wave_input.editingFinished.emit()
+        self.assertEqual(self.entries[7]["place_at_wave"], "5")

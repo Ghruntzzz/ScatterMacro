@@ -75,3 +75,14 @@ class DashboardSetupTests(unittest.TestCase):
             self.assertEqual(window.viewport_rect.width(), 1060)
         finally:
             window.close()
+
+    def test_place_at_wave_persists_on_selected_route(self):
+        values = dashboard.read_dashboard_values()
+        dialog = dashboard.UnitSetupDialog(values)
+        self.assertEqual(dialog.table.columnCount(), 7)
+        wave = dialog.table.cellWidget(0, 6)
+        wave.setText("9")
+        dialog.save()
+        entry = dashboard.load_unit_indexes(values)[0]
+        self.assertEqual(entry["place_at_wave"], "9")
+        self.assertEqual(dashboard.load_unit_indexes(dict(values, map="Flower Forest"))[0]["place_at_wave"], "")

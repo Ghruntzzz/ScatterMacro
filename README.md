@@ -25,7 +25,7 @@ Select Install on Anime Expeditions, then Open. The installed setup app provides
 Current flow: Install -> Open -> choose route -> configure unit indexes and
 settings -> Save Setup. Nothing is sent to Roblox. Navigation, detection, camera
 setup, placing/upgrading units, card selection, rewards, repeat stage, global
-hotkeys, and webhook delivery are not connected yet. Settings for those features
+hotkeys, wave reading, unit placement, and webhook delivery are not connected yet.\nA tested wave-gating helper can defer a unit index until its requested wave\nwithout blocking later ready indexes, but has not yet been wired into live play. Settings for those features
 are preparation, not a claim that automation is running.
 
 ## Installation and updates

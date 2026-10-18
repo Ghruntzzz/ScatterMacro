@@ -6,8 +6,8 @@ import os
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import QPoint, QRect, QTimer, Qt
-from PySide6.QtGui import QColor, QFont, QFontDatabase, QKeySequence, QLinearGradient, QPainter, QPainterPath, QPixmap, QRadialGradient, QRegion
+from PySide6.QtCore import QPoint, QRect, QTimer, Qt, QRegularExpression
+from PySide6.QtGui import QColor, QFont, QFontDatabase, QKeySequence, QRegularExpressionValidator, QLinearGradient, QPainter, QPainterPath, QPixmap, QRadialGradient, QRegion
 from PySide6.QtWidgets import QApplication, QComboBox, QDialog, QDialogButtonBox, QFrame, QHeaderView, QLabel, QLineEdit, QMessageBox, QPlainTextEdit, QPushButton, QSpinBox, QTableWidget, QVBoxLayout, QWidget
 
 
@@ -251,6 +251,7 @@ def load_unit_indexes_from_path(config_path: Path, count: int = 6) -> list[dict[
                 "auto_upgrade": section.get(f"{prefix}AutoUpgrade", "0"),
                 "x": section.get(f"{prefix}X", ""),
                 "y": section.get(f"{prefix}Y", ""),
+                "place_at_wave": section.get(f"{prefix}PlaceAtWave", ""),
             }
         )
     return indexes
@@ -263,17 +264,17 @@ class UnitSetupDialog(QDialog):
         self.count = count
         self.path = active_unit_config(values)
         self.setWindowTitle("Unit indexes | " + values["map"])
-        self.resize(850, 400)
+        self.resize(980, 400)
         self.setStyleSheet("QWidget {background:#100c0e;color:#f3eff0;} QComboBox,QSpinBox {background:#24131a;padding:6px;} QPushButton {background:#7e1726;padding:8px;}")
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel("Saved setup only. Coordinates are relative to the Roblox client; no clicks are sent."))
-        self.table = QTableWidget(count, 6)
+        self.table = QTableWidget(count, 7)
         self.table.setVerticalHeaderLabels([str(i) for i in range(first_index, first_index + count)])
-        self.table.setHorizontalHeaderLabels(["Unit slot", "Target", "Upgrade", "Auto upgrade", "X", "Y"])
+        self.table.setHorizontalHeaderLabels(["Unit slot", "Target", "Upgrade", "Auto upgrade", "X", "Y", "Place at wave"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         layout.addWidget(self.table)
         for row, entry in enumerate(load_unit_indexes(values, first_index + count - 1)[first_index - 1:]):
-            for col, key in enumerate(("unit", "priority", "upgrade", "auto_upgrade", "x", "y")):
+            for col, key in enumerate(("unit", "priority", "upgrade", "auto_upgrade", "x", "y", "place_at_wave")):
                 if col < 2:
                     widget = QComboBox()
                     widget.addItems([str(i) for i in range(7)] if col == 0 else ["First", "Last", "Closest", "Strongest", "Weakest", "Flying"])
@@ -285,6 +286,12 @@ class UnitSetupDialog(QDialog):
                     if value not in [widget.itemText(i) for i in range(widget.count())]:
                         widget.addItem(value)
                     widget.setCurrentText(value)
+                elif col == 6:
+                    widget = QLineEdit(entry[key])
+                    widget.setPlaceholderText("Any wave")
+                    widget.setValidator(QRegularExpressionValidator(
+                        QRegularExpression(r"(?:[1-9][0-9]{0,3})?"), widget
+                    ))
                 else:
                     widget = QSpinBox()
                     widget.setRange(-1 if col >= 4 else 0, 10000 if col >= 4 else 100)
@@ -303,9 +310,14 @@ class UnitSetupDialog(QDialog):
         if not parser.has_section("UnitIndexes"):
             parser.add_section("UnitIndexes")
         for row in range(self.count):
-            for col, key in enumerate(("Unit", "Priority", "Upgrade", "AutoUpgrade", "X", "Y")):
+            for col, key in enumerate(("Unit", "Priority", "Upgrade", "AutoUpgrade", "X", "Y", "PlaceAtWave")):
                 widget = self.table.cellWidget(row, col)
-                value = widget.currentText() if col < 2 else "" if widget.value() < 0 else str(widget.value())
+                value = (widget.currentText() if col < 2
+                         else widget.text().strip() if col == 6
+                         else "" if widget.value() < 0 else str(widget.value()))
+                if col == 6:
+                    from python_macro.deployment import requested_wave
+                    requested_wave(value)
                 parser.set("UnitIndexes", f"Index{self.first_index + row}{key}", value)
         write_ini(parser, self.path)
         self.accept()
@@ -897,9 +909,12 @@ class RuntimeWindow(DashboardWindow):
         read_ini(parser, self.unit_config_path)
         if not parser.has_section("UnitIndexes"):
             parser.add_section("UnitIndexes")
+        from python_macro.deployment import requested_wave
+        requested_wave(entry.get("place_at_wave", ""))
         for key, suffix in (("unit", "Unit"), ("priority", "Priority"), ("upgrade", "Upgrade"),
-                            ("auto_upgrade", "AutoUpgrade"), ("x", "X"), ("y", "Y")):
-            parser.set("UnitIndexes", f"Index{index + 1}{suffix}", entry[key])
+                            ("auto_upgrade", "AutoUpgrade"), ("x", "X"), ("y", "Y"),
+                            ("place_at_wave", "PlaceAtWave")):
+            parser.set("UnitIndexes", f"Index{index + 1}{suffix}", entry.get(key, ""))
         write_ini(parser, self.unit_config_path)
 
     def _render_unit_manager_page(self) -> None:

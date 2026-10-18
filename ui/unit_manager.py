@@ -1,17 +1,17 @@
 """AHK-style in-dashboard Unit Manager with per-route auto-saving indexes."""
 from math import ceil
 
-from PySide6.QtCore import Qt, Signal, QPointF, QRectF
-from PySide6.QtGui import QImage, QPixmap, QPainter, QColor, QPen, QFont
+from PySide6.QtCore import Qt, Signal, QPointF, QRectF, QRegularExpression
+from PySide6.QtGui import QImage, QPixmap, QPainter, QColor, QPen, QFont, QRegularExpressionValidator
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QPushButton,
-    QComboBox, QSpinBox, QDialog, QFrame, QAbstractSpinBox,
+    QComboBox, QSpinBox, QDialog, QFrame, QAbstractSpinBox, QLineEdit,
 )
 
 
 EMPTY_INDEX = {
     "unit": "0", "priority": "First", "upgrade": "0",
-    "auto_upgrade": "0", "x": "", "y": "",
+    "auto_upgrade": "0", "x": "", "y": "", "place_at_wave": "",
 }
 PAGE_SIZE = 6
 TARGETS = ["First", "Last", "Closest", "Strongest", "Boss",
@@ -177,6 +177,23 @@ class UnitManager(QWidget):
             grid.addWidget(field, row + 1, col)
         editor.addLayout(grid)
 
+        wave_row = QHBoxLayout()
+        wave_row.setSpacing(7)
+        wave_row.addWidget(self._text("Place at wave", "subtitle"))
+        self.wave_input = QLineEdit()
+        self.wave_input.setObjectName("place-at-wave")
+        self.wave_input.setFixedWidth(82)
+        self.wave_input.setPlaceholderText("Any")
+        self.wave_input.setToolTip("Enter a wave from 1 to 9999, or leave blank to place when ready.")
+        self.wave_input.setValidator(QRegularExpressionValidator(
+            QRegularExpression(r"(?:[1-9][0-9]{0,3})?"), self.wave_input
+        ))
+        self.wave_input.editingFinished.connect(self.changed)
+        self.fields["place_at_wave"] = self.wave_input
+        wave_row.addWidget(self.wave_input)
+        wave_row.addWidget(self._text("Blank = no wave delay", "subtitle"))
+        editor.addLayout(wave_row)
+
         position_actions = QHBoxLayout()
         self.capture_button = self._button("Set position", self.capture_position, "primary")
         self.view_positions_button = self._button("View markers", self.view_positions)
@@ -261,6 +278,8 @@ class UnitManager(QWidget):
                     # Retain historical upgrade or target choices.
                     field.addItem(value)
                 field.setCurrentText(value)
+            elif isinstance(field, QLineEdit):
+                field.setText(value)
             else:
                 field.setValue(int(value) if value else -1 if key in ("x", "y") else 0)
         self.loading = False
@@ -278,10 +297,12 @@ class UnitManager(QWidget):
             entry = self.entries[index]
             coords = (f"{entry['x']}, {entry['y']}"
                       if entry.get("x", "") != "" and entry.get("y", "") != "" else "Not set")
+            wave = entry.get("place_at_wave", "")
+            wave_label = f"Wave {wave}" if wave else "Any wave"
             button.setText(
                 f"{index + 1:02d}   Unit {entry['unit']}  ·  {entry['priority']}\n"
                 f"Upgrade {entry['upgrade']}  /  Auto {entry['auto_upgrade']}\n"
-                f"POS  {coords}"
+                f"POS  {coords}  ·  {wave_label}"
             )
             button.setProperty("selected", index == self.selected)
             button.style().unpolish(button)
@@ -293,7 +314,10 @@ class UnitManager(QWidget):
         if self.busy():
             self.log("Stop the macro before editing unit indexes.")
             return False
+        entry = {**EMPTY_INDEX, **entry}
         try:
+            from python_macro.deployment import requested_wave
+            requested_wave(entry["place_at_wave"])
             self.save(self.selected, entry)
         except (OSError, ValueError) as error:
             self.log(f"Could not save index: {error}")
@@ -306,15 +330,16 @@ class UnitManager(QWidget):
         if self.loading:
             return
         entry = {
-            key: field.currentText() if isinstance(field, QComboBox)
-            else ("" if field.value() < 0 else str(field.value()))
+            key: (field.currentText() if isinstance(field, QComboBox)
+                  else field.text().strip() if isinstance(field, QLineEdit)
+                  else "" if field.value() < 0 else str(field.value()))
             for key, field in self.fields.items()
         }
         if not self._commit(entry):
             self.select(self.selected)
 
     def copy_index(self):
-        self.copied_index = dict(self.entries[self.selected])
+        self.copied_index = {**EMPTY_INDEX, **self.entries[self.selected]}
         self.paste_button.setEnabled(True)
         self.log(f"Copied unit index {self.selected + 1}.")
 
