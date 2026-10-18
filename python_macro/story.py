@@ -224,7 +224,9 @@ def navigate_story(map_name, capture, reader, click, stop, log, timeout=30,
             frame = capture()
             target = find_start(frame)
             if target is not None:
-                if click(int(target[0]), int(target[1]), frame.shape) is False:
+                x, y = int(target[0]), int(target[1])
+                log(f"Start button image found at ({x}, {y}); score {target[2]:.2f}.")
+                if click(x, y, frame.shape) is False:
                     return
                 break
             if stop.wait(0.08):

@@ -104,4 +104,11 @@ class StartButtonLocator:
         if best is None or best[0] < self.min_score:
             return None
         score, (x, y), tw, th = best
-        return x + tw // 2, y + th // 2, score
+        # Check that the full candidate is actually green, rather than a
+        # high-correlating text label or another dark element on screen.
+        patch = image[y:y + th, x:x + tw]
+        hsv = cv2.cvtColor(patch, cv2.COLOR_BGR2HSV)
+        green = cv2.inRange(hsv, (28, 65, 65), (94, 255, 255))
+        if cv2.countNonZero(green) < 0.45 * tw * th:
+            return None
+        return x + tw // 2, y + th // 2, float(score)

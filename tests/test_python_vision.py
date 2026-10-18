@@ -50,3 +50,25 @@ class PythonVisionTests(unittest.TestCase):
         frame = np.zeros((230, 320, 4), dtype=np.uint8)
         frame[:, :, :3] = (20, 28, 30)
         self.assertIsNone(locator(frame))
+
+    def test_start_button_reference_clicks_its_center(self):
+        from python_macro.vision import StartButtonLocator
+        path = Path(__file__).resolve().parents[1] / "assets" / "start-button-template.png"
+        locator = StartButtonLocator(path)
+        template = cv2.imread(str(path))
+        self.assertEqual(template.shape[:2], (38, 142))
+        for factor in (1.0, 1.2, 0.85):
+            scaled = cv2.resize(template, None, fx=factor, fy=factor)
+            h, w = scaled.shape[:2]
+            canvas = np.full((270, 350, 4), 20, dtype=np.uint8)
+            canvas[64:64+h, 82:82+w, :3] = scaled
+            result = locator(canvas)
+            self.assertIsNotNone(result, str(factor))
+            self.assertLessEqual(abs(result[0] - (82 + w // 2)), 2)
+            self.assertLessEqual(abs(result[1] - (64 + h // 2)), 2)
+
+    def test_start_button_rejects_empty_client_image(self):
+        from python_macro.vision import StartButtonLocator
+        path = Path(__file__).resolve().parents[1] / "assets" / "start-button-template.png"
+        locator = StartButtonLocator(path)
+        self.assertIsNone(locator(np.zeros((220, 350, 4), dtype=np.uint8)))
