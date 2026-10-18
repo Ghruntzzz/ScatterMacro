@@ -99,3 +99,15 @@ then holds left button down for 120ms and always sends button-up (even on F2).
 A failure to inject or position the pointer surfaces an explicit diagnostic.
 Screen-state verification remains separate: the Play icon is not considered
 clicked until the Story menu is detected.
+
+## Native mouse movement and AHK-style retry
+
+Roblox may show the pointer over a button without consuming a click when
+`SetCursorPos` repositioning doesn't feed the game's mouse-motion path.
+The runtime now injects actual Win32 mouse move packets during the brief
+jitter and recenters before clicking. It first clicks using checked
+`SendInput`, verifies that Story appears, and if it doesn't, retries
+the Play icon using a Win32 Event-style click (similar to AHK's Event mode).
+Both methods preserve F2 cancellation and mouse-button release. Since the
+original Anime Expeditions AHK script is not present in this repository, the
+exact historical command cannot be verified.

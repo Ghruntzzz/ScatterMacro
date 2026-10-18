@@ -33,7 +33,7 @@ class StoryWorker(QThread):
             play_icon = PlayIconLocator(root / "assets" / "play-button-template.png")
             navigate_story(self.map_name, client.capture, TextReader(), client.click,
                            self.stop, self.message.emit, scroll=client.scroll,
-                           find_play=play_icon)
+                           find_play=play_icon, alternate_click=client.click_event)
         except Exception as exc:
             self.message.emit(f"Navigation stopped: {exc}")
         finally:

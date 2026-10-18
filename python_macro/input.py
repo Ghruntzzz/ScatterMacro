@@ -9,6 +9,7 @@ POST_JITTER_SECONDS = 0.045
 CLICK_HOLD_SECONDS = 0.12
 WHEEL_DELTA = 120
 
+MOUSE_MOVE = 0x0001
 MOUSE_LEFT_DOWN = 0x0002
 MOUSE_LEFT_UP = 0x0004
 MOUSE_WHEEL = 0x0800
@@ -52,6 +53,9 @@ class RobloxClient:
         self.user.SetCursorPos.restype = wintypes.BOOL
         self.user.SendInput.argtypes = [wintypes.UINT, ctypes.POINTER(INPUT), ctypes.c_int]
         self.user.SendInput.restype = wintypes.UINT
+        self.user.mouse_event.argtypes = [wintypes.DWORD, wintypes.DWORD,
+                                         wintypes.DWORD, wintypes.DWORD, ctypes.c_size_t]
+        self.user.mouse_event.restype = None
 
     def check_focus(self):
         if self.user.GetForegroundWindow() != self.hwnd:
@@ -93,12 +97,12 @@ class RobloxClient:
                 f"actual ({actual.x}, {actual.y}). Check Windows scaling."
             )
 
-    def _send_mouse(self, flags, data=0):
+    def _send_mouse(self, flags, data=0, dx=0, dy=0):
         # Unlike legacy mouse_event, SendInput returns the number of accepted
         # inputs. A zero return is a transport failure, not a successful click.
         packet = INPUT(type=INPUT_MOUSE,
                        data=INPUT_UNION(mi=MOUSEINPUT(
-                           dx=0, dy=0,
+                           dx=dx, dy=dy,
                            mouseData=data & 0xffffffff,
                            dwFlags=flags, time=0, dwExtraInfo=0,
                        )))
@@ -111,6 +115,21 @@ class RobloxClient:
             )
 
     def click(self, x, y, shape):
+        return self._click(x, y, shape, method="input")
+
+    def click_event(self, x, y, shape):
+        """AHK SendMode Event-like attempt when SendInput did not change the menu."""
+        return self._click(x, y, shape, method="event")
+
+    def _button_event(self, flag, method):
+        if method == "event":
+            # AutoHotkey Event-like Win32 mouse_event. Unlike SendInput this API
+            # cannot report injection acceptance: menu-state validation is mandatory.
+            self.user.mouse_event(flag, 0, 0, 0, 0)
+        else:
+            self._send_mouse(flag)
+
+    def _click(self, x, y, shape, method):
         if self.stop.is_set():
             return False
         point, rect = self._validated_point(x, y, shape)
@@ -128,8 +147,16 @@ class RobloxClient:
                 point.x + max(-x, min(dx, rect.right - 1 - x)),
                 point.y + max(-y, min(dy, rect.bottom - 1 - y)),
             )
+            # SetCursorPos alone can move the visible pointer without
+            # feeding Roblox's mouse-move input path. Inject real motion
+            # events, then return to the exact intended pixel before clicking.
+            self._send_mouse(MOUSE_MOVE, dx=1)
+            self._send_mouse(MOUSE_MOVE, dx=-1)
             if self.stop.wait(JITTER_SECONDS):
                 return False
+        # Recenter after injected movement (Windows pointer acceleration may
+        # round tiny relative moves). Keep the button-up at the same pixel.
+        self._move(point.x, point.y)
         if self.stop.wait(POST_JITTER_SECONDS):
             return False
         final, _ = self._validated_point(x, y, shape)
@@ -138,12 +165,12 @@ class RobloxClient:
         self._check_cursor(point.x, point.y)
         if self.stop.is_set():
             return False
-        self._send_mouse(MOUSE_LEFT_DOWN)
+        self._button_event(MOUSE_LEFT_DOWN, method)
         try:
             self.stop.wait(CLICK_HOLD_SECONDS)
         finally:
             # Always release even if F2 stops the macro during the click.
-            self._send_mouse(MOUSE_LEFT_UP)
+            self._button_event(MOUSE_LEFT_UP, method)
         return not self.stop.is_set()
 
     def scroll(self, steps, x, y, shape):

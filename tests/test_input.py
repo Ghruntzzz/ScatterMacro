@@ -5,7 +5,7 @@ from ctypes import wintypes
 from python_macro.input import (
     RobloxClient, HOVER_SECONDS, JITTER_SECONDS, JITTER_OFFSETS,
     POST_JITTER_SECONDS, CLICK_HOLD_SECONDS,
-    MOUSE_LEFT_DOWN, MOUSE_LEFT_UP, MOUSE_WHEEL, WHEEL_DELTA,
+    MOUSE_MOVE, MOUSE_LEFT_DOWN, MOUSE_LEFT_UP, MOUSE_WHEEL, WHEEL_DELTA,
     INPUT, MOUSEINPUT,
 )
 
@@ -43,7 +43,7 @@ class ClickTests(unittest.TestCase):
         client.user.ClientToScreen.return_value = True
         return client
 
-    def test_hover_then_jitter_then_checked_down_up(self):
+    def test_hover_then_native_motion_jitter_then_checked_down_up(self):
         client = self.client()
         events = []
         client.stop.wait.side_effect = lambda s: events.append(("wait", s)) or False
@@ -58,20 +58,37 @@ class ClickTests(unittest.TestCase):
         def inject(count, pointer, size):
             self.assertEqual(count, 1)
             self.assertEqual(size, __import__("ctypes").sizeof(INPUT))
-            events.append(("send", pointer._obj.data.mi.dwFlags))
+            events.append(("send", pointer._obj.data.mi.dwFlags,
+                           pointer._obj.data.mi.dx))
             return 1
 
         client.user.SendInput.side_effect = inject
         self.assertTrue(client.click(20, 30, (80, 100, 4)))
-        self.assertEqual(events, [
-            ("move", 20, 30), ("wait", HOVER_SECONDS),
-            ("move", 18, 30), ("wait", JITTER_SECONDS),
-            ("move", 22, 30), ("wait", JITTER_SECONDS),
-            ("move", 20, 30), ("wait", JITTER_SECONDS),
-            ("wait", POST_JITTER_SECONDS),
-            ("send", MOUSE_LEFT_DOWN), ("wait", CLICK_HOLD_SECONDS),
-            ("send", MOUSE_LEFT_UP),
+        self.assertEqual([x[1:] for x in events if x[0] == "move"],
+                         [(20, 30), (18, 30), (22, 30), (20, 30), (20, 30)])
+        injections = [x for x in events if x[0] == "send"]
+        self.assertEqual(injections, [
+            ("send", MOUSE_MOVE, 1), ("send", MOUSE_MOVE, -1),
+            ("send", MOUSE_MOVE, 1), ("send", MOUSE_MOVE, -1),
+            ("send", MOUSE_MOVE, 1), ("send", MOUSE_MOVE, -1),
+            ("send", MOUSE_LEFT_DOWN, 0),
+            ("send", MOUSE_LEFT_UP, 0),
         ])
+        self.assertLess(events.index(("wait", HOVER_SECONDS)),
+                        events.index(("send", MOUSE_MOVE, 1)))
+        self.assertLess(events.index(("send", MOUSE_MOVE, -1)),
+                        events.index(("send", MOUSE_LEFT_DOWN, 0)))
+        self.assertIn(("wait", CLICK_HOLD_SECONDS), events)
+
+    def test_ahk_event_fallback_preserves_hover_and_mouse_release(self):
+        client = self.client()
+        self.assertTrue(client.click_event(20, 30, (80, 100, 4)))
+        self.assertEqual([call.args[0] for call in client.user.mouse_event.call_args_list],
+                         [MOUSE_LEFT_DOWN, MOUSE_LEFT_UP])
+        self.assertEqual(
+            [c.args[1]._obj.data.mi.dwFlags for c in client.user.SendInput.call_args_list],
+            [MOUSE_MOVE, MOUSE_MOVE] * len(JITTER_OFFSETS),
+        )
 
     def test_jitter_stays_inside_client_near_edges(self):
         client = self.client()

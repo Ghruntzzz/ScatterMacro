@@ -14,7 +14,8 @@ def normalize(text):
 
 
 def navigate_story(map_name, capture, reader, click, stop, log, timeout=30,
-                   scroll=None, max_map_scrolls=MAX_MAP_SCROLLS, find_play=None):
+                   scroll=None, max_map_scrolls=MAX_MAP_SCROLLS, find_play=None,
+                   alternate_click=None):
     """Find Play -> Story -> chosen map, scrolling only when the map is absent.
 
     No unit placement follows this navigation yet. All clicking is delegated to
@@ -37,8 +38,10 @@ def navigate_story(map_name, capture, reader, click, stop, log, timeout=30,
                     return
                 continue
             attempts += 1
-            log(f"Play icon found. Clicking (attempt {attempts}/3).")
-            click(position[0], position[1], frame.shape)
+            method = "Event fallback" if attempts > 1 and alternate_click else "SendInput"
+            log(f"Play icon found. Clicking with {method} (attempt {attempts}/3).")
+            click_method = alternate_click if attempts > 1 and alternate_click else click
+            click_method(position[0], position[1], frame.shape)
             if stop.is_set():
                 return
             for _ in range(5):

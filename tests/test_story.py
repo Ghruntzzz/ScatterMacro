@@ -128,3 +128,18 @@ class StoryTests(unittest.TestCase):
         navigate_story("School Grounds", lambda: np.zeros((120, 160, 4)),
                        reader, click, stop, Mock(), find_play=lambda frame: (45, 32, 0.99))
         self.assertEqual(click.call_count, 1)
+
+    def test_play_falls_back_to_ahk_style_event_after_unverified_input(self):
+        reader = Mock()
+        # Each attempt checks OCR 5 times; the second attempt confirms Story.
+        reader.read.side_effect = ([[]] * 5 + [[label("Story")],
+                                   [label("Story")], [label("Flower Forest")]])
+        primary, fallback = Mock(), Mock()
+        navigate_story("Flower Forest", lambda: np.zeros((120, 160, 4)),
+                       reader, primary, FastStop(), Mock(),
+                       find_play=lambda frame: (45, 32, 0.99),
+                       alternate_click=fallback)
+        # Primary clicks Play once, then Story and the chosen map.
+        self.assertEqual(primary.call_count, 3)
+        fallback.assert_called_once()
+        self.assertEqual(fallback.call_args.args[:2], (45, 32))
