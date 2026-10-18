@@ -105,7 +105,9 @@ class DashboardSetupTests(unittest.TestCase):
             self.assertEqual(window.viewport_rect.height(), 860)
             self.assertEqual(window.viewport_rect.top(), 60)
             self.assertEqual(window.viewport_rect.bottom(), 919)
-            self.assertEqual(window.viewport_rect.width(), 1060)
+            self.assertEqual(window.viewport_rect.width(), 1120)
+            self.assertEqual(window.viewport_rect.left(), 245)
+            self.assertEqual((window.width(), window.height()), (1835, 950))
         finally:
             window.close()
 
@@ -120,6 +122,9 @@ class DashboardSetupTests(unittest.TestCase):
             self.assertEqual(set(window.stat_values),
                              {"RUNS", "AVG RUN", "CURRENT RUN"})
             self.assertEqual((window.log.parentWidget().x(), window.log.parentWidget().y()), (18, 406))
+            self.assertEqual(window.log.parentWidget().width(), 210)
+            self.assertEqual(window.log.width(), 178)
+            self.assertEqual(window.unit_manager.x(), 1390)
             self.assertLess(window.log.height(), 430)
             self.assertEqual(window.index_editor.height(), 894)
         finally:

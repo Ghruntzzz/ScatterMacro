@@ -55,12 +55,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '0.1.23'
+          $version = '0.1.24'
           $tag = "anime-expeditions-v$version"
           $name = "AnimeExpeditions-$version-windows.zip"
           $archive = "dist/$name"
           if (!(Test-Path $archive)) { throw "Missing macro ZIP: $archive" }
-          gh release create $tag $archive --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Anime Expeditions $version - Start Button Image Fix" --notes "Bundled the exact uploaded 142x38 green Start image, validated green button area before clicking, and reported the matched button center/confidence in Action Output. Preserves the working SendInput hover-wiggle method and single Roblox-window selection."
+          gh release create $tag $archive --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Anime Expeditions $version - Wider Roblox Viewport" --notes "Widened the embedded Roblox viewport from 1060 to 1120 pixels, while preserving the 1835x950 runtime window. Reorganized the left Session Stats and Action Output into a narrower sidebar; the Unit Manager stays at its existing size and position. Includes the new green Start button template fix."
           if ($LASTEXITCODE -ne 0) { throw 'Macro release upload failed' }
           New-Item -ItemType Directory -Force 'dist/verified' | Out-Null
           gh release download $tag --repo $env:GITHUB_REPOSITORY --pattern $name --dir 'dist/verified'
@@ -72,7 +72,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '0.1.23'
+          $version = '0.1.24'
           $archive = "dist/AnimeExpeditions-$version-windows.zip"
           $sha256 = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
           $url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/anime-expeditions-v$version/AnimeExpeditions-$version-windows.zip"
