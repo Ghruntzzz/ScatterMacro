@@ -74,11 +74,19 @@ class ClickTests(unittest.TestCase):
         ])
         self.assertEqual(
             [e[1] for e in events if e[0] == "input"],
-            [MOUSE_MOVE] * (2 + len(PRECLICK_WIGGLE_OFFSETS)) +
+            [MOUSE_MOVE] * (2 + 2 * len(PRECLICK_WIGGLE_OFFSETS)) +
             [MOUSE_LEFT_DOWN, MOUSE_LEFT_UP],
         )
         self.assertLess(events.index(("wait", PRECLICK_SETTLE_SECONDS)),
                         events.index(("input", MOUSE_LEFT_DOWN)))
+        # Jitter must send real deltas (not just zero-distance move packets).
+        native_deltas = [
+            c.args[1]._obj.data.mi.dx
+            for c in client.user.SendInput.call_args_list
+            if c.args[1]._obj.data.mi.dwFlags == MOUSE_MOVE
+        ]
+        self.assertIn(1, native_deltas)
+        self.assertIn(-1, native_deltas)
         self.assertEqual(events[-2:], [("wait", CLICK_HOLD_SECONDS),
                                        ("input", MOUSE_LEFT_UP)])
 
@@ -93,7 +101,7 @@ class ClickTests(unittest.TestCase):
 
     def test_focus_restores_minimized_roblox_then_clicks(self):
         client = self.client()
-        client.user.GetForegroundWindow.side_effect = [999, 123, 123, 123, 123]
+        client.user.GetForegroundWindow.side_effect = [999] + [123] * 40
         client.user.IsIconic.return_value = True
         self.assertTrue(client.direct_click(20, 30, (80, 100, 4)))
         client.user.ShowWindow.assert_called_once_with(123, 9)

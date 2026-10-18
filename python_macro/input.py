@@ -210,8 +210,10 @@ class RobloxClient:
             px = point.x + max(-x, min(dx, rect.right - 1 - x))
             py = point.y + max(-y, min(dy, rect.bottom - 1 - y))
             self._move(px, py)
-            # Real Win32 movement, not only a visual SetCursorPos jump.
-            self._send_mouse(MOUSE_MOVE)
+            # Explicit nonzero movement packets notify apps that consume
+            # actual mouse deltas, rather than only visual cursor jumps.
+            self._send_mouse(MOUSE_MOVE, dx=1)
+            self._send_mouse(MOUSE_MOVE, dx=-1)
             if self.stop.wait(PRECLICK_WIGGLE_SECONDS):
                 return None
 
