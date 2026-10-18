@@ -49,8 +49,8 @@ class StoryTests(unittest.TestCase):
 
     def test_scroll_limit_fails_safely(self):
         reader = Mock()
-        reader.read.side_effect = [[label("Play")], [label("Story")]]
-        reader.read.return_value = []
+        first_results = iter([[label("Play")], [label("Story")]])
+        reader.read.side_effect = lambda *args, **kwargs: next(first_results, [])
         click, scroll = Mock(), Mock()
         with self.assertRaisesRegex(RuntimeError, "downward map-list scrolls"):
             navigate_story("Missing Map", lambda: np.zeros((100, 200, 4)),
