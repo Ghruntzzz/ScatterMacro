@@ -8,12 +8,12 @@
     {
       "id": "anime-expeditions",
       "name": "Anime Expeditions",
-      "version": "0.1.12",
+      "version": "0.1.13",
       "setup_only": false,
       "entrypoint": "AnimeExpeditions.exe",
-      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.12/AnimeExpeditions-0.1.12-windows.zip",
-      "sha256": "e0d8ae71b0b89bd06fb61fb05edb3f9c51749a9399d592e2f6be500221d003a3",
-      "description": "Runtime Story navigation test and modern PySide6 Unit Manager: numbered placement markers, upgrade dropdowns, arrow-free X/Y, 104 editable indexes and auto-save, with Place at wave saved per index, unit slots 0-6 and a taller 760px Roblox viewport. Automatic wave detection and unit placement are not connected. Unit placement/upgrade execution and other modes are not connected."
+      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.13/AnimeExpeditions-0.1.13-windows.zip",
+      "sha256": "bc28622676618eec5f8b0c0428e7857b35534f83e4b1a813af1e7d9241c56d7b",
+      "description": "Win32 SendInput click reliability, pointer verification, and runtime Story navigation test and modern PySide6 Unit Manager: numbered placement markers, upgrade dropdowns, arrow-free X/Y, 104 editable indexes and auto-save, with Place at wave saved per index, unit slots 0-6 and a taller 760px Roblox viewport. Automatic wave detection and unit placement are not connected. Unit placement/upgrade execution and other modes are not connected."
     }
   ]
 }
