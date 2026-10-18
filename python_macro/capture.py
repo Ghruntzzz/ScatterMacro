@@ -11,13 +11,16 @@ def roblox_windows():
     user.GetWindowTextW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
     user.IsWindowVisible.argtypes = [wintypes.HWND]
     found = []
+    user.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
     callback_type = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
 
     def visit(hwnd, _):
         title = ctypes.create_unicode_buffer(512)
         user.GetWindowTextW(hwnd, title, len(title))
         if user.IsWindowVisible(hwnd) and title.value == "Roblox":
-            found.append((int(hwnd), title.value))
+            pid = wintypes.DWORD()
+            user.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+            found.append((int(hwnd), title.value, int(pid.value)))
         return True
 
     user.EnumWindows(callback_type(visit), 0)
@@ -26,6 +29,8 @@ def roblox_windows():
 
 def capture_client(hwnd):
     user = ctypes.windll.user32
+    if not any(win[0] == hwnd for win in roblox_windows()):
+        raise RuntimeError("Selected Roblox window is no longer open.")
     user.GetClientRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
     user.ClientToScreen.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.POINT)]
     user.IsIconic.argtypes = [wintypes.HWND]
@@ -40,3 +45,14 @@ def capture_client(hwnd):
     with mss.mss() as screen:
         frame = screen.grab(dict(left=origin.x, top=origin.y, width=width, height=height))
         return np.asarray(frame).copy()
+
+
+def selected_roblox_window(hwnd, pid, windows=None):
+    """Resolve HWND AND PID: never silently retarget another Roblox instance."""
+    windows = roblox_windows() if windows is None else windows
+    for win in windows:
+        if int(win[0]) == int(hwnd) and int(win[2]) == int(pid) and int(pid) > 0:
+            return win
+    raise RuntimeError(
+        "Selected Roblox window closed or changed. Refresh and select a Roblox window."
+    )

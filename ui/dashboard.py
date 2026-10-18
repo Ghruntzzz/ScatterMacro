@@ -121,6 +121,8 @@ def read_dashboard_values() -> dict[str, str]:
         "expedition_difficulty": dashboard.get("ExpeditionDifficulty", "1"),
         "tower_type": dashboard.get("TowerType", "Trait Tower"),
         "private_server": roblox.get("PrivateServerLink", ""),
+        "roblox_hwnd": roblox.get("SelectedWindowHWND", ""),
+        "roblox_pid": roblox.get("SelectedWindowPID", ""),
         "webhook": discord.get("Webhook", ""),
         "discord_id": discord.get("UserID", ""),
         "automatic_check": updates.get("AutomaticCheck", "1"),
@@ -388,6 +390,50 @@ class DashboardWindow(QWidget):
         self._label(route, "ACTIVE ROUTE", 22, 16, 110, 18, f"color: {WINE}; font: 700 9px 'Bahnschrift';")
         self.route_value = self._label(route, "", 160, 15, 690, 20, f"color: {TEXT}; font: 700 10px 'Bahnschrift';")
         self.route_value.setText(f"Mode: {self.values['mode']} | Map: {self.values['map']}")
+        self.roblox_selector = QComboBox(route)
+        self.roblox_selector.setGeometry(850, 10, 195, 32)
+        self.roblox_selector.setToolTip("Select the only Roblox window used for embedding and macro input.")
+        self.refresh_roblox_button = QPushButton("REFRESH", route)
+        self.refresh_roblox_button.setGeometry(1050, 10, 98, 32)
+        self.refresh_roblox_button.clicked.connect(self._refresh_roblox_windows)
+        self.roblox_selector.currentIndexChanged.connect(self._save_roblox_window_selection)
+        self._refresh_roblox_windows()
+
+    def _refresh_roblox_windows(self) -> None:
+        from python_macro.capture import roblox_windows
+        from PySide6.QtCore import QSignalBlocker
+        wanted = (self.values.get("roblox_hwnd", ""),
+                  self.values.get("roblox_pid", ""))
+        with QSignalBlocker(self.roblox_selector):
+            self.roblox_selector.clear()
+            self.roblox_selector.addItem("Select Roblox window", None)
+            try:
+                windows = roblox_windows()
+            except (OSError, AttributeError):
+                windows = []
+            for hwnd, title, pid in windows:
+                self.roblox_selector.addItem(
+                    f"{title} · PID {pid} · HWND {hwnd}", (str(hwnd), str(pid))
+                )
+            for index in range(1, self.roblox_selector.count()):
+                if self.roblox_selector.itemData(index) == wanted:
+                    self.roblox_selector.setCurrentIndex(index)
+                    break
+            else:
+                # A single window is unambiguous on first run. Do not
+                # automatically retarget if a stored window has disappeared.
+                if not any(wanted) and len(windows) == 1:
+                    self.roblox_selector.setCurrentIndex(1)
+        self._save_roblox_window_selection()
+
+    def _save_roblox_window_selection(self) -> None:
+        selected = self.roblox_selector.currentData()
+        hwnd, pid = selected if selected else ("", "")
+        # Keep stale selection until the user explicitly chooses a new one.
+        if not selected and self.values.get("roblox_hwnd"):
+            return
+        self.values["roblox_hwnd"], self.values["roblox_pid"] = hwnd, pid
+        update_config("Roblox", {"SelectedWindowHWND": hwnd, "SelectedWindowPID": pid})
 
     def _configuration(self) -> None:
         config = self._card(18, 208, 680, 316, 8)
@@ -594,6 +640,17 @@ class DashboardWindow(QWidget):
         self._save_dashboard()
         if self.mode_box.currentText() != "Story":
             self._set_status("Setup saved. This mode's automation is not connected yet.")
+            return
+        from python_macro.capture import selected_roblox_window
+        hwnd = self.values.get("roblox_hwnd", "")
+        pid = self.values.get("roblox_pid", "")
+        if not hwnd or not pid:
+            self._set_status("Choose a Roblox window and refresh the list first.")
+            return
+        try:
+            selected_roblox_window(hwnd, pid)
+        except RuntimeError as error:
+            self._set_status(str(error))
             return
         self.runtime_window = RuntimeWindow()
         self.runtime_window.setup_dashboard = self
@@ -882,6 +939,8 @@ class RuntimeWindow(DashboardWindow):
         self.session_value = self._label(
             stats_panel, "Session  --:--:--", 22, 329, 226, 18,
             f"color: {MUTED}; font: 9px 'Segoe UI';")
+        self._label(stats_panel, f"Roblox PID: {self.values.get('roblox_pid', '?')}",
+                    22, 278, 226, 16, f"color: {MUTED}; font: 9px 'Segoe UI';")
 
         action = self._card(18, 406, 270, 528, 8)
         self._section_title(action, "ACTION OUTPUT", 20)
@@ -1053,10 +1112,17 @@ class RuntimeWindow(DashboardWindow):
     def _align_roblox(self):
         from ctypes import wintypes
         from python_macro.capture import roblox_windows
-        windows = roblox_windows()
-        if len(windows) != 1:
+        from python_macro.capture import selected_roblox_window
+        try:
+            target = selected_roblox_window(
+                self.values.get("roblox_hwnd", ""), self.values.get("roblox_pid", ""),
+                roblox_windows(),
+            )
+        except (RuntimeError, ValueError):
+            if self.worker is not None and self.worker.isRunning():
+                self.worker.stop.set()
             return False
-        hwnd = windows[0][0]
+        hwnd = target[0]
         user = ctypes.windll.user32
         user.GetWindowRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
         user.GetClientRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
@@ -1119,7 +1185,9 @@ class RuntimeWindow(DashboardWindow):
         from ui.story_navigation import StoryWorker
         self._align_roblox()
         self.worker = StoryWorker(self.values["map"], self, act_name=self.values["act"],
-                                  difficulty=self.values["difficulty"])
+                                  difficulty=self.values["difficulty"],
+                                  selected_hwnd=self.values.get("roblox_hwnd", ""),
+                                  selected_pid=self.values.get("roblox_pid", ""))
         self.worker.message.connect(self.log.appendPlainText)
         self.worker.finished.connect(self._story_finished)
         self.runtime_status.setText("RUNNING")

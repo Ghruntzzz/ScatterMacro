@@ -16,22 +16,24 @@ from python_macro.act_labels import ActLabelLocator
 class StoryWorker(QThread):
     message = Signal(str)
 
-    def __init__(self, map_name, parent, act_name="Act 1", difficulty="Normal"):
+    def __init__(self, map_name, parent, act_name="Act 1", difficulty="Normal",
+                 selected_hwnd="", selected_pid=""):
         super().__init__(parent)
         self.map_name = map_name
         self.act_name = act_name
         self.difficulty = difficulty
+        self.selected_hwnd = selected_hwnd
+        self.selected_pid = selected_pid
         self.stop = Event()
 
     def run(self):
         try:
-            windows = roblox_windows()
-            if len(windows) != 1:
-                raise RuntimeError("Open exactly one Roblox window before starting.")
+            from python_macro.capture import selected_roblox_window
+            target = selected_roblox_window(self.selected_hwnd, self.selected_pid)
             self.message.emit("Opening Story mode.")
             if self.stop.wait(0.5):
                 return
-            client = RobloxClient(windows[0][0], self.stop)
+            client = RobloxClient(target[0], self.stop)
             if not client.focus_roblox():
                 return
             root = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[1]))
