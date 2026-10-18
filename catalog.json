@@ -8,12 +8,12 @@
     {
       "id": "anime-expeditions",
       "name": "Anime Expeditions",
-      "version": "0.1.27",
+      "version": "0.1.29",
       "setup_only": false,
       "entrypoint": "AnimeExpeditions.exe",
-      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.27/AnimeExpeditions-0.1.27-windows.zip",
-      "sha256": "0f2cbeffecdd50e3f7f9c6f4cda30141da611d4292c519285f9ccc54d3eac970",
-      "description": "Full Story lobby navigation with faster OpenCV Start detection, cached image scales and reusable OCR. Preserves selected Roblox targeting, hover/wiggle input and runtime Unit Manager. Unit placement/upgrades not yet automated."
+      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.29/AnimeExpeditions-0.1.29-windows.zip",
+      "sha256": "4004c5cff68df80a8f6be69bd81e0a862971f470ab0d99aae4fe936222f8a2f9",
+      "description": "Verified Story navigation with automatic Roblox detection, faster OCR/OpenCV, click retries and target highlights. F2 emergency stop and SendInput retained. Unit placement/upgrades not yet automated."
     }
   ]
 }
