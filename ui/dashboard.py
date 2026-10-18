@@ -406,7 +406,7 @@ class DashboardWindow(QWidget):
         self._label(deploy, "DEPLOYMENT", 22, 20, 150, 18, f"color: {WINE}; font: 700 9px 'Bahnschrift';")
         self._label(deploy, "Story test: Play > Story > selected map. Other modes: setup only.", 22, 48, 530, 20, f"color: {TEXT}; font: 700 10px 'Bahnschrift';")
         self._label(deploy, "Match and Discord settings save automatically.", 22, 73, 360, 18, f"color: {MUTED}; font: 9px 'Segoe UI';")
-        start = self._button(deploy, "START STORY" if self.mode_box.currentText() == "Story" else "SAVE SETUP", 578, 37, 214, True)
+        start = self._button(deploy, "OPEN RUNTIME" if self.mode_box.currentText() == "Story" else "SAVE SETUP", 578, 37, 214, True)
         self.start_button = start
         settings = self._button(deploy, "SETTINGS", 812, 37, 164)
         exit_button = self._button(deploy, "EXIT", 996, 37, 154)
@@ -518,7 +518,7 @@ class DashboardWindow(QWidget):
         self._refresh_route_controls()
         self._save_dashboard()
         if hasattr(self, "start_button"):
-            self.start_button.setText("START STORY" if _mode == "Story" else "SAVE SETUP")
+            self.start_button.setText("OPEN RUNTIME" if _mode == "Story" else "SAVE SETUP")
 
     def _act_changed(self, _act: str) -> None:
         if self.mode_box.currentText() == "Story":
@@ -859,9 +859,8 @@ class RuntimeWindow(DashboardWindow):
         self.log.setStyleSheet(f"background: {blend_color(PANEL, '#000000', 0.45)}; border: 1px solid {OUTLINE}; border-radius: 6px; color: {TEXT}; padding: 8px; font: 9px 'Consolas';")
         self.worker = None
         self.return_pending = False
-        self.start_runtime_button = self._small_button(action, "START STORY", 22, 544, 108)
-        self.stop_runtime_button = self._small_button(action, "STOP", 140, 544, 108)
-        self.start_runtime_button.clicked.connect(self._start_story)
+        self._label(action, "F1: START   |   F2: STOP", 22, 525, 226, 18, f"color: {TEXT}; font: 700 10px 'Bahnschrift';")
+        self.stop_runtime_button = self._small_button(action, "STOP (F2)", 22, 550, 226)
         self.stop_runtime_button.clicked.connect(self._stop_story)
         return_button = self._small_button(action, "RETURN TO DASHBOARD", 22, 592, 226)
         return_button.clicked.connect(self._return_to_dashboard)
@@ -873,8 +872,6 @@ class RuntimeWindow(DashboardWindow):
         self.state_timer.start(500)
 
         live = self._card(300, 116, 1075, 818, 8)
-        self._section_title(live, "LIVE VIEWPORT", 14)
-        self._label(live, "Roblox remains visible here while the macro runs.", 22, 43, 390, 16, f"color: {MUTED}; font: 8px 'Segoe UI';")
         viewport = QFrame(live)
         viewport.setGeometry(5, 44, self.VIEWPORT_W, self.VIEWPORT_H)
         viewport.setStyleSheet(f"background: transparent; border: 1px solid {WINE_DARK}; border-radius: 8px;")
@@ -885,7 +882,21 @@ class RuntimeWindow(DashboardWindow):
         self.unit_page = 1
         self.unit_indexes = load_unit_indexes(self.values, 104)
         self.unit_config_path = active_unit_config(self.values)
-        self._render_unit_manager_page()
+        from ui.unit_manager import UnitManager
+        self.index_editor = UnitManager(self.unit_indexes, self._save_runtime_index,
+                                       lambda: self.worker is not None and self.worker.isRunning(),
+                                       self.log.appendPlainText, manager)
+        self.index_editor.setGeometry(12, 12, 403, 794)
+
+    def _save_runtime_index(self, index, entry):
+        parser = configparser.ConfigParser(interpolation=None)
+        read_ini(parser, self.unit_config_path)
+        if not parser.has_section("UnitIndexes"):
+            parser.add_section("UnitIndexes")
+        for key, suffix in (("unit", "Unit"), ("priority", "Priority"), ("upgrade", "Upgrade"),
+                            ("auto_upgrade", "AutoUpgrade"), ("x", "X"), ("y", "Y")):
+            parser.set("UnitIndexes", f"Index{index + 1}{suffix}", entry[key])
+        write_ini(parser, self.unit_config_path)
 
     def _render_unit_manager_page(self) -> None:
         """Redraw only the Unit Manager so page controls stay responsive."""
@@ -930,7 +941,34 @@ class RuntimeWindow(DashboardWindow):
 
     def showEvent(self, event) -> None:
         super().showEvent(event)
+        from python_macro.hotkeys import RuntimeHotkeys
+        if not hasattr(self, "hotkeys"):
+            self.hotkeys = RuntimeHotkeys(int(self.winId()))
+        try:
+            self.hotkeys.register()
+        except RuntimeError as exc:
+            self.log.appendPlainText(str(exc))
         QTimer.singleShot(50, self._publish_viewport)
+
+    def hideEvent(self, event) -> None:
+        if hasattr(self, "hotkeys"):
+            self.hotkeys.close()
+        self._stop_story()
+        super().hideEvent(event)
+
+    def nativeEvent(self, event_type, message):
+        from ctypes import wintypes
+        from python_macro.hotkeys import RuntimeHotkeys
+        if event_type in (b"windows_generic_MSG", b"windows_dispatcher_MSG"):
+            msg = wintypes.MSG.from_address(int(message))
+            if msg.message == 0x0312 and self.isVisible() and not self.return_pending:
+                if msg.wParam == RuntimeHotkeys.START:
+                    self._start_story()
+                    return True, 0
+                if msg.wParam == RuntimeHotkeys.STOP:
+                    self._stop_story()
+                    return True, 0
+        return super().nativeEvent(event_type, message)
 
     def moveEvent(self, event) -> None:
         super().moveEvent(event)
@@ -1013,7 +1051,6 @@ class RuntimeWindow(DashboardWindow):
         self.worker = StoryWorker(self.values["map"], self)
         self.worker.message.connect(self.log.appendPlainText)
         self.worker.finished.connect(self._story_finished)
-        self.start_runtime_button.setEnabled(False)
         self.runtime_status.setText("RUNNING")
         self.worker.start()
 
@@ -1024,7 +1061,6 @@ class RuntimeWindow(DashboardWindow):
 
     def _story_finished(self) -> None:
         self.runtime_status.setText("READY")
-        self.start_runtime_button.setEnabled(True)
         if self.worker is not None:
             self.worker.deleteLater()
             self.worker = None
@@ -1038,6 +1074,8 @@ class RuntimeWindow(DashboardWindow):
         self.setup_dashboard.show()
 
     def closeEvent(self, event) -> None:
+        if hasattr(self, "hotkeys"):
+            self.hotkeys.close()
         if self.worker is not None and self.worker.isRunning():
             self.return_pending = True
             self._stop_story()

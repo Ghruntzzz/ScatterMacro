@@ -28,9 +28,9 @@ class LauncherTests(unittest.TestCase):
         self.app.processEvents()
         self.folder.cleanup()
 
-    def test_setup_macro_install_is_enabled(self):
+    def test_story_macro_install_is_enabled(self):
         macro = self.window.catalog[0]
-        self.assertTrue(macro["setup_only"])
+        self.assertFalse(macro["setup_only"])
         install = next(button for button in self.window.findChildren(QPushButton) if button.text() == "Install")
         self.assertTrue(install.isEnabled())
 

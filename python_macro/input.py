@@ -2,6 +2,7 @@
 import ctypes
 from ctypes import wintypes
 
+HOVER_SECONDS = 0.25
 
 class RobloxClient:
     def __init__(self, hwnd, stop):
@@ -41,7 +42,18 @@ class RobloxClient:
             raise RuntimeError("Another window is covering the detected button.")
         if not self.user.SetCursorPos(point.x, point.y):
             raise RuntimeError("Cannot move the cursor to Roblox.")
+        if self.stop.wait(HOVER_SECONDS):
+            return
         self.check_focus()
+        current_rect = wintypes.RECT()
+        current_point = wintypes.POINT(x, y)
+        if (not self.user.GetClientRect(self.hwnd, ctypes.byref(current_rect)) or
+                (current_rect.bottom, current_rect.right) != shape[:2] or
+                not self.user.ClientToScreen(self.hwnd, ctypes.byref(current_point)) or
+                (current_point.x, current_point.y) != (point.x, point.y)):
+            raise RuntimeError("Roblox moved or resized during hover. Restart navigation.")
+        if self.user.GetAncestor(self.user.WindowFromPoint(point), 2) != self.hwnd:
+            raise RuntimeError("Another window covered the button during hover.")
         if self.stop.is_set():
             return
         self.user.mouse_event(0x0002, 0, 0, 0, 0)
