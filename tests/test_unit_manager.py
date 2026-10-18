@@ -145,6 +145,22 @@ class UnitManagerTests(unittest.TestCase):
         self.assertTrue(image.read_only)
         self.assertFalse(image.pixmap().isNull())
 
+    def test_place_at_wave_matches_other_editor_fields(self):
+        from PySide6.QtWidgets import QLineEdit
+        field = self.widget.wave_input
+        self.assertIsInstance(field, QLineEdit)
+        self.assertEqual(field.objectName(), "place-at-wave")
+        self.assertEqual(field.maximumWidth(), 16777215)
+        stylesheet = self.widget.styleSheet()
+        self.assertIn("QComboBox,QSpinBox,QLineEdit {", stylesheet)
+        self.assertIn("QComboBox:focus,QSpinBox:focus,QLineEdit:focus", stylesheet)
+        self.widget.resize(403, 794)
+        self.widget.show()
+        QApplication.processEvents()
+        # The wave field occupies the same form column as other controls.
+        self.assertEqual(field.width(), self.widget.fields["unit"].width())
+        self.assertEqual(field.height(), self.widget.fields["unit"].height())
+
     def test_place_at_wave_textbox_saves_and_appears_on_cards(self):
         from PySide6.QtWidgets import QLineEdit
         self.assertIsInstance(self.widget.fields["place_at_wave"], QLineEdit)

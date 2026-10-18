@@ -99,12 +99,12 @@ class UnitManager(QWidget):
             QLabel#saved { font: 600 9px 'Segoe UI'; color: #8edcbb; }
             QLabel#page { font: 600 9px 'Segoe UI'; color: #c8b5c1; }
             QFrame#editor-card { background: #1b1820; border: 1px solid #4b3845; border-radius: 12px; }
-            QComboBox,QSpinBox {
+            QComboBox,QSpinBox,QLineEdit {
                 background: #100f15; color: #f9eff3; border: 1px solid #564251;
                 border-radius: 7px; min-height: 28px; padding: 4px 8px;
             }
-            QComboBox:hover,QSpinBox:hover { border-color: #a46580; }
-            QComboBox:focus,QSpinBox:focus { border-color: #e07f9f; }
+            QComboBox:hover,QSpinBox:hover,QLineEdit:hover { border-color: #a46580; }
+            QComboBox:focus,QSpinBox:focus,QLineEdit:focus { border-color: #e07f9f; }
             QComboBox QAbstractItemView { background: #28212b; color: #f7eef4; selection-background-color: #873851; }
             QPushButton {
                 background: #302631; color: #f2e7ed; border: 1px solid #604555;
@@ -151,6 +151,7 @@ class UnitManager(QWidget):
             ("unit", "Unit slot"), ("priority", "Target priority"),
             ("upgrade", "Upgrade level"), ("auto_upgrade", "Auto upgrade"),
             ("x", "Position X"), ("y", "Position Y"),
+            ("place_at_wave", "Place at wave"),
         ]
         grid = QGridLayout()
         grid.setHorizontalSpacing(10)
@@ -166,6 +167,16 @@ class UnitManager(QWidget):
                 field = QComboBox()
                 field.addItems(options[key])
                 field.currentTextChanged.connect(self.changed)
+            elif key == "place_at_wave":
+                field = QLineEdit()
+                field.setObjectName("place-at-wave")
+                field.setPlaceholderText("Any")
+                field.setToolTip("Enter a wave from 1 to 9999, or leave blank to place when ready.")
+                field.setValidator(QRegularExpressionValidator(
+                    QRegularExpression(r"(?:[1-9][0-9]{0,3})?"), field
+                ))
+                field.editingFinished.connect(self.changed)
+                self.wave_input = field
             else:
                 field = QSpinBox()
                 field.setRange(-1, 10000)
@@ -175,24 +186,8 @@ class UnitManager(QWidget):
                 field.valueChanged.connect(self.changed)
             self.fields[key] = field
             grid.addWidget(field, row + 1, col)
+        grid.addWidget(self._text("Blank = no wave delay", "subtitle"), 7, 1)
         editor.addLayout(grid)
-
-        wave_row = QHBoxLayout()
-        wave_row.setSpacing(7)
-        wave_row.addWidget(self._text("Place at wave", "subtitle"))
-        self.wave_input = QLineEdit()
-        self.wave_input.setObjectName("place-at-wave")
-        self.wave_input.setFixedWidth(82)
-        self.wave_input.setPlaceholderText("Any")
-        self.wave_input.setToolTip("Enter a wave from 1 to 9999, or leave blank to place when ready.")
-        self.wave_input.setValidator(QRegularExpressionValidator(
-            QRegularExpression(r"(?:[1-9][0-9]{0,3})?"), self.wave_input
-        ))
-        self.wave_input.editingFinished.connect(self.changed)
-        self.fields["place_at_wave"] = self.wave_input
-        wave_row.addWidget(self.wave_input)
-        wave_row.addWidget(self._text("Blank = no wave delay", "subtitle"))
-        editor.addLayout(wave_row)
 
         position_actions = QHBoxLayout()
         self.capture_button = self._button("Set position", self.capture_position, "primary")

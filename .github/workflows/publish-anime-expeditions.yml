@@ -46,12 +46,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '0.1.9'
+          $version = '0.1.10'
           $tag = "anime-expeditions-v$version"
           $name = "AnimeExpeditions-$version-windows.zip"
           $archive = "dist/$name"
           if (!(Test-Path $archive)) { throw "Missing macro ZIP: $archive" }
-          gh release create $tag $archive --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Anime Expeditions $version - Place at Wave" --notes "Runtime dashboard: Numbered placement markers, arrow-free position fields, dropdown upgrades, no jump section, unit slots 0-6, optional per-index Place at wave field, wave-gating helper and a clean runtime Action Output without the extra Stop button. F2 stop remains active. Roblox viewport extends from 720 to 760 px high within the runtime, with the client aligned to the full height. Copy/paste and auto-save preserved. Preserves existing route configurations. Story navigation remains limited; unit placement and upgrades are not automated."
+          gh release create $tag $archive --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Anime Expeditions $version - Matched Wave Field Styling" --notes "Runtime dashboard: Numbered placement markers, arrow-free position fields, dropdown upgrades, no jump section, unit slots 0-6, optional per-index Place at wave textbox with matching field styling and full-width alignment, wave-gating helper and a clean runtime Action Output without the extra Stop button. F2 stop remains active. Roblox viewport extends from 720 to 760 px high within the runtime, with the client aligned to the full height. Copy/paste and auto-save preserved. Preserves existing route configurations. Story navigation remains limited; unit placement and upgrades are not automated."
           if ($LASTEXITCODE -ne 0) { throw 'Macro release upload failed' }
           New-Item -ItemType Directory -Force 'dist/verified' | Out-Null
           gh release download $tag --repo $env:GITHUB_REPOSITORY --pattern $name --dir 'dist/verified'
@@ -63,7 +63,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '0.1.9'
+          $version = '0.1.10'
           $archive = "dist/AnimeExpeditions-$version-windows.zip"
           $sha256 = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
           $url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/anime-expeditions-v$version/AnimeExpeditions-$version-windows.zip"
