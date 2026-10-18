@@ -8,6 +8,9 @@ on:
       - ui/dashboard.py
       - ui/story_navigation.py
       - python_macro/**
+      - assets/play-button-template.png
+      - tests/test_story.py
+      - tests/test_python_vision.py
       - tools/BuildAnimeExpeditions.ps1
       - tools/PackageMacro.py
       - tests/test_unit_manager.py
@@ -49,12 +52,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '0.1.11'
+          $version = '0.1.12'
           $tag = "anime-expeditions-v$version"
           $name = "AnimeExpeditions-$version-windows.zip"
           $archive = "dist/$name"
           if (!(Test-Path $archive)) { throw "Missing macro ZIP: $archive" }
-          gh release create $tag $archive --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Anime Expeditions $version - Reliable Story Navigation" --notes "Story navigation now hovers, performs quick 2px cursor jitter before clicking and searches missing maps with bounded downward wheel scrolling after focusing the lower map list. Runtime retries Roblox viewport alignment on launch to avoid requiring a window drag. F2 cancel remains available. Runtime dashboard: Numbered placement markers, arrow-free position fields, dropdown upgrades, no jump section, unit slots 0-6, optional per-index Place at wave textbox with matching field styling and full-width alignment, wave-gating helper and a clean runtime Action Output without the extra Stop button. F2 stop remains active. Roblox viewport extends from 720 to 760 px high within the runtime, with the client aligned to the full height. Copy/paste and auto-save preserved. Preserves existing route configurations. Story navigation remains limited; unit placement and upgrades are not automated."
+          gh release create $tag $archive --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Anime Expeditions $version - Play Image Verification" --notes "Play detection now matches the bundled user-supplied image (rather than OCR text), clicks the icon center and verifies the Story menu before proceeding, with up to three attempts. Story navigation hovers and performs quick 2px jitter before clicking and searches missing maps with bounded downward wheel scrolling after focusing the lower map list. Runtime retries Roblox viewport alignment on launch to avoid requiring a window drag. F2 cancel remains available. Runtime dashboard: Numbered placement markers, arrow-free position fields, dropdown upgrades, no jump section, unit slots 0-6, optional per-index Place at wave textbox with matching field styling and full-width alignment, wave-gating helper and a clean runtime Action Output without the extra Stop button. F2 stop remains active. Roblox viewport extends from 720 to 760 px high within the runtime, with the client aligned to the full height. Copy/paste and auto-save preserved. Preserves existing route configurations. Story navigation remains limited; unit placement and upgrades are not automated."
           if ($LASTEXITCODE -ne 0) { throw 'Macro release upload failed' }
           New-Item -ItemType Directory -Force 'dist/verified' | Out-Null
           gh release download $tag --repo $env:GITHUB_REPOSITORY --pattern $name --dir 'dist/verified'
@@ -66,7 +69,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '0.1.11'
+          $version = '0.1.12'
           $archive = "dist/AnimeExpeditions-$version-windows.zip"
           $sha256 = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
           $url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/anime-expeditions-v$version/AnimeExpeditions-$version-windows.zip"

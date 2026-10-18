@@ -80,3 +80,12 @@ stop hotkey interrupts scrolling and mouse movement. This assumes the map list
 is beneath the lower-middle Roblox client area. Runtime startup retries Roblox
 client alignment so the viewport fills without manually dragging the dashboard.
 This automation still stops after selecting the Story map.
+
+## Play icon recognition
+
+The runtime searches for the supplied teal Play button using a bundled
+multiscale image template (`assets/play-button-template.png`), not the tiny
+Play text. It clicks the center of the icon, then waits for the Story menu
+to become visible. Unconfirmed clicks are retried up to three times and
+reported as errors rather than successes. The icon image is included in the
+Windows macro package.
