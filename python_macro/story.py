@@ -81,7 +81,7 @@ def select_text(label, predicate, capture, reader, click, stop, timeout):
 
 def navigate_story(map_name, capture, reader, click, stop, log, timeout=30,
                    scroll=None, max_map_scrolls=MAX_MAP_SCROLLS, find_play=None,
-                   skip_play=False, act_name=None, difficulty="Normal"):
+                   skip_play=False, act_name=None, difficulty="Normal", find_act=None):
     """Navigate using captured Roblox client coordinates and cancellable input.
 
     act_name=None retains the legacy map-only contract for existing callers;
@@ -187,9 +187,24 @@ def navigate_story(map_name, capture, reader, click, stop, log, timeout=30,
     if stop.wait(0.10):
         return
     log(f"Selecting {act}.")
-    if not select_text(act, lambda t: is_act_label(t, act),
-                       capture, reader, click, stop, timeout):
-        return
+    selected_act = False
+    if find_act is not None:
+        deadline = time.monotonic() + timeout
+        while not stop.is_set() and time.monotonic() < deadline:
+            frame = capture()
+            target = find_act(frame, act)
+            if target is not None:
+                selected_act = click(int(target[0]), int(target[1]), frame.shape) is not False
+                break
+            if stop.wait(0.10):
+                return
+    else:
+        selected_act = select_text(act, lambda t: is_act_label(t, act),
+                                   capture, reader, click, stop, timeout)
+    if not selected_act or stop.is_set():
+        if stop.is_set():
+            return
+        raise RuntimeError(f"Could not identify {act} button. No other act was clicked.")
     if stop.wait(0.10):
         return
 

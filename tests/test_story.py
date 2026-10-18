@@ -178,6 +178,20 @@ class StoryTests(unittest.TestCase):
                        skip_play=True, act_name="Act 5", difficulty="Hard")
         self.assertEqual(click.call_count, 6)
 
+    def test_act_locator_path_avoids_ocr_and_stars(self):
+        reader = Mock()
+        reader.read.side_effect = [[label("Story")], [label("School Grounds")],
+                                   [label("Select Stage")], [label("Start")]]
+        matcher = Mock(return_value=(50, 83, 0.98))
+        click = Mock()
+        navigate_story("School Grounds", lambda: np.zeros((100, 200, 4)),
+                       reader, click, FastStop(), Mock(), skip_play=True,
+                       act_name="Act 3", find_act=matcher)
+        matcher.assert_called_once()
+        self.assertEqual(matcher.call_args.args[1], "Act 3")
+        self.assertEqual(click.call_count, 5)
+        self.assertEqual(click.call_args_list[2].args[:2], (50, 83))
+
     def test_infinite_and_mastery_skip_difficulty(self):
         for act, printed in (("Infinite", "∞"), ("Mastery", "M")):
             with self.subTest(act=act):
