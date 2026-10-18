@@ -41,6 +41,42 @@ class UnitManagerTests(unittest.TestCase):
         self.widget.clear_index()
         self.assertEqual(self.entries[103]['x'], '')
 
+    def test_jump_and_copy_paste_between_pages(self):
+        self.widget.select(4)
+        self.widget.fields["unit"].setCurrentText("4")
+        self.widget.fields["upgrade"].setValue(6)
+        self.widget.copy_index()
+        self.widget.index_picker.setValue(104)
+        self.assertEqual(self.widget.selected, 103)
+        self.assertEqual(self.widget.page_indicator.text(), "PAGE 18 / 18")
+        self.widget.paste_index()
+        self.assertEqual(self.entries[103]["unit"], "4")
+        self.assertEqual(self.entries[103]["upgrade"], "6")
+        self.assertEqual(self.entries[4]["unit"], "4")
+
+    def test_clear_position_keeps_upgrade_and_busy_prevents_paste(self):
+        self.widget.fields["unit"].setCurrentText("2")
+        self.widget.fields["upgrade"].setValue(5)
+        self.widget.fields["x"].setValue(0)
+        self.widget.fields["y"].setValue(50)
+        self.widget.clear_position()
+        self.assertEqual(self.entries[0]["x"], "")
+        self.assertEqual(self.entries[0]["y"], "")
+        self.assertEqual(self.entries[0]["upgrade"], "5")
+        self.widget.copy_index()
+        self.widget.select(2)
+        self.busy.return_value = True
+        self.widget.paste_index()
+        self.assertEqual(self.entries[2]["unit"], "None")
+
+    def test_cards_select_real_index_and_show_coordinates_at_zero(self):
+        self.widget.fields["x"].setValue(0)
+        self.widget.fields["y"].setValue(90)
+        self.assertIn("POS  0, 90", self.widget.cards[0].text())
+        self.widget.cards[5].click()
+        self.assertEqual(self.widget.selected, 5)
+        self.assertEqual(self.widget.index_picker.value(), 6)
+
     def test_save_failure_restores_values(self):
         self.save.side_effect = OSError('locked')
         self.widget.fields['upgrade'].setValue(4)

@@ -1,6 +1,6 @@
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
-$python = Join-Path $env:LOCALAPPDATA 'Programs\Python\Python312\python.exe'
+$python = (Get-Command python -ErrorAction Stop).Source
 Push-Location $root
 try {
     & $python -m PyInstaller --noconfirm --clean --onedir --windowed --name AnimeExpeditions --icon assets/scattermacro.ico --collect-all rapidocr --collect-all onnxruntime --add-data 'assets;assets' anime_main.py
