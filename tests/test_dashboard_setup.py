@@ -60,5 +60,8 @@ class DashboardSetupTests(unittest.TestCase):
             self.assertNotIn("STOP (F2)", buttons)
             self.assertIn("RETURN TO DASHBOARD", buttons)
             self.assertIn("F1: START   |   F2: STOP", labels)
+            self.assertEqual(window.viewport_rect.height(), 760)
+            self.assertEqual(window.viewport_rect.bottom(), 919)
+            self.assertEqual(window.viewport_rect.width(), 1060)
         finally:
             window.close()

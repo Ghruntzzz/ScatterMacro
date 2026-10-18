@@ -45,12 +45,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '0.1.6'
+          $version = '0.1.7'
           $tag = "anime-expeditions-v$version"
           $name = "AnimeExpeditions-$version-windows.zip"
           $archive = "dist/$name"
           if (!(Test-Path $archive)) { throw "Missing macro ZIP: $archive" }
-          gh release create $tag $archive --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Anime Expeditions $version - Unit Manager Controls" --notes "Runtime dashboard: Numbered placement markers, arrow-free position fields, dropdown upgrades, no jump section and a cleaner runtime Action Output without the extra Stop button. F2 stop remains active. Copy/paste and auto-save preserved. Preserves existing route configurations. Story navigation remains limited; unit placement and upgrades are not automated."
+          gh release create $tag $archive --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Anime Expeditions $version - Taller Roblox Viewport" --notes "Runtime dashboard: Numbered placement markers, arrow-free position fields, dropdown upgrades, no jump section and a cleaner runtime Action Output without the extra Stop button. F2 stop remains active. Roblox viewport extends from 720 to 760 px high within the runtime, with the client aligned to the full height. Copy/paste and auto-save preserved. Preserves existing route configurations. Story navigation remains limited; unit placement and upgrades are not automated."
           if ($LASTEXITCODE -ne 0) { throw 'Macro release upload failed' }
           New-Item -ItemType Directory -Force 'dist/verified' | Out-Null
           gh release download $tag --repo $env:GITHUB_REPOSITORY --pattern $name --dir 'dist/verified'
@@ -62,7 +62,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '0.1.6'
+          $version = '0.1.7'
           $archive = "dist/AnimeExpeditions-$version-windows.zip"
           $sha256 = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
           $url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/anime-expeditions-v$version/AnimeExpeditions-$version-windows.zip"
@@ -75,7 +75,7 @@ jobs:
           $macro[0].version = $version
           $macro[0].url = $url
           $macro[0].sha256 = $sha256
-          $macro[0].description = "Runtime Story navigation test and modern PySide6 Unit Manager: numbered placement markers, upgrade dropdowns, arrow-free X/Y, 104 editable indexes and auto-save. Unit placement/upgrade execution and other modes are not connected."
+          $macro[0].description = "Runtime Story navigation test and modern PySide6 Unit Manager: numbered placement markers, upgrade dropdowns, arrow-free X/Y, 104 editable indexes and auto-save, with a taller 760px Roblox viewport. Unit placement/upgrade execution and other modes are not connected."
           $catalog | ConvertTo-Json -Depth 20 | Set-Content catalog.json -Encoding utf8
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

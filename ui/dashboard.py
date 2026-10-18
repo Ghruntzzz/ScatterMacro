@@ -817,7 +817,7 @@ class RuntimeWindow(DashboardWindow):
     VIEWPORT_X = 305
     VIEWPORT_Y = 160
     VIEWPORT_W = 1060
-    VIEWPORT_H = 720
+    VIEWPORT_H = 760
 
     def __init__(self) -> None:
         super().__init__()
