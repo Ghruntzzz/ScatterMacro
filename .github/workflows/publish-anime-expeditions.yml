@@ -60,7 +60,7 @@ jobs:
           $name = "AnimeExpeditions-$version-windows.zip"
           $archive = "dist/$name"
           if (!(Test-Path $archive)) { throw "Missing macro ZIP: $archive" }
-          gh release create $tag $archive --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Anime Expeditions $version - Wider Roblox Viewport" --notes "Widened the embedded Roblox viewport from 1060 to 1120 pixels, while preserving the 1835x950 runtime window. Reorganized the left Session Stats and Action Output into a narrower sidebar; the Unit Manager stays at its existing size and position. Includes the new green Start button template fix."
+          gh release create $tag $archive --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Anime Expeditions $version - Updated Play Button Recognition" --notes "Replaced the bundled Play button reference with the newly provided 58x59 image for the wider Roblox viewport and extended image-matching scales. Retains the verified SendInput hover/wiggle click and selected Roblox window targeting."
           if ($LASTEXITCODE -ne 0) { throw 'Macro release upload failed' }
           New-Item -ItemType Directory -Force 'dist/verified' | Out-Null
           gh release download $tag --repo $env:GITHUB_REPOSITORY --pattern $name --dir 'dist/verified'
