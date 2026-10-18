@@ -19,7 +19,7 @@ window or a helper process. Only installing a launcher update restarts it.
 Select Install on Anime Expeditions, then Open. The installed setup app provides:
 - Mode, map, act, and difficulty configuration.
 - Private-server and Discord settings, saved locally.
-- Per-route Unit Manager in the runtime dashboard: 104 selectable indexes,\n  unit/target/upgrade editing, copy/paste, reset, and client-relative position capture.\n  Changes auto-save to the currently selected route's existing INI profile.
+- Per-route modern PySide6 Unit Manager in the runtime dashboard: 104 selectable indexes,\n  unit/target/upgrade editing, copy/paste, reset, and client-relative position capture.\n  Changes auto-save to the currently selected route's existing INI profile.
 - Saved keybind preferences and other settings.
 
 Current flow: Install -> Open -> choose route -> configure unit indexes and

@@ -49,130 +49,152 @@ class UnitManager(QWidget):
         self.entries, self.save, self.busy, self.log = entries, save, busy, log
         self.selected, self.page, self.loading = 0, 0, False
         self.copied_index = None
+
         self.setObjectName("unit-editor")
         self.setStyleSheet("""
-            QWidget#unit-editor { background: transparent; color:#f3eff0; font: 10px 'Segoe UI'; }
-            QLabel { color:#f3eff0; background:transparent; }
-            QLabel#muted { color:#af999f; }
-            QLabel#kicker { color:#e29caf; font:700 9px 'Bahnschrift'; }
-            QLabel#section { color:#f5e6ea; font:700 13px 'Bahnschrift'; }
-            QFrame#separator { background:#632336; max-height:1px; border:0; }
+            QWidget#unit-editor { background: transparent; color: #f4f0f3; font: 10px 'Segoe UI'; }
+            QLabel { background: transparent; color: #f4f0f3; }
+            QLabel#title { font: 700 18px 'Segoe UI'; color: #fff7fa; }
+            QLabel#subtitle { font: 10px 'Segoe UI'; color: #aea0ab; }
+            QLabel#section { font: 700 10px 'Segoe UI'; color: #edc2d1; }
+            QLabel#saved { font: 600 9px 'Segoe UI'; color: #8edcbb; }
+            QLabel#page { font: 600 9px 'Segoe UI'; color: #c8b5c1; }
+            QFrame#editor-card { background: #1b1820; border: 1px solid #4b3845; border-radius: 12px; }
+            QFrame#jump-card { background: #241d26; border: 1px solid #513d49; border-radius: 9px; }
             QComboBox,QSpinBox {
-                background:#1b1015; color:#f5e9eb; border:1px solid #5b2838;
-                border-radius:6px; padding:4px 7px; min-height:26px;
+                background: #100f15; color: #f9eff3; border: 1px solid #564251;
+                border-radius: 7px; min-height: 28px; padding: 4px 8px;
             }
-            QComboBox:focus,QSpinBox:focus { border-color:#d25e83; }
-            QComboBox QAbstractItemView {
-                background:#211218; color:#f5e9eb; selection-background-color:#7e1726;
-            }
+            QComboBox:hover,QSpinBox:hover { border-color: #a46580; }
+            QComboBox:focus,QSpinBox:focus { border-color: #e07f9f; }
+            QComboBox QAbstractItemView { background: #28212b; color: #f7eef4; selection-background-color: #873851; }
             QPushButton {
-                background:#25131a; color:#f7e9ec; border:1px solid #673041;
-                border-radius:6px; padding:6px 5px; font:700 9px 'Bahnschrift';
+                background: #302631; color: #f2e7ed; border: 1px solid #604555;
+                border-radius: 8px; padding: 6px; font: 600 10px 'Segoe UI';
             }
-            QPushButton:hover { background:#4a1a2b; border-color:#b04b6b; }
-            QPushButton:disabled { color:#82727a; border-color:#422a33; }
-            QPushButton#primary { background:#7e1726; border-color:#b44462; }
+            QPushButton:hover { background: #473044; border-color: #bf708d; }
+            QPushButton:disabled { color: #80727b; border-color: #46343e; }
+            QPushButton#primary { background: #893651; color: white; border-color: #c56583; }
+            QPushButton#primary:hover { background: #a24665; }
+            QPushButton#reset { background: #2b2029; color: #e8b5c0; }
             QPushButton#index-card {
-                text-align:left; padding:7px 10px;
-                background:#160f12; border:1px solid #432733;
-                font:9px 'Segoe UI'; border-radius:8px;
+                background: #1b171e; color: #ccbfc8; border: 1px solid #493745;
+                border-radius: 9px; text-align: left; padding: 6px 10px; font: 9px 'Segoe UI';
             }
+            QPushButton#index-card:hover { background: #332330; border-color: #a66080; }
             QPushButton#index-card[selected="true"] {
-                background:#441521; border:2px solid #d25e83;
+                background: #452634; color: #fff4f8; border: 2px solid #e183a6;
             }
         """)
         root = QVBoxLayout(self)
-        root.setContentsMargins(8, 7, 8, 7)
-        root.setSpacing(7)
-
-        root.addWidget(self._text("UNIT MANAGER", "section"))
-        root.addWidget(self._text("Select, configure and save unit indexes for this route.", "muted"))
+        root.setContentsMargins(9, 7, 9, 7)
+        root.setSpacing(8)
 
         header = QHBoxLayout()
-        header.addWidget(self._text("JUMP TO INDEX", "kicker"))
+        title_area = QVBoxLayout()
+        title_area.setSpacing(2)
+        title_area.addWidget(self._text("Unit manager", "title"))
+        title_area.addWidget(self._text("Deployments · Configure each step", "subtitle"))
+        header.addLayout(title_area, 1)
+        header.addWidget(self._text("●  Auto-save", "saved"), 0, Qt.AlignVCenter)
+        root.addLayout(header)
+
+        jump = QFrame()
+        jump.setObjectName("jump-card")
+        jump_row = QHBoxLayout(jump)
+        jump_row.setContentsMargins(11, 4, 11, 4)
+        jump_row.setSpacing(9)
+        jump_row.addWidget(self._text("JUMP TO", "section"))
         self.index_picker = QSpinBox()
         self.index_picker.setObjectName("index-picker")
         self.index_picker.setRange(1, max(1, len(entries)))
-        self.index_picker.setFixedWidth(82)
+        self.index_picker.setFixedWidth(85)
         self.index_picker.valueChanged.connect(lambda value: self.select(value - 1))
-        header.addWidget(self.index_picker)
-        header.addStretch()
-        self.page_indicator = self._text("", "muted")
-        header.addWidget(self.page_indicator)
-        root.addLayout(header)
+        jump_row.addWidget(self.index_picker)
+        jump_row.addStretch()
+        self.page_indicator = self._text("", "page")
+        jump_row.addWidget(self.page_indicator)
+        root.addWidget(jump)
 
-        divider = QFrame()
-        divider.setObjectName("separator")
-        root.addWidget(divider)
-        self.heading = self._text("", "kicker")
-        root.addWidget(self.heading)
+        self.editor_card = QFrame()
+        self.editor_card.setObjectName("editor-card")
+        editor = QVBoxLayout(self.editor_card)
+        editor.setContentsMargins(13, 11, 13, 11)
+        editor.setSpacing(7)
+        editor.addWidget(self._text("SELECTED INDEX", "section"))
+        self.heading = self._text("", "title")
+        editor.addWidget(self.heading)
 
-        grid = QGridLayout()
-        grid.setHorizontalSpacing(10)
-        grid.setVerticalSpacing(5)
-        root.addLayout(grid)
         self.fields = {}
         labels = [
-            ("unit", "UNIT SLOT"), ("priority", "TARGET PRIORITY"),
-            ("upgrade", "UPGRADE LEVEL"), ("auto_upgrade", "AUTO UPGRADE"),
-            ("x", "POSITION X"), ("y", "POSITION Y"),
+            ("unit", "Unit slot"), ("priority", "Target priority"),
+            ("upgrade", "Upgrade level"), ("auto_upgrade", "Auto upgrade"),
+            ("x", "Position X"), ("y", "Position Y"),
         ]
-        for index, (key, name) in enumerate(labels):
-            column, row = index % 2, (index // 2) * 2
-            grid.addWidget(self._text(name, "kicker"), row, column)
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(10)
+        grid.setVerticalSpacing(4)
+        for i, (key, name) in enumerate(labels):
+            col, row = i % 2, (i // 2) * 2
+            grid.addWidget(self._text(name, "subtitle"), row, col)
             if key in ("unit", "priority"):
                 field = QComboBox()
-                field.addItems(["None"] + [str(i) for i in range(1, 11)] if key == "unit" else TARGETS)
+                field.addItems(["None"] + [str(n) for n in range(1, 11)] if key == "unit" else TARGETS)
                 field.currentTextChanged.connect(self.changed)
             else:
                 field = QSpinBox()
-                field.setRange(-1 if key in ("x", "y") else 0,
-                               10000 if key in ("x", "y") else 100)
+                field.setRange(-1 if key in ("x", "y") else 0, 10000 if key in ("x", "y") else 100)
                 if key in ("x", "y"):
                     field.setSpecialValueText("Not set")
                 field.setKeyboardTracking(False)
                 field.valueChanged.connect(self.changed)
             self.fields[key] = field
-            grid.addWidget(field, row + 1, column)
+            grid.addWidget(field, row + 1, col)
+        editor.addLayout(grid)
 
-        coordinate_actions = QHBoxLayout()
-        self.capture_button = self._button("SET POSITION", self.capture_position, "primary")
-        self.clear_position_button = self._button("CLEAR POSITION", self.clear_position)
-        coordinate_actions.addWidget(self.capture_button)
-        coordinate_actions.addWidget(self.clear_position_button)
-        root.addLayout(coordinate_actions)
+        position_actions = QHBoxLayout()
+        self.capture_button = self._button("Set position", self.capture_position, "primary")
+        self.clear_position_button = self._button("Clear position", self.clear_position)
+        position_actions.addWidget(self.capture_button, 1)
+        position_actions.addWidget(self.clear_position_button, 1)
+        editor.addLayout(position_actions)
 
-        index_actions = QHBoxLayout()
-        self.copy_button = self._button("COPY INDEX", self.copy_index)
-        self.paste_button = self._button("PASTE INDEX", self.paste_index)
-        self.clear_button = self._button("CLEAR INDEX", self.clear_index)
-        index_actions.addWidget(self.copy_button)
-        index_actions.addWidget(self.paste_button)
-        index_actions.addWidget(self.clear_button)
-        root.addLayout(index_actions)
+        actions = QHBoxLayout()
+        self.copy_button = self._button("Copy", self.copy_index)
+        self.paste_button = self._button("Paste", self.paste_index)
+        self.clear_button = self._button("Reset", self.clear_index, "reset")
         self.paste_button.setEnabled(False)
+        for button in (self.copy_button, self.paste_button, self.clear_button):
+            actions.addWidget(button, 1)
+        editor.addLayout(actions)
+        root.addWidget(self.editor_card)
 
-        root.addWidget(self._text("SAVED INDEXES • Click a card to edit", "kicker"))
+        card_heading = QHBoxLayout()
+        card_heading.addWidget(self._text("Index library", "section"))
+        card_heading.addStretch()
+        card_heading.addWidget(self._text(f"{len(entries)} indexes", "subtitle"))
+        root.addLayout(card_heading)
+
         self.cards = []
         cards = QGridLayout()
         cards.setSpacing(7)
-        root.addLayout(cards)
         for offset in range(PAGE_SIZE):
-            card = QPushButton()
-            card.setObjectName("index-card")
-            card.setMinimumHeight(84)
-            card.clicked.connect(lambda checked=False, offset=offset:
-                                 self.select(self.page * PAGE_SIZE + offset))
-            cards.addWidget(card, offset // 2, offset % 2)
-            self.cards.append(card)
-
+            button = QPushButton()
+            button.setObjectName("index-card")
+            button.setFixedHeight(74)
+            button.setCursor(Qt.PointingHandCursor)
+            button.clicked.connect(lambda checked=False, offset=offset: self.select(self.page * PAGE_SIZE + offset))
+            cards.addWidget(button, offset // 2, offset % 2)
+            self.cards.append(button)
+        root.addLayout(cards)
         root.addStretch()
-        navigation = QHBoxLayout()
-        self.previous = self._button("← PREVIOUS", lambda: self.select((self.page - 1) * PAGE_SIZE))
-        self.next = self._button("NEXT →", lambda: self.select((self.page + 1) * PAGE_SIZE))
-        navigation.addWidget(self.previous)
-        navigation.addWidget(self.next)
-        root.addLayout(navigation)
+
+        nav = QHBoxLayout()
+        self.previous = self._button("←  Previous", lambda: self.select((self.page - 1) * PAGE_SIZE))
+        self.next = self._button("Next  →", lambda: self.select((self.page + 1) * PAGE_SIZE))
+        nav.addWidget(self.previous, 1)
+        nav.addWidget(self.next, 1)
+        root.addLayout(nav)
 
         if self.entries:
             self.select(0)
@@ -197,7 +219,7 @@ class UnitManager(QWidget):
             return
         self.selected, self.page, self.loading = index, index // PAGE_SIZE, True
         entry = self.entries[index]
-        self.heading.setText(f"EDIT INDEX {index + 1:03d}  •  AUTO SAVE")
+        self.heading.setText(f"Index {index + 1:03d}")
         self.index_picker.setValue(index + 1)
         for key, field in self.fields.items():
             value = str(entry.get(key, EMPTY_INDEX[key]))
@@ -225,9 +247,8 @@ class UnitManager(QWidget):
             coords = (f"{entry['x']}, {entry['y']}"
                       if entry.get("x", "") != "" and entry.get("y", "") != "" else "Not set")
             button.setText(
-                f"INDEX {index + 1:03d}  •  {entry['unit']}\n"
-                f"TARGET  {entry['priority']}\n"
-                f"UPG  {entry['upgrade']}  /  AUTO  {entry['auto_upgrade']}\n"
+                f"{index + 1:02d}   Unit {entry['unit']}  ·  {entry['priority']}\n"
+                f"Upgrade {entry['upgrade']}  /  Auto {entry['auto_upgrade']}\n"
                 f"POS  {coords}"
             )
             button.setProperty("selected", index == self.selected)

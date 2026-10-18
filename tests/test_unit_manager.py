@@ -77,6 +77,14 @@ class UnitManagerTests(unittest.TestCase):
         self.assertEqual(self.widget.selected, 5)
         self.assertEqual(self.widget.index_picker.value(), 6)
 
+    def test_modern_panel_keeps_index_selection(self):
+        self.assertEqual(self.widget.editor_card.objectName(), "editor-card")
+        self.assertEqual(self.widget.heading.text(), "Index 001")
+        self.assertEqual(self.widget.cards[0].property("selected"), True)
+        self.widget.cards[4].click()
+        self.assertEqual(self.widget.heading.text(), "Index 005")
+        self.assertEqual(self.widget.selected, 4)
+
     def test_save_failure_restores_values(self):
         self.save.side_effect = OSError('locked')
         self.widget.fields['upgrade'].setValue(4)
