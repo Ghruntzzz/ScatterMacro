@@ -115,7 +115,7 @@ class StoryTests(unittest.TestCase):
     def test_unconfirmed_play_button_never_reports_success(self):
         reader, click, log = Mock(), Mock(), Mock()
         reader.read.return_value = []
-        with self.assertRaisesRegex(RuntimeError, "could not be verified"):
+        with self.assertRaisesRegex(RuntimeError, "Play did not open the Story menu"):
             navigate_story("School Grounds", lambda: np.zeros((120, 160, 4)),
                            reader, click, FastStop(), log,
                            find_play=lambda frame: (45, 32, 0.99))
@@ -124,7 +124,7 @@ class StoryTests(unittest.TestCase):
 
     def test_missing_play_image_does_not_fall_back_to_ocr_word(self):
         reader, click = Mock(), Mock()
-        with self.assertRaisesRegex(RuntimeError, "could not be verified"):
+        with self.assertRaisesRegex(RuntimeError, "Play did not open the Story menu"):
             navigate_story("School Grounds", lambda: np.zeros((120, 160, 4)),
                            reader, click, FastStop(), Mock(), find_play=lambda frame: None,
                            timeout=0.02)

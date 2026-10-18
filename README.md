@@ -121,24 +121,25 @@ The first attempt uses checked SendInput, and an unconfirmed Play click can
 retry in AHK-style Event mode. If Windows refuses foreground focus, the macro
 reports an error rather than sending input to a different application.
 
-## Play click-method tester
+## Story mode navigation (0.1.18)
 
-On the runtime dashboard, press **TEST PLAY CLICK METHODS** in Action Output
-while Roblox is on the lobby screen. The worker searches for the supplied Play
-icon and attempts, in order, direct SendInput, AHK-style mouse_event, virtual
-desktop absolute-position SendInput, and window-message mouse click. After
-each attempt it checks the screen for the Story menu, logs success or failure,
-and **stops testing immediately after a verified success**. F2 stops the test.
-The regular Story run uses this same check before proceeding to Story/map
-navigation. The widget logs which click method worked; window messages can
-be ignored by Roblox, and acceptance by Windows alone is not proof of success.
+The runtime keeps the working **SendInput direct** method: focus Roblox,
+hover at the detected target, wiggle with real Win32 mouse-movement events,
+recenter, pause to allow Roblox to update its pointer, then mouse-down/up.
+The Play icon is recognized with the bundled image template, and opening
+the Story menu is confirmed before proceeding. The Play-method testing
+button and its diagnostic Action Output messages have been removed.
 
-## Hover, native wiggle and stale-position protection
+Story uses the **map, act, and difficulty saved on the main dashboard**.
+After Play -> Story -> map, it selects **Act 1-5**, **Mastery** (M) or
+**Infinite** (infinity symbol). Acts 1-5 use the game's default Normal
+difficulty, or select Hard when the dashboard says Hard. Mastery and
+Infinite skip difficulty. It then clicks **Select Stage** and **Start**.
+Each text/symbol must be unambiguously recognized or the runtime stops
+safely instead of guessing. The map-list wheel scroll is faster and
+individual scroll events are not logged in Action Output. F2 still cancels.
 
-Every Play click method now uses the same preparation sequence: bring Roblox
-to the foreground, move to the detected icon, hover briefly, wiggle a few pixels
-with genuine Win32 mouse-move events, return to the detected center, pause to
-allow Roblox to process the updated pointer position, verify the foreground and
-cursor coordinates, and only then send mouse-down/up. The four-method tester
-continues to verify the actual Story menu, not merely Windows accepting input.
-F2 cancels before button-down, even when triggered during the wiggle.
+The live Act selection UI has not yet been verified against real screenshots.
+Small M and infinity glyphs may require tighter image templates, which can
+be added once matching game screenshots are available. Unit placement,
+wave detection, and upgrades are not yet connected.
