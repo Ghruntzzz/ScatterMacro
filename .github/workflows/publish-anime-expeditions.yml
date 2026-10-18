@@ -45,12 +45,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '0.1.5'
+          $version = '0.1.6'
           $tag = "anime-expeditions-v$version"
           $name = "AnimeExpeditions-$version-windows.zip"
           $archive = "dist/$name"
           if (!(Test-Path $archive)) { throw "Missing macro ZIP: $archive" }
-          gh release create $tag $archive --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Anime Expeditions $version - Index Position Markers" --notes "Runtime dashboard: Numbered markers on Roblox position snapshots, editable arrow-free X/Y boxes, upgrade dropdowns, and an uncluttered Unit Manager without the jump section. Copy/paste and auto-save preserved. Preserves existing route configurations. Story navigation remains limited; unit placement and upgrades are not automated."
+          gh release create $tag $archive --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Anime Expeditions $version - Unit Manager Controls" --notes "Runtime dashboard: Numbered placement markers, arrow-free position fields, dropdown upgrades, no jump section and a cleaner runtime Action Output without the extra Stop button. F2 stop remains active. Copy/paste and auto-save preserved. Preserves existing route configurations. Story navigation remains limited; unit placement and upgrades are not automated."
           if ($LASTEXITCODE -ne 0) { throw 'Macro release upload failed' }
           New-Item -ItemType Directory -Force 'dist/verified' | Out-Null
           gh release download $tag --repo $env:GITHUB_REPOSITORY --pattern $name --dir 'dist/verified'
@@ -62,7 +62,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '0.1.5'
+          $version = '0.1.6'
           $archive = "dist/AnimeExpeditions-$version-windows.zip"
           $sha256 = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
           $url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/anime-expeditions-v$version/AnimeExpeditions-$version-windows.zip"

@@ -50,3 +50,15 @@ class DashboardSetupTests(unittest.TestCase):
         index = dashboard.load_unit_indexes(values)[0]
         self.assertEqual((index["unit"], index["priority"], index["x"], index["y"]), ("2", "Weakest", "300", "200"))
         self.assertEqual(dashboard.load_unit_indexes(dict(values, map="Flower Forest"))[0]["unit"], "None")
+
+    def test_runtime_has_no_stop_button_but_keeps_stop_hotkey_hint(self):
+        from PySide6.QtWidgets import QPushButton, QLabel
+        window = dashboard.RuntimeWindow()
+        try:
+            buttons = [button.text() for button in window.findChildren(QPushButton)]
+            labels = [label.text() for label in window.findChildren(QLabel)]
+            self.assertNotIn("STOP (F2)", buttons)
+            self.assertIn("RETURN TO DASHBOARD", buttons)
+            self.assertIn("F1: START   |   F2: STOP", labels)
+        finally:
+            window.close()

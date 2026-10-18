@@ -860,9 +860,8 @@ class RuntimeWindow(DashboardWindow):
         self.worker = None
         self.return_pending = False
         self._label(action, "F1: START   |   F2: STOP", 22, 525, 226, 18, f"color: {TEXT}; font: 700 10px 'Bahnschrift';")
-        self.stop_runtime_button = self._small_button(action, "STOP (F2)", 22, 550, 226)
-        self.stop_runtime_button.clicked.connect(self._stop_story)
-        return_button = self._small_button(action, "RETURN TO DASHBOARD", 22, 592, 226)
+        # The F2 emergency stop remains active via RuntimeHotkeys; no extra button.
+        return_button = self._small_button(action, "RETURN TO DASHBOARD", 22, 550, 226)
         return_button.clicked.connect(self._return_to_dashboard)
         self.log_timer = QTimer(self)
         self.log_timer.timeout.connect(self._refresh_log)
