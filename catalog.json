@@ -3,11 +3,11 @@
     {
       "id": "anime-expeditions",
       "name": "Anime Expeditions",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "setup_only": false,
       "entrypoint": "AnimeExpeditions.exe",
-      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.1/AnimeExpeditions-0.1.1-windows.zip",
-      "sha256": "c5c74b8b6783dc178d8cba7e4193c17ef2dece5fb7e210438a119e6094d1bf59",
+      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.2/AnimeExpeditions-0.1.2-windows.zip",
+      "sha256": "024746718cba571e287262f3b8fc36a27e295d90d427ca270da07993ffc2b090",
       "description": "Story navigation test: Play > Story > selected visible map. Runtime Start/Stop, Action Output and Unit Manager editing. Other modes are setup-only; in-game automation and global hotkeys are not connected."
     }
   ]
