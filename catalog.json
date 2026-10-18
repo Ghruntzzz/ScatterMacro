@@ -8,12 +8,12 @@
     {
       "id": "anime-expeditions",
       "name": "Anime Expeditions",
-      "version": "0.1.16",
+      "version": "0.1.17",
       "setup_only": false,
       "entrypoint": "AnimeExpeditions.exe",
-      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.16/AnimeExpeditions-0.1.16-windows.zip",
-      "sha256": "97598d27ff349ab26064f5a417b4280adbaa979e5afea4ec6595b018e77574e0",
-      "description": "Includes an interactive Play click-method tester with four Win32 approaches and verified Story menu detection; modern PySide6 Unit Manager with indexed positions and Place at wave. Unit placement and upgrades are not yet automated."
+      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.17/AnimeExpeditions-0.1.17-windows.zip",
+      "sha256": "500e812e59051b85a5347087d5f6370b91c431063917dde4e5b4b1d836eb3a06",
+      "description": "Play click tester with hover, native Win32 mouse wiggle, recenter and pointer settle before clicking using four methods, with verified Story menu detection; modern PySide6 Unit Manager with indexed positions and Place at wave. Unit placement and upgrades are not yet automated."
     }
   ]
 }
