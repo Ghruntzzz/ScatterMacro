@@ -67,7 +67,7 @@ class ClickTests(unittest.TestCase):
 
     def test_focus_restores_minimized_roblox_then_clicks(self):
         client = self.client()
-        client.user.GetForegroundWindow.side_effect = [999, 999, 123, 123, 123, 123, 123]
+        client.user.GetForegroundWindow.side_effect = [999, 123, 123, 123, 123]
         client.user.IsIconic.return_value = True
         self.assertTrue(client.direct_click(20, 30, (80, 100, 4)))
         client.user.ShowWindow.assert_called_once_with(123, 9)
