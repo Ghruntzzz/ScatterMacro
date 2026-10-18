@@ -8,12 +8,12 @@
     {
       "id": "anime-expeditions",
       "name": "Anime Expeditions",
-      "version": "0.1.3",
+      "version": "0.1.4",
       "setup_only": false,
       "entrypoint": "AnimeExpeditions.exe",
-      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.3/AnimeExpeditions-0.1.3-windows.zip",
-      "sha256": "97abfd8976746b6676e4d454be8051983d9c5ad7a6fdcb2ddbec0d8825e4fca0",
-      "description": "Runtime Story navigation test and AHK-style Unit Manager: 104 editable indexes, position capture, copy/paste, auto-save. Unit placement/upgrade execution and other modes are not connected."
+      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.4/AnimeExpeditions-0.1.4-windows.zip",
+      "sha256": "ed49ade2182f2dca8ab8b187b922f84de70d601a0b0f701e9ed65f21b4e1291a",
+      "description": "Runtime Story navigation test and modern PySide6 Unit Manager: 104 editable indexes, position capture, copy/paste, auto-save. Unit placement/upgrade execution and other modes are not connected."
     }
   ]
 }
