@@ -12,6 +12,11 @@ MAX_FOCUS_ATTEMPTS = 3
 WHEEL_DELTA = 120
 
 MOUSE_MOVE = 0x0001
+MOUSE_ABSOLUTE = 0x8000
+MOUSE_VIRTUAL_DESKTOP = 0x4000
+WM_MOUSEMOVE = 0x0200
+WM_LBUTTONDOWN = 0x0201
+WM_LBUTTONUP = 0x0202
 MOUSE_LEFT_DOWN = 0x0002
 MOUSE_LEFT_UP = 0x0004
 MOUSE_WHEEL = 0x0800
@@ -64,6 +69,10 @@ class RobloxClient:
         self.user.ShowWindow.restype = wintypes.BOOL
         self.user.SetForegroundWindow.argtypes = [wintypes.HWND]
         self.user.SetForegroundWindow.restype = wintypes.BOOL
+        self.user.GetSystemMetrics.argtypes = [ctypes.c_int]
+        self.user.GetSystemMetrics.restype = ctypes.c_int
+        self.user.PostMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+        self.user.PostMessageW.restype = wintypes.BOOL
 
     def check_focus(self):
         if self.user.GetForegroundWindow() != self.hwnd:
@@ -240,3 +249,61 @@ class RobloxClient:
         if self.stop.is_set():
             return
         self._send_mouse(MOUSE_WHEEL, int(steps) * WHEEL_DELTA)
+
+    def direct_click_absolute(self, x, y, shape):
+        """Send a Windows virtual-desktop absolute mouse move, then click."""
+        if not self.focus_roblox():
+            return False
+        point, _ = self._validated_point(x, y, shape)
+        # Coordinates must be based on the virtual desktop, including negative
+        # X origins for secondary monitors left of the primary screen.
+        left = self.user.GetSystemMetrics(76)  # SM_XVIRTUALSCREEN
+        top = self.user.GetSystemMetrics(77)  # SM_YVIRTUALSCREEN
+        width = self.user.GetSystemMetrics(78)  # SM_CXVIRTUALSCREEN
+        height = self.user.GetSystemMetrics(79)  # SM_CYVIRTUALSCREEN
+        if width < 2 or height < 2:
+            raise RuntimeError("Windows returned an invalid virtual desktop size.")
+        nx = round((point.x - left) * 65535 / (width - 1))
+        ny = round((point.y - top) * 65535 / (height - 1))
+        if not (0 <= nx <= 65535 and 0 <= ny <= 65535):
+            raise RuntimeError("Play click is outside the Windows virtual desktop.")
+        self._send_mouse(MOUSE_MOVE | MOUSE_ABSOLUTE | MOUSE_VIRTUAL_DESKTOP,
+                         dx=nx, dy=ny)
+        # Input normalization can shift by 1 pixel. Center precisely before down.
+        self._move(point.x, point.y)
+        self._check_cursor(point.x, point.y)
+        self.check_focus()
+        if self.stop.is_set():
+            return False
+        self._button_event(MOUSE_LEFT_DOWN, "input")
+        try:
+            self.stop.wait(CLICK_HOLD_SECONDS)
+        finally:
+            self._button_event(MOUSE_LEFT_UP, "input")
+        return not self.stop.is_set()
+
+    def direct_click_message(self, x, y, shape):
+        """Diagnostic WM_LBUTTONDOWN/UP delivered to Roblox's HWND.
+
+        Some games ignore window messages and rely on raw device input; that is
+        why this is a fallback, not a claim that messages bypass game controls.
+        """
+        if not self.focus_roblox():
+            return False
+        point, _ = self._validated_point(x, y, shape)
+        self._move(point.x, point.y)
+        self._check_cursor(point.x, point.y)
+        self.check_focus()
+        if self.stop.is_set():
+            return False
+        coordinate = ((int(y) & 0xffff) << 16) | (int(x) & 0xffff)
+        if not self.user.PostMessageW(self.hwnd, WM_MOUSEMOVE, 0, coordinate):
+            raise RuntimeError("Windows rejected the mouse-move window message.")
+        if not self.user.PostMessageW(self.hwnd, WM_LBUTTONDOWN, 1, coordinate):
+            raise RuntimeError("Windows rejected the left-button-down window message.")
+        try:
+            self.stop.wait(CLICK_HOLD_SECONDS)
+        finally:
+            if not self.user.PostMessageW(self.hwnd, WM_LBUTTONUP, 0, coordinate):
+                raise RuntimeError("Windows rejected the left-button-up window message.")
+        return not self.stop.is_set()
