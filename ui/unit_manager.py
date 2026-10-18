@@ -1,11 +1,11 @@
 """AHK-style in-dashboard Unit Manager with per-route auto-saving indexes."""
 from math import ceil
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QImage, QPixmap
+from PySide6.QtCore import Qt, Signal, QPointF, QRectF
+from PySide6.QtGui import QImage, QPixmap, QPainter, QColor, QPen, QFont
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QPushButton,
-    QComboBox, QSpinBox, QDialog, QFrame,
+    QComboBox, QSpinBox, QDialog, QFrame, QAbstractSpinBox,
 )
 
 
@@ -18,20 +18,59 @@ TARGETS = ["First", "Last", "Closest", "Strongest", "Boss",
            "Weakest", "Shielded", "Fastest", "Flying"]
 
 
+def configured_positions(entries, width, height):
+    """All saved indexes with a position inside the captured Roblox client."""
+    result = []
+    for index, entry in enumerate(entries, 1):
+        x, y = entry.get("x", ""), entry.get("y", "")
+        if str(x).strip() == "" or str(y).strip() == "":
+            continue
+        try:
+            x, y = int(x), int(y)
+        except (ValueError, TypeError):
+            continue
+        if 0 <= x < width and 0 <= y < height:
+            result.append((index, x, y))
+    return result
+
+
 class PositionImage(QLabel):
     chosen = Signal(int, int)
 
-    def __init__(self, frame):
+    def __init__(self, frame, entries=(), selected=0, read_only=False):
         super().__init__()
         self.height_px, self.width_px = frame.shape[:2]
+        self.read_only = read_only
+        self.markers = configured_positions(entries, self.width_px, self.height_px)
         image = QImage(frame.data, self.width_px, self.height_px, frame.strides[0],
                        QImage.Format_ARGB32).copy()
         pixmap = QPixmap.fromImage(image).scaled(1000, 650, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setFont(QFont("Segoe UI", 9, QFont.Bold))
+        overlaps = {}
+        for index, x, y in self.markers:
+            px, py = x * pixmap.width() / self.width_px, y * pixmap.height() / self.height_px
+            count = overlaps.get((x, y), 0)
+            overlaps[(x, y)] = count + 1
+            # Offset overlapping labels so multiple indexes at one spot remain legible.
+            px += (count % 4) * 32
+            py -= (count // 4) * 32
+            px = max(17, min(pixmap.width() - 17, px))
+            py = max(17, min(pixmap.height() - 17, py))
+            selected_marker = index == selected + 1
+            painter.setPen(QPen(QColor("#fce8ef"), 2))
+            painter.setBrush(QColor("#b12b5e") if selected_marker else QColor("#26202b"))
+            painter.drawEllipse(QPointF(px, py), 15, 15)
+            painter.setPen(QColor("white"))
+            painter.drawText(QRectF(px - 15, py - 15, 30, 30), Qt.AlignCenter, str(index))
+        painter.end()
         self.setPixmap(pixmap)
         self.setFixedSize(pixmap.size())
+        self.setCursor(Qt.ArrowCursor if read_only else Qt.CrossCursor)
 
     def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
+        if not self.read_only and event.button() == Qt.LeftButton:
             x = max(0, min(self.width_px - 1, int(event.position().x() * self.width_px / self.width())))
             y = max(0, min(self.height_px - 1, int(event.position().y() * self.height_px / self.height())))
             self.chosen.emit(x, y)
@@ -60,7 +99,6 @@ class UnitManager(QWidget):
             QLabel#saved { font: 600 9px 'Segoe UI'; color: #8edcbb; }
             QLabel#page { font: 600 9px 'Segoe UI'; color: #c8b5c1; }
             QFrame#editor-card { background: #1b1820; border: 1px solid #4b3845; border-radius: 12px; }
-            QFrame#jump-card { background: #241d26; border: 1px solid #513d49; border-radius: 9px; }
             QComboBox,QSpinBox {
                 background: #100f15; color: #f9eff3; border: 1px solid #564251;
                 border-radius: 7px; min-height: 28px; padding: 4px 8px;
@@ -99,23 +137,6 @@ class UnitManager(QWidget):
         header.addWidget(self._text("●  Auto-save", "saved"), 0, Qt.AlignVCenter)
         root.addLayout(header)
 
-        jump = QFrame()
-        jump.setObjectName("jump-card")
-        jump_row = QHBoxLayout(jump)
-        jump_row.setContentsMargins(11, 4, 11, 4)
-        jump_row.setSpacing(9)
-        jump_row.addWidget(self._text("JUMP TO", "section"))
-        self.index_picker = QSpinBox()
-        self.index_picker.setObjectName("index-picker")
-        self.index_picker.setRange(1, max(1, len(entries)))
-        self.index_picker.setFixedWidth(85)
-        self.index_picker.valueChanged.connect(lambda value: self.select(value - 1))
-        jump_row.addWidget(self.index_picker)
-        jump_row.addStretch()
-        self.page_indicator = self._text("", "page")
-        jump_row.addWidget(self.page_indicator)
-        root.addWidget(jump)
-
         self.editor_card = QFrame()
         self.editor_card.setObjectName("editor-card")
         editor = QVBoxLayout(self.editor_card)
@@ -137,15 +158,19 @@ class UnitManager(QWidget):
         for i, (key, name) in enumerate(labels):
             col, row = i % 2, (i // 2) * 2
             grid.addWidget(self._text(name, "subtitle"), row, col)
-            if key in ("unit", "priority"):
+            if key in ("unit", "priority", "upgrade", "auto_upgrade"):
+                options = {"unit": ["None"] + [str(n) for n in range(1, 11)],
+                           "priority": TARGETS,
+                           "upgrade": [str(n) for n in range(16)],
+                           "auto_upgrade": [str(n) for n in range(7)]}
                 field = QComboBox()
-                field.addItems(["None"] + [str(n) for n in range(1, 11)] if key == "unit" else TARGETS)
+                field.addItems(options[key])
                 field.currentTextChanged.connect(self.changed)
             else:
                 field = QSpinBox()
-                field.setRange(-1 if key in ("x", "y") else 0, 10000 if key in ("x", "y") else 100)
-                if key in ("x", "y"):
-                    field.setSpecialValueText("Not set")
+                field.setRange(-1, 10000)
+                field.setSpecialValueText("Not set")
+                field.setButtonSymbols(QAbstractSpinBox.NoButtons)
                 field.setKeyboardTracking(False)
                 field.valueChanged.connect(self.changed)
             self.fields[key] = field
@@ -154,8 +179,10 @@ class UnitManager(QWidget):
 
         position_actions = QHBoxLayout()
         self.capture_button = self._button("Set position", self.capture_position, "primary")
-        self.clear_position_button = self._button("Clear position", self.clear_position)
-        position_actions.addWidget(self.capture_button, 1)
+        self.view_positions_button = self._button("View markers", self.view_positions)
+        self.clear_position_button = self._button("Clear", self.clear_position)
+        position_actions.addWidget(self.capture_button, 2)
+        position_actions.addWidget(self.view_positions_button, 2)
         position_actions.addWidget(self.clear_position_button, 1)
         editor.addLayout(position_actions)
 
@@ -172,7 +199,9 @@ class UnitManager(QWidget):
         card_heading = QHBoxLayout()
         card_heading.addWidget(self._text("Index library", "section"))
         card_heading.addStretch()
-        card_heading.addWidget(self._text(f"{len(entries)} indexes", "subtitle"))
+        self.page_indicator = self._text("", "page")
+        card_heading.addWidget(self.page_indicator)
+        card_heading.addWidget(self._text(f"· {len(entries)} indexes", "subtitle"))
         root.addLayout(card_heading)
 
         self.cards = []
@@ -220,7 +249,6 @@ class UnitManager(QWidget):
         self.selected, self.page, self.loading = index, index // PAGE_SIZE, True
         entry = self.entries[index]
         self.heading.setText(f"Index {index + 1:03d}")
-        self.index_picker.setValue(index + 1)
         for key, field in self.fields.items():
             value = str(entry.get(key, EMPTY_INDEX[key]))
             if isinstance(field, QComboBox):
@@ -302,8 +330,14 @@ class UnitManager(QWidget):
         if self._commit(entry):
             self.select(self.selected)
 
+    def view_positions(self):
+        self._position_dialog(read_only=True)
+
     def capture_position(self):
-        if self.busy():
+        self._position_dialog(read_only=False)
+
+    def _position_dialog(self, read_only=False):
+        if not read_only and self.busy():
             self.log("Stop the macro before setting a position.")
             return
         from python_macro.capture import roblox_windows, capture_client
@@ -313,18 +347,26 @@ class UnitManager(QWidget):
                 raise RuntimeError("Open exactly one Roblox window.")
             frame = capture_client(windows[0][0])
             dialog = QDialog(self)
-            dialog.setWindowTitle("Choose a placement position on the Roblox snapshot • Esc cancels")
+            dialog.setWindowTitle("Saved position markers" if read_only else "Set position")
             layout = QVBoxLayout(dialog)
-            image = PositionImage(frame)
+            instructions = QLabel(
+                "Numbered markers show saved index positions; pink is selected. "
+                + ("Close to return." if read_only else "Click the screenshot to save a new location.")
+            )
+            instructions.setWordWrap(True)
+            layout.addWidget(instructions)
+            image = PositionImage(frame, self.entries, self.selected, read_only=read_only)
             layout.addWidget(image)
-
-            def chosen(x, y):
-                entry = dict(self.entries[self.selected], x=str(x), y=str(y))
-                if self._commit(entry):
-                    self.select(self.selected)
-                    dialog.accept()
-
-            image.chosen.connect(chosen)
+            if not read_only:
+                def chosen(x, y):
+                    entry = dict(self.entries[self.selected], x=str(x), y=str(y))
+                    if self._commit(entry):
+                        self.select(self.selected)
+                        dialog.accept()
+                image.chosen.connect(chosen)
+            close = QPushButton("Close" if read_only else "Cancel")
+            close.clicked.connect(dialog.reject)
+            layout.addWidget(close)
             dialog.exec()
         except (OSError, RuntimeError, ValueError) as error:
             self.log(f"Position capture unavailable: {error}")
