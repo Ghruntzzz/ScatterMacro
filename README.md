@@ -89,3 +89,13 @@ Play text. It clicks the center of the icon, then waits for the Story menu
 to become visible. Unconfirmed clicks are retried up to three times and
 reported as errors rather than successes. The icon image is included in the
 Windows macro package.
+
+## Reliable click injection
+
+Windows mouse clicks and wheel scrolling use the native `SendInput` API with
+checked return values rather than `mouse_event`. The runtime verifies the
+cursor's actual location, hovers, performs a quick 2px jitter before clicking,
+then holds left button down for 120ms and always sends button-up (even on F2).
+A failure to inject or position the pointer surfaces an explicit diagnostic.
+Screen-state verification remains separate: the Play icon is not considered
+clicked until the Story menu is detected.
