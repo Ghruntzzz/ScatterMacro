@@ -111,3 +111,12 @@ the Play icon using a Win32 Event-style click (similar to AHK's Event mode).
 Both methods preserve F2 cancellation and mouse-button release. Since the
 original Anime Expeditions AHK script is not present in this repository, the
 exact historical command cannot be verified.
+
+## Direct Story clicks and Roblox focus
+
+Story navigation now explicitly requests and verifies Roblox foreground focus
+before starting and before each click. It uses direct clicks (move once to the
+detected target center, mouse down, then up) without hovering or jittering.
+The first attempt uses checked SendInput, and an unconfirmed Play click can
+retry in AHK-style Event mode. If Windows refuses foreground focus, the macro
+reports an error rather than sending input to a different application.

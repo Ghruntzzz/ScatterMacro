@@ -25,15 +25,18 @@ class StoryWorker(QThread):
             windows = roblox_windows()
             if len(windows) != 1:
                 raise RuntimeError("Open exactly one Roblox window before starting.")
-            self.message.emit("Switch to Roblox. Navigation starts in 3 seconds.")
-            if self.stop.wait(3):
+            self.message.emit("Focusing Roblox for direct clicks.")
+            if self.stop.wait(0.5):
                 return
             client = RobloxClient(windows[0][0], self.stop)
+            if not client.focus_roblox():
+                return
+            self.message.emit("Roblox is focused. Starting Story navigation.")
             root = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[1]))
             play_icon = PlayIconLocator(root / "assets" / "play-button-template.png")
-            navigate_story(self.map_name, client.capture, TextReader(), client.click,
+            navigate_story(self.map_name, client.capture, TextReader(), client.direct_click,
                            self.stop, self.message.emit, scroll=client.scroll,
-                           find_play=play_icon, alternate_click=client.click_event)
+                           find_play=play_icon, alternate_click=client.direct_click_event)
         except Exception as exc:
             self.message.emit(f"Navigation stopped: {exc}")
         finally:

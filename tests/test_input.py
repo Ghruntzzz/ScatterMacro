@@ -6,7 +6,7 @@ from python_macro.input import (
     RobloxClient, HOVER_SECONDS, JITTER_SECONDS, JITTER_OFFSETS,
     POST_JITTER_SECONDS, CLICK_HOLD_SECONDS,
     MOUSE_MOVE, MOUSE_LEFT_DOWN, MOUSE_LEFT_UP, MOUSE_WHEEL, WHEEL_DELTA,
-    INPUT, MOUSEINPUT,
+    INPUT, MOUSEINPUT, MAX_FOCUS_ATTEMPTS,
 )
 
 
@@ -42,6 +42,60 @@ class ClickTests(unittest.TestCase):
         client.user.GetClientRect.side_effect = rect
         client.user.ClientToScreen.return_value = True
         return client
+
+
+    def test_direct_click_focuses_and_skips_hover_jitter(self):
+        client = self.client()
+        client.focus_roblox = Mock(return_value=True)
+        events = []
+        client.user.SendInput.side_effect = lambda n, packet, size: (
+            events.append(packet._obj.data.mi.dwFlags) or 1
+        )
+        self.assertTrue(client.direct_click(20, 30, (80, 100, 4)))
+        client.focus_roblox.assert_called_once()
+        self.assertEqual(events, [MOUSE_LEFT_DOWN, MOUSE_LEFT_UP])
+        self.assertEqual(client.user.SetCursorPos.call_count, 1)
+        self.assertEqual(client.stop.wait.call_args.args, (CLICK_HOLD_SECONDS,))
+
+    def test_direct_event_click_focuses_and_releases(self):
+        client = self.client()
+        client.focus_roblox = Mock(return_value=True)
+        self.assertTrue(client.direct_click_event(20, 30, (80, 100, 4)))
+        self.assertEqual([c.args[0] for c in client.user.mouse_event.call_args_list],
+                         [MOUSE_LEFT_DOWN, MOUSE_LEFT_UP])
+        client.user.SendInput.assert_not_called()
+
+    def test_focus_restores_minimized_roblox_then_clicks(self):
+        client = self.client()
+        client.user.GetForegroundWindow.side_effect = [999, 999, 123, 123, 123, 123, 123]
+        client.user.IsIconic.return_value = True
+        self.assertTrue(client.direct_click(20, 30, (80, 100, 4)))
+        client.user.ShowWindow.assert_called_once_with(123, 9)
+        client.user.SetForegroundWindow.assert_called_once_with(123)
+        self.assertEqual(client.user.SendInput.call_count, 2)
+
+    def test_direct_click_never_sends_input_if_focus_denied(self):
+        client = self.client()
+        client.user.GetForegroundWindow.return_value = 456
+        client.user.IsIconic.return_value = False
+        with self.assertRaisesRegex(RuntimeError, "did not focus Roblox"):
+            client.direct_click(20, 30, (80, 100, 4))
+        self.assertEqual(client.user.SetForegroundWindow.call_count, MAX_FOCUS_ATTEMPTS)
+        client.user.SendInput.assert_not_called()
+        client.user.SetCursorPos.assert_not_called()
+
+    def test_direct_click_stop_during_focus_prevents_input(self):
+        client = self.client()
+        client.user.GetForegroundWindow.return_value = 456
+        client.user.IsIconic.return_value = False
+        client.stop.wait.return_value = True
+        self.assertFalse(client.direct_click(20, 30, (80, 100, 4)))
+        client.user.SendInput.assert_not_called()
+
+    def test_focus_skips_foreground_call_if_roblox_is_already_active(self):
+        client = self.client()
+        self.assertTrue(client.focus_roblox())
+        client.user.SetForegroundWindow.assert_not_called()
 
     def test_hover_then_native_motion_jitter_then_checked_down_up(self):
         client = self.client()

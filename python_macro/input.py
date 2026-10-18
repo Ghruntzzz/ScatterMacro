@@ -7,6 +7,8 @@ JITTER_SECONDS = 0.012
 JITTER_OFFSETS = ((-2, 0), (2, 0), (0, 0))
 POST_JITTER_SECONDS = 0.045
 CLICK_HOLD_SECONDS = 0.12
+FOCUS_SETTLE_SECONDS = 0.10
+MAX_FOCUS_ATTEMPTS = 3
 WHEEL_DELTA = 120
 
 MOUSE_MOVE = 0x0001
@@ -56,10 +58,41 @@ class RobloxClient:
         self.user.mouse_event.argtypes = [wintypes.DWORD, wintypes.DWORD,
                                          wintypes.DWORD, wintypes.DWORD, ctypes.c_size_t]
         self.user.mouse_event.restype = None
+        self.user.IsIconic.argtypes = [wintypes.HWND]
+        self.user.IsIconic.restype = wintypes.BOOL
+        self.user.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
+        self.user.ShowWindow.restype = wintypes.BOOL
+        self.user.SetForegroundWindow.argtypes = [wintypes.HWND]
+        self.user.SetForegroundWindow.restype = wintypes.BOOL
 
     def check_focus(self):
         if self.user.GetForegroundWindow() != self.hwnd:
             raise RuntimeError("Roblox lost focus. Bring Roblox forward and try again.")
+
+    def focus_roblox(self):
+        """Request real foreground focus and verify it before sending input.
+
+        Windows can deny SetForegroundWindow because of foreground-lock rules.
+        If that happens, never click a different window.
+        """
+        if self.stop.is_set():
+            return False
+        if self.user.GetForegroundWindow() == self.hwnd:
+            return True
+        if self.user.IsIconic(self.hwnd):
+            self.user.ShowWindow(self.hwnd, 9)  # SW_RESTORE
+        for _ in range(MAX_FOCUS_ATTEMPTS):
+            if self.stop.is_set():
+                return False
+            self.user.SetForegroundWindow(self.hwnd)
+            if self.stop.wait(FOCUS_SETTLE_SECONDS):
+                return False
+            if self.user.GetForegroundWindow() == self.hwnd:
+                return True
+        raise RuntimeError(
+            "Windows did not focus Roblox. Click the Roblox window once, "
+            "then start the macro again. No input was sent."
+        )
 
     def capture(self):
         from python_macro.capture import capture_client
@@ -120,6 +153,30 @@ class RobloxClient:
     def click_event(self, x, y, shape):
         """AHK SendMode Event-like attempt when SendInput did not change the menu."""
         return self._click(x, y, shape, method="event")
+
+    def direct_click(self, x, y, shape):
+        """Focus Roblox and click the target immediately without hover/jitter."""
+        return self._direct_click(x, y, shape, method="input")
+
+    def direct_click_event(self, x, y, shape):
+        """Direct AHK-style Event fallback, also without hover/jitter."""
+        return self._direct_click(x, y, shape, method="event")
+
+    def _direct_click(self, x, y, shape, method):
+        if not self.focus_roblox():
+            return False
+        point, _ = self._validated_point(x, y, shape)
+        self._move(point.x, point.y)
+        self._check_cursor(point.x, point.y)
+        self.check_focus()
+        if self.stop.is_set():
+            return False
+        self._button_event(MOUSE_LEFT_DOWN, method)
+        try:
+            self.stop.wait(CLICK_HOLD_SECONDS)
+        finally:
+            self._button_event(MOUSE_LEFT_UP, method)
+        return not self.stop.is_set()
 
     def _button_event(self, flag, method):
         if method == "event":
