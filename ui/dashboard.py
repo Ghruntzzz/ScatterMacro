@@ -887,10 +887,6 @@ class RuntimeWindow(DashboardWindow):
         # The F2 emergency stop remains active via RuntimeHotkeys; no extra button.
         return_button = self._small_button(action, "RETURN TO DASHBOARD", 22, 550, 226)
         return_button.clicked.connect(self._return_to_dashboard)
-        self.test_clicks_button = self._small_button(action, "TEST PLAY CLICK METHODS", 22, 600, 226)
-        self.test_clicks_button.clicked.connect(self._test_play_clicks)
-        self._label(action, "Tests four methods, stops on success.", 22, 644, 226, 24,
-                    f"color: {MUTED}; font: 9px 'Segoe UI';")
         self.log_timer = QTimer(self)
         self.log_timer.timeout.connect(self._refresh_log)
         # Worker signals own Action Output; stale file logs must not overwrite it.
@@ -1100,18 +1096,6 @@ class RuntimeWindow(DashboardWindow):
         self._restore_setup()
         self.close()
 
-    def _test_play_clicks(self) -> None:
-        if self.return_pending or (self.worker is not None and self.worker.isRunning()):
-            return
-        from ui.story_navigation import StoryWorker
-        self._align_roblox()
-        self.worker = StoryWorker(self.values["map"], self, test_only=True)
-        self.worker.message.connect(self.log.appendPlainText)
-        self.worker.finished.connect(self._story_finished)
-        self.runtime_status.setText("TESTING")
-        self.test_clicks_button.setEnabled(False)
-        self.worker.start()
-
     def _start_story(self) -> None:
         if self.values["mode"] != "Story":
             self.log.appendPlainText("Only Story navigation is available.")
@@ -1120,7 +1104,7 @@ class RuntimeWindow(DashboardWindow):
             return
         from ui.story_navigation import StoryWorker
         self._align_roblox()
-        self.worker = StoryWorker(self.values["map"], self)
+        self.worker = StoryWorker(self.values["map"], self, act_name=self.values["act"])
         self.worker.message.connect(self.log.appendPlainText)
         self.worker.finished.connect(self._story_finished)
         self.runtime_status.setText("RUNNING")
@@ -1133,7 +1117,6 @@ class RuntimeWindow(DashboardWindow):
 
     def _story_finished(self) -> None:
         self.runtime_status.setText("READY")
-        self.test_clicks_button.setEnabled(True)
         if self.worker is not None:
             self.worker.deleteLater()
             self.worker = None

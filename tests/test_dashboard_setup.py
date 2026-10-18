@@ -61,11 +61,14 @@ class DashboardSetupTests(unittest.TestCase):
         self.assertEqual((index["unit"], index["priority"], index["x"], index["y"]), ("2", "Weakest", "300", "200"))
         self.assertEqual(dashboard.load_unit_indexes(dict(values, map="Flower Forest"))[0]["unit"], "0")
 
-    def test_runtime_has_diagnostic_click_tester(self):
+    def test_runtime_has_no_play_click_diagnostics(self):
+        from PySide6.QtWidgets import QPushButton
         window = dashboard.RuntimeWindow()
         try:
-            self.assertEqual(window.test_clicks_button.text(), "TEST PLAY CLICK METHODS")
-            self.assertTrue(window.test_clicks_button.isEnabled())
+            texts = [button.text() for button in window.findChildren(QPushButton)]
+            self.assertNotIn("TEST PLAY CLICK METHODS", texts)
+            self.assertFalse(hasattr(window, "test_clicks_button"))
+            self.assertFalse(hasattr(window, "_test_play_clicks"))
         finally:
             window.close()
 
