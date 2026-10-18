@@ -48,8 +48,9 @@ class INPUT(ctypes.Structure):
 
 
 class RobloxClient:
-    def __init__(self, hwnd, stop):
+    def __init__(self, hwnd, stop, selected_pid=None):
         self.hwnd, self.stop = hwnd, stop
+        self.selected_pid = int(selected_pid) if selected_pid is not None else None
         self.user = ctypes.WinDLL("user32", use_last_error=True)
         self.user.GetForegroundWindow.restype = wintypes.HWND
         self.user.GetClientRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
@@ -79,6 +80,9 @@ class RobloxClient:
         self.user.PostMessageW.restype = wintypes.BOOL
 
     def check_focus(self):
+        if self.selected_pid is not None:
+            from python_macro.capture import selected_roblox_window
+            selected_roblox_window(self.hwnd, self.selected_pid)
         if self.user.GetForegroundWindow() != self.hwnd:
             raise RuntimeError("Roblox lost focus. Bring Roblox forward and try again.")
 
@@ -90,6 +94,9 @@ class RobloxClient:
         """
         if self.stop.is_set():
             return False
+        if self.selected_pid is not None:
+            from python_macro.capture import selected_roblox_window
+            selected_roblox_window(self.hwnd, self.selected_pid)
         if self.user.GetForegroundWindow() == self.hwnd:
             return True
         if self.user.IsIconic(self.hwnd):

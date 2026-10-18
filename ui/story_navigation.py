@@ -33,7 +33,7 @@ class StoryWorker(QThread):
             self.message.emit("Opening Story mode.")
             if self.stop.wait(0.5):
                 return
-            client = RobloxClient(target[0], self.stop)
+            client = RobloxClient(target[0], self.stop, selected_pid=target[2])
             if not client.focus_roblox():
                 return
             root = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[1]))

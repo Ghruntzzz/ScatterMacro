@@ -39,6 +39,27 @@ class DashboardSetupTests(unittest.TestCase):
         self.assertIn("%20", values["private_server"])
         window.close()
 
+    def test_selector_displays_two_roblox_windows_and_persists_selected_pid(self):
+        with patch("python_macro.capture.roblox_windows",
+                   return_value=[(101, "Roblox", 4001), (202, "Roblox", 4002)]):
+            window = dashboard.DashboardWindow()
+            try:
+                self.assertEqual(window.roblox_selector.count(), 3)
+                self.assertEqual(window.roblox_selector.currentIndex(), 0)
+                window.roblox_selector.setCurrentIndex(2)
+                values = dashboard.read_dashboard_values()
+                self.assertEqual(values["roblox_hwnd"], "202")
+                self.assertEqual(values["roblox_pid"], "4002")
+                window._refresh_roblox_windows()
+                self.assertEqual(window.roblox_selector.currentIndex(), 2)
+                with patch("python_macro.capture.roblox_windows",
+                           return_value=[(101, "Roblox", 4001)]):
+                    window._refresh_roblox_windows()
+                    self.assertEqual(window.roblox_selector.currentIndex(), 0)
+                    self.assertEqual(dashboard.read_dashboard_values()["roblox_pid"], "4002")
+            finally:
+                window.close()
+
     def test_setup_unit_slots_are_zero_through_six(self):
         values = dashboard.read_dashboard_values()
         dialog = dashboard.UnitSetupDialog(values)

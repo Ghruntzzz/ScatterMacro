@@ -19,6 +19,7 @@ on:
       - tests/test_story.py
       - tests/test_input.py
       - tests/test_dashboard_setup.py
+      - tests/test_roblox_selection.py
       - tests/test_deployment.py
       - anime_main.py
       - .github/workflows/publish-anime-expeditions.yml
