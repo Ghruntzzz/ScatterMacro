@@ -2,7 +2,9 @@ import unittest
 
 import numpy as np
 
-from python_macro.vision import Region, text_variants
+from python_macro.vision import Region, text_variants, PlayIconLocator
+from pathlib import Path
+import cv2
 
 
 class PythonVisionTests(unittest.TestCase):
@@ -24,3 +26,27 @@ class PythonVisionTests(unittest.TestCase):
             self.assertEqual(variant.shape, (60, 160))
         self.assertTrue(np.array_equal(original, frame))
         self.assertTrue(set(np.unique(variants[-1])).issubset({0, 255}))
+
+    def test_visual_template_targets_icon_above_its_caption(self):
+        path = Path(__file__).resolve().parents[1] / "assets" / "play-button-template.png"
+        locator = PlayIconLocator(path)
+        template = cv2.imread(str(path))
+        for factor in (1.0, 1.3, 0.85):
+            scaled = cv2.resize(template, None, fx=factor, fy=factor)
+            h, w = scaled.shape[:2]
+            frame = np.zeros((230, 320, 4), dtype=np.uint8)
+            frame[:, :, :3] = (20, 28, 30)
+            frame[50:50 + h, 90:90 + w, :3] = scaled
+            result = locator(frame)
+            self.assertIsNotNone(result, msg=str(factor))
+            x, y, confidence = result
+            self.assertLessEqual(abs(x - (90 + w // 2)), 2)
+            self.assertLessEqual(abs(y - (50 + round(h * 0.43))), 2)
+            self.assertGreater(confidence, 0.86)
+
+    def test_visual_template_rejects_blank_background(self):
+        path = Path(__file__).resolve().parents[1] / "assets" / "play-button-template.png"
+        locator = PlayIconLocator(path)
+        frame = np.zeros((230, 320, 4), dtype=np.uint8)
+        frame[:, :, :3] = (20, 28, 30)
+        self.assertIsNone(locator(frame))

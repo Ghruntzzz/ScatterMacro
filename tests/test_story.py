@@ -89,3 +89,42 @@ class StoryTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "Play"):
             navigate_story("School Grounds", Mock(), Mock(), click, FastStop(), Mock(), timeout=0)
         click.assert_not_called()
+
+    def test_image_play_click_waits_for_story_confirmation(self):
+        reader = Mock()
+        reader.read.side_effect = [[], [label("Story")], [label("Story")],
+                                   [label("Flower Forest")]]
+        click, log = Mock(), Mock()
+        navigate_story("Flower Forest", lambda: np.zeros((120, 160, 4)),
+                       reader, click, FastStop(), log,
+                       find_play=lambda frame: (45, 32, 0.99))
+        self.assertEqual(click.call_count, 3)
+        self.assertEqual(click.call_args_list[0].args[:2], (45, 32))
+        self.assertTrue(any("Play click verified" in c.args[0] for c in log.call_args_list))
+
+    def test_unconfirmed_play_button_never_reports_success(self):
+        reader, click, log = Mock(), Mock(), Mock()
+        reader.read.return_value = []
+        with self.assertRaisesRegex(RuntimeError, "could not be verified"):
+            navigate_story("School Grounds", lambda: np.zeros((120, 160, 4)),
+                           reader, click, FastStop(), log,
+                           find_play=lambda frame: (45, 32, 0.99))
+        self.assertEqual(click.call_count, 3)
+        self.assertFalse(any("Play click verified" in c.args[0] for c in log.call_args_list))
+
+    def test_missing_play_image_does_not_fall_back_to_ocr_word(self):
+        reader, click = Mock(), Mock()
+        with self.assertRaisesRegex(RuntimeError, "could not be verified"):
+            navigate_story("School Grounds", lambda: np.zeros((120, 160, 4)),
+                           reader, click, FastStop(), Mock(), find_play=lambda frame: None,
+                           timeout=0.02)
+        click.assert_not_called()
+        reader.read.assert_not_called()
+
+    def test_stopping_during_play_validation_prevents_later_click(self):
+        stop = FastStop()
+        reader, click = Mock(), Mock()
+        reader.read.side_effect = lambda *a, **kw: stop.set() or []
+        navigate_story("School Grounds", lambda: np.zeros((120, 160, 4)),
+                       reader, click, stop, Mock(), find_play=lambda frame: (45, 32, 0.99))
+        self.assertEqual(click.call_count, 1)
