@@ -143,3 +143,19 @@ The live Act selection UI has not yet been verified against real screenshots.
 Small M and infinity glyphs may require tighter image templates, which can
 be added once matching game screenshots are available. Unit placement,
 wave detection, and upgrades are not yet connected.
+
+## Story act-label matching and compact runtime (0.1.19)
+
+The **Act 1–5, Infinite (∞), and Mastery (M)** buttons use reference label
+templates cropped from the supplied screenshot. Each reference deliberately
+excludes the decorative stars. The macro selects only a sufficiently
+confident match, rather than clicking uncertain OCR numbers. The Story
+navigation pauses have been shortened while preserving the verified
+SendInput hover/wiggle/recenter click preparation.
+
+The runtime's old full-width stats header has been removed. Four **Session
+Stats** tiles and the session indicator are in the upper left panel; the
+smaller **Action Output** panel is immediately below. The Roblox viewport
+starts higher and fills the additional vertical area; the Unit Manager
+retains its settings and more vertical room. The Start button currently
+uses OCR until a standalone reference image can be supplied and bundled.
