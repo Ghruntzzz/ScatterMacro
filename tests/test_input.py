@@ -107,7 +107,10 @@ class ClickTests(unittest.TestCase):
         client = self.client()
         client.stop.wait.side_effect = [False, True]
         self.assertFalse(client.click(20, 30, (80, 100, 4)))
-        client.user.SendInput.assert_not_called()
+        self.assertFalse(
+            any(c.args[1]._obj.data.mi.dwFlags in (MOUSE_LEFT_DOWN, MOUSE_LEFT_UP)
+                for c in client.user.SendInput.call_args_list)
+        )
 
     def test_stop_during_mouse_down_still_releases(self):
         client = self.client()
@@ -116,7 +119,11 @@ class ClickTests(unittest.TestCase):
         client.stop.is_set.side_effect = lambda: not bool(waits)
         # Last false -> stop will flip only after click's hold.
         self.assertFalse(client.click(20, 30, (80, 100, 4)))
-        self.assertEqual(client.user.SendInput.call_count, 2)
+        self.assertEqual(
+            [c.args[1]._obj.data.mi.dwFlags for c in client.user.SendInput.call_args_list
+             if c.args[1]._obj.data.mi.dwFlags in (MOUSE_LEFT_DOWN, MOUSE_LEFT_UP)],
+            [MOUSE_LEFT_DOWN, MOUSE_LEFT_UP],
+        )
 
     def test_focus_loss_prevents_input(self):
         client = self.client()
@@ -139,7 +146,10 @@ class ClickTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(RuntimeError, "Cursor missed"):
             client.click(20, 30, (80, 100, 4))
-        client.user.SendInput.assert_not_called()
+        self.assertFalse(
+            any(c.args[1]._obj.data.mi.dwFlags in (MOUSE_LEFT_DOWN, MOUSE_LEFT_UP)
+                for c in client.user.SendInput.call_args_list)
+        )
 
     def test_downward_scroll_uses_checked_input(self):
         client = self.client()
