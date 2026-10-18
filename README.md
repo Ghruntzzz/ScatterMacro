@@ -1,6 +1,6 @@
 # ScatterMacro
 
-A black-and-wine-red Python launcher with independent macro installation and updates.
+A black-and-wine-red Python launcher with independently installable packages and one unified update feed.
 
 ## Open the launcher
 
@@ -30,9 +30,12 @@ are preparation, not a claim that automation is running.
 
 ## Installation and updates
 
-Catalog and launcher update checks run at startup. Updates has separate manual
-checks for macros and the launcher. Opening an installed macro checks for a newer
-version and offers installation first. Offline opening requires confirmation.
+The launcher checks one catalog.json feed on startup for updates to both the launcher
+and every macro. One **Check for updates** button refreshes the Updates tab;
+each available update has its own Install/Update action. Opening an installed macro
+uses that same feed to check for a newer version first. Offline opening requires
+confirmation. Unreleased macro versions remain hidden until their verified
+release assets are published.
 
 Macros install into %LOCALAPPDATA%/ScatterMacro/macros/<macro-id>. Each has a
 persistent config folder and separate versioned program folders. Macro configs
@@ -55,7 +58,10 @@ packages. Macros provide their own dependencies, independent of the launcher.
 Build the macro first with tools/BuildAnimeExpeditions.ps1, then update its
 checksum in catalog.json and build the launcher with tools/BuildLauncher.ps1.
 Publish both verified assets before exposing catalog/update feeds.
-launcher-update.json identifies the runtime ZIP and its checksum.
+The `launcher` field in `catalog.json` identifies the launcher runtime ZIP and
+checksum. `launcher-update.json` remains available for compatibility with older
+0.3.0 launchers. Only publish new version information to either feed after
+building, releasing, and verifying the actual Windows assets.
 
 Use Python 3.12, install ui/requirements-python.txt, then run python main.py.
 Run python -m unittest discover -s tests. Run the setup source with

@@ -1,4 +1,9 @@
 {
+  "launcher": {
+    "version": "0.3.0",
+    "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/launcher-v0.3.0/ScatterLauncher-0.3.0-windows.zip",
+    "sha256": "ba2ca0966db671b314add3f96b4950f0984908ca32aac5534da9f7b64492fb36"
+  },
   "macros": [
     {
       "id": "anime-expeditions",

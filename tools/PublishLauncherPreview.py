@@ -22,8 +22,8 @@ def main():
         paths = [ROOT / "dist/AnimeExpeditions-0.1.3-windows.zip"]
         notes = "Update Anime Expeditions through ScatterMacro. Story opens the runtime dashboard: F1 starts and F2 stops while runtime is open, including when Roblox has focus. Navigation hovers 250ms before clicking. Unit Manager now supports direct index editing, automatic saves, selectable cards, paging and client-relative snapshot position capture. Removed the Live Viewport heading. Story still stops after Play > Story > selected visible map. Unit placement/upgrade execution, act/difficulty selection and other modes are not implemented. Keep Roblox foreground; allow three seconds after F1 to switch to it. Live game validation is still required."
     else:
-        tag, name = "launcher-v0.3.0", "ScatterMacro 0.3.0"
-        paths = [ROOT / "dist/ScatterMacro.exe", ROOT / "dist/ScatterLauncher-0.3.0-windows.zip"]
+        tag, name = "launcher-v0.3.1", "ScatterMacro 0.3.1"
+        paths = [ROOT / "dist/ScatterMacro.exe", ROOT / "dist/ScatterLauncher-0.3.1-windows.zip"]
         notes = "Download ScatterMacro.exe and open it. No ZIP extraction or neighboring _internal folder is required. The executable installs its bundled runtime under LocalAppData/ScatterMacro/launcher and reuses it. Future managed updates switch to the newer runtime. The ZIP asset is for the built-in updater.\n\nAdds redesigned rounded wine-red loading screen, inline update checks without popups, and installable Anime Expeditions setup. Install Anime Expeditions from the library, then Open to configure it. Game automation is not connected yet. Settings remain in each macro's own config folder."
     if not all(path.is_file() for path in paths):
         raise SystemExit("Build the release assets first.")

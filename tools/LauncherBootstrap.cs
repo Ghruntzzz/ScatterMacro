@@ -10,7 +10,7 @@ using System.Windows.Forms;
 
 class LauncherBootstrap
 {
-    const string EmbeddedVersion = "0.3.0";
+    const string EmbeddedVersion = "0.3.1";
 
     [STAThread]
     static int Main(string[] args)

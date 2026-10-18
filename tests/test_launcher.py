@@ -37,9 +37,9 @@ class LauncherTests(unittest.TestCase):
     def test_update_checks_never_open_windows_or_processes(self):
         self.window.show()
         baseline = {w for w in self.app.topLevelWidgets() if w.isVisible()}
-        catalog = {"macros": self.window.catalog}
         release = {"version": VERSION, "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/test/a.zip", "sha256": "0" * 64}
-        with patch("ui.launcher.fetch_json", side_effect=[catalog, release]), \
+        feed = {"macros": self.window.catalog, "launcher": release}
+        with patch("ui.launcher.fetch_json", return_value=feed) as fetch, \
              patch("ui.launcher.subprocess.Popen") as spawn, \
              patch.object(QMessageBox, "information") as info, \
              patch.object(QMessageBox, "question") as question:
@@ -51,6 +51,7 @@ class LauncherTests(unittest.TestCase):
                 self.assertEqual({w for w in self.app.topLevelWidgets() if w.isVisible()}, baseline)
                 time.sleep(0.005)
             self.assertIsNone(self.window.future)
+            fetch.assert_called_once()
             spawn.assert_not_called()
             info.assert_not_called()
             question.assert_not_called()
@@ -85,11 +86,29 @@ class LauncherTests(unittest.TestCase):
         self.assertIn("Macro configs", texts)
         self.assertTrue(self.window.windowFlags() & Qt.FramelessWindowHint)
 
-    def test_separate_update_controls(self):
+    def test_one_update_control_and_launcher_update_card(self):
         self.window.show_page("Updates")
         texts = [button.text() for button in self.window.findChildren(QPushButton)]
-        self.assertIn("Check launcher updates", texts)
-        self.assertIn("Check macro updates", texts)
+        self.assertEqual(texts.count("Check for updates"), 1)
+        self.assertNotIn("Check launcher updates", texts)
+        self.assertNotIn("Check macro updates", texts)
+        self.window.release = dict(self.window.catalog[0], version="99.0.0")
+        self.window.updates_checked = True
+        self.window.show_page("Updates")
+        texts = [button.text() for button in self.window.findChildren(QPushButton)]
+        self.assertIn("Update launcher to 99.0.0", texts)
+        self.assertEqual(self.window.nav["Updates"].text(), "Updates (1)")
+
+    def test_macro_update_button_does_not_launch_macro(self):
+        macro = self.window.catalog[0]
+        with patch.object(self.window.library, "installed", return_value={"version": "0.0.1"}), \
+             patch.object(self.window, "install_macro") as install, \
+             patch.object(self.window, "launch_macro") as launch, \
+             patch.object(self.window, "start_job") as job:
+            self.window.macro_action(macro)
+            install.assert_called_once_with(macro)
+            launch.assert_not_called()
+            job.assert_not_called()
 
     def test_open_checks_updates_before_launch(self):
         macro = self.window.catalog[0]
@@ -101,7 +120,7 @@ class LauncherTests(unittest.TestCase):
              patch.object(QMessageBox, "question", return_value=QMessageBox.Yes):
             self.window.macro_action(macro)
             launch.assert_not_called()
-            job.call_args.args[2]([latest])
+            job.call_args.args[2]({"macros": [latest], "launcher": {"version": VERSION}})
             install.assert_called_once_with(latest, launch=True)
             launch.assert_not_called()
 

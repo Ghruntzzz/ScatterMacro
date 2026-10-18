@@ -1,6 +1,6 @@
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
-$python = Join-Path $env:LOCALAPPDATA 'Programs\Python\Python312\python.exe'
+$python = (Get-Command python -ErrorAction Stop).Source
 Push-Location $root
 try {
     & $python -m PyInstaller --noconfirm --clean --onedir --windowed --name ScatterLauncher --icon assets/scattermacro.ico --add-data 'assets;assets' --add-data 'catalog.json;.' main.py
@@ -17,8 +17,8 @@ try {
     $icu = Join-Path $root 'dist\ScatterLauncher\_internal\icuuc.dll'
     if (Test-Path -LiteralPath $icu) { Remove-Item -LiteralPath $icu }
     & (Join-Path $PSScriptRoot 'TestLauncherBuild.ps1')
-    Compress-Archive -Path dist/ScatterLauncher -DestinationPath dist/ScatterLauncher-0.3.0-windows.zip -Force
-    $archive = Join-Path $root 'dist\ScatterLauncher-0.3.0-windows.zip'
+    Compress-Archive -Path dist/ScatterLauncher -DestinationPath dist/ScatterLauncher-0.3.1-windows.zip -Force
+    $archive = Join-Path $root 'dist\ScatterLauncher-0.3.1-windows.zip'
     $hashFile = Join-Path $root 'dist\payload.sha256'
     [IO.File]::WriteAllText($hashFile, (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant())
     $compiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'

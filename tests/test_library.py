@@ -93,3 +93,23 @@ class PackageTests(unittest.TestCase):
         self.assertEqual((old / "ScatterLauncher.exe").read_text(), "old")
         self.assertEqual((managed / updater.VERSION / "ScatterLauncher.exe").read_text(), "new")
         self.assertEqual(Path(launch.call_args.args[0][0]).parent, managed / updater.VERSION)
+
+
+class UnifiedFeedTests(unittest.TestCase):
+    def test_catalog_validates_launcher_and_independent_macros(self):
+        from python_macro.library import validate_update_feed
+        release = {"version": "0.3.0",
+                   "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/test/package.zip",
+                   "sha256": "a" * 64}
+        macro = dict(release, id="anime-expeditions", name="Anime Expeditions",
+                     entrypoint="AnimeExpeditions.exe")
+        feed = validate_update_feed({"launcher": release, "macros": [macro]})
+        self.assertEqual(feed["launcher"]["version"], "0.3.0")
+        self.assertEqual(feed["macros"][0]["id"], "anime-expeditions")
+
+    def test_missing_or_invalid_launcher_rejected(self):
+        from python_macro.library import validate_update_feed
+        with self.assertRaises(ValueError):
+            validate_update_feed({"macros": []})
+        with self.assertRaises(ValueError):
+            validate_update_feed({"launcher": {"version": "bad"}, "macros": []})

@@ -10,7 +10,7 @@ import tempfile
 import urllib.request
 import zipfile
 
-VERSION = "0.3.0"
+VERSION = "0.3.1"
 UPDATE_URL = "https://raw.githubusercontent.com/Ghruntz/ScatterMacro/main/launcher-update.json"
 
 CATALOG_URL = "https://raw.githubusercontent.com/Ghruntz/ScatterMacro/main/catalog.json"
@@ -61,6 +61,18 @@ def validate_release(release):
     version_tuple(release["version"])
     if not release["url"].startswith(DOWNLOAD_PREFIX) or not re.fullmatch(r"[a-fA-F0-9]{64}", release["sha256"]):
         raise ValueError("Invalid release source or checksum")
+
+
+def validate_update_feed(feed):
+    """Validate the one manifest consumed by the launcher Updates tab.
+
+    Keep the legacy launcher-update.json separate for installed 0.3.0 clients;
+    new clients only need the catalog feed.
+    """
+    if not isinstance(feed, dict) or not isinstance(feed.get("launcher"), dict):
+        raise ValueError("Invalid unified update feed")
+    validate_release(feed["launcher"])
+    return {"launcher": feed["launcher"], "macros": validate_catalog(feed)}
 
 
 def download_release(release, target):

@@ -1,4 +1,4 @@
-"""Install-first ScatterMacro library with independent package updates."""
+"""Install-first ScatterMacro library with one unified Updates tab."""
 from concurrent.futures import ThreadPoolExecutor
 import json
 import os
@@ -13,8 +13,8 @@ from PySide6.QtWidgets import (
     QMessageBox, QPushButton, QScrollArea, QSizeGrip, QSizePolicy, QVBoxLayout, QWidget,
 )
 from python_macro.library import (
-    Library, VERSION, CATALOG_URL, UPDATE_URL, fetch_json, validate_catalog,
-    validate_release, version_tuple,
+    Library, VERSION, CATALOG_URL, fetch_json, validate_catalog,
+    validate_update_feed, version_tuple,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -69,6 +69,7 @@ class Launcher(QMainWindow):
         self.library = library or Library()
         self.catalog = validate_catalog(json.loads((ROOT / "catalog.json").read_text(encoding="utf-8")))
         self.release = None
+        self.updates_checked = False
         self.processes = {}
         self.executor = ThreadPoolExecutor(max_workers=1)
         self.future = None
@@ -147,27 +148,27 @@ class Launcher(QMainWindow):
         column.addWidget(label("YOUR LIBRARY", "eyebrow"))
         column.addWidget(label("Choose your next session." if page == "Home" else page, "title"))
         if page == "Updates":
-            column.addWidget(label("Launcher and macro updates are independent. Your saved configurations stay in place.", "muted"))
-            row = QHBoxLayout()
-            for text, scope in (("Check launcher updates", "launcher"), ("Check macro updates", "macros")):
-                button = QPushButton(text)
-                button.clicked.connect(lambda _, s=scope: self.check_updates(s))
-                self.check_buttons.append(button)
-                row.addWidget(button)
-            column.addLayout(row)
-            column.addWidget(label("Launcher " + VERSION, "eyebrow"))
+            column.addWidget(label("One updater checks the launcher and all macros. Each update installs separately; saved configurations remain in place.", "muted"))
+            check = QPushButton("Check for updates")
+            check.clicked.connect(lambda: self.check_updates())
+            self.check_buttons.append(check)
+            column.addWidget(check, alignment=Qt.AlignLeft)
+            column.addWidget(label("SCATTERMACRO LAUNCHER", "eyebrow"))
+            column.addWidget(label("Installed: " + VERSION, "muted"))
             if launcher_update:
-                button = QPushButton("Install launcher " + self.release["version"])
+                column.addWidget(label("Update available: " + self.release["version"], "eyebrow"))
+                button = QPushButton("Update launcher to " + self.release["version"])
                 button.setObjectName("primary")
                 button.clicked.connect(self.update_launcher)
-                column.addWidget(button)
+                column.addWidget(button, alignment=Qt.AlignLeft)
             else:
-                column.addWidget(label("Use Check launcher updates to check for a newer version.", "muted"))
+                column.addWidget(label("Launcher up to date." if self.updates_checked else "Check for updates to see the latest launcher version.", "muted"))
+            column.addWidget(label("MACRO UPDATES", "eyebrow"))
         else:
             row = QHBoxLayout()
             row.addWidget(label("Install the macros you want. Each has its own saved configuration.", "muted"), 1)
             check = QPushButton("Check for updates")
-            check.clicked.connect(lambda: self.check_updates("all"))
+            check.clicked.connect(lambda: self.check_updates())
             self.check_buttons.append(check)
             row.addWidget(check)
             column.addLayout(row)
@@ -211,7 +212,7 @@ class Launcher(QMainWindow):
             row.addLayout(copy, 3)
             column.addWidget(card)
             cards.append((macro["name"].lower(), card))
-        empty = label("No matching macros." if cards else "No macro updates available." if page == "Updates" else "No macros installed yet.", "muted")
+        empty = label("No matching macros." if cards else "All installed macros are up to date." if page == "Updates" and self.updates_checked else "Check for updates to see available macro releases." if page == "Updates" else "No macros installed yet.", "muted")
         empty.setVisible(not cards)
         column.addWidget(empty)
         def filter_cards(text):
@@ -254,29 +255,17 @@ class Launcher(QMainWindow):
             if failed:
                 failed(error)
 
-    def check_updates(self, scope="all"):
-        def work():
-            result, errors = {}, []
-            if scope in ("all", "macros"):
-                try:
-                    result["catalog"] = validate_catalog(fetch_json(CATALOG_URL))
-                except Exception as error:
-                    errors.append("Macro check failed: " + str(error))
-            if scope in ("all", "launcher"):
-                try:
-                    release = fetch_json(UPDATE_URL)
-                    validate_release(release)
-                    result["release"] = release
-                except Exception as error:
-                    errors.append("Launcher check failed: " + str(error))
-            return result, errors
-        def done(value):
-            result, errors = value
-            self.catalog = result.get("catalog", self.catalog)
-            self.release = result.get("release", self.release)
+    def check_updates(self):
+        def done(feed):
+            self.catalog = feed["macros"]
+            self.release = feed["launcher"]
+            self.updates_checked = True
             self.show_page(self.page)
-            self.status.setText(" | ".join(errors) if errors else "Update check complete. Available updates are shown in Updates.")
-        self.start_job("Checking for updates...", work, done)
+            count = sum(self.has_update(m) for m in self.catalog)
+            count += int(version_tuple(self.release["version"]) > version_tuple(VERSION))
+            self.status.setText(f"Update check complete. {count} update(s) available in Updates.")
+        self.start_job("Checking launcher and macro updates...",
+                       lambda: validate_update_feed(fetch_json(CATALOG_URL)), done)
 
     def macro_action(self, macro):
         if self.future is not None:
@@ -289,9 +278,14 @@ class Launcher(QMainWindow):
         if not self.library.installed(macro["id"]):
             self.install_macro(macro)
             return
-        def checked(catalog):
-            self.catalog = catalog
-            latest = next((m for m in catalog if m["id"] == macro["id"]), None)
+        if self.has_update(macro):
+            self.install_macro(macro)
+            return
+        def checked(feed):
+            self.catalog = feed["macros"]
+            self.release = feed["launcher"]
+            self.updates_checked = True
+            latest = next((m for m in self.catalog if m["id"] == macro["id"]), None)
             self.show_page(self.page)
             if latest and self.has_update(latest):
                 answer = QMessageBox.question(self, "Macro update", latest["name"] + " has an update. Install it before opening?")
@@ -304,7 +298,7 @@ class Launcher(QMainWindow):
         def failed(error):
             if QMessageBox.question(self, "Update check unavailable", "Could not check for updates. Open the installed version anyway?") == QMessageBox.Yes:
                 self.launch_macro(macro)
-        self.start_job("Checking this macro for updates...", lambda: validate_catalog(fetch_json(CATALOG_URL)), checked, failed)
+        self.start_job("Checking for updates...", lambda: validate_update_feed(fetch_json(CATALOG_URL)), checked, failed)
 
     def install_macro(self, macro, launch=False):
         def done(_):
@@ -322,6 +316,9 @@ class Launcher(QMainWindow):
         self.status.setText(macro["name"] + " opened.")
 
     def update_launcher(self):
+        if not self.release or version_tuple(self.release["version"]) <= version_tuple(VERSION):
+            self.status.setText("No newer launcher release is available.")
+            return
         if not getattr(sys, "frozen", False):
             self.status.setText("Launcher installation updates are available in the packaged Windows app.")
             return
