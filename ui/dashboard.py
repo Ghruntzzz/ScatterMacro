@@ -121,8 +121,8 @@ def read_dashboard_values() -> dict[str, str]:
         "expedition_difficulty": dashboard.get("ExpeditionDifficulty", "1"),
         "tower_type": dashboard.get("TowerType", "Trait Tower"),
         "private_server": roblox.get("PrivateServerLink", ""),
-        "roblox_hwnd": roblox.get("SelectedWindowHWND", ""),
-        "roblox_pid": roblox.get("SelectedWindowPID", ""),
+        "roblox_hwnd": "",  # Legacy selector values must never bind a new session.
+        "roblox_pid": "",
         "webhook": discord.get("Webhook", ""),
         "discord_id": discord.get("UserID", ""),
         "automatic_check": updates.get("AutomaticCheck", "1"),
@@ -608,6 +608,8 @@ class DashboardWindow(QWidget):
         # Session-only binding: do not persist/reuse a stale process ID.
         self.values["roblox_hwnd"], self.values["roblox_pid"] = str(hwnd), str(pid)
         self.runtime_window = RuntimeWindow()
+        self.runtime_window.values["roblox_hwnd"] = str(hwnd)
+        self.runtime_window.values["roblox_pid"] = str(pid)
         self.runtime_window.setup_dashboard = self
         self.runtime_window.show()
         self.hide()

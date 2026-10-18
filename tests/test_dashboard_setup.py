@@ -52,6 +52,25 @@ class DashboardSetupTests(unittest.TestCase):
             finally:
                 window.close()
 
+    def test_auto_detected_window_is_bound_to_runtime_without_persisting(self):
+        from unittest.mock import Mock
+        dashboard.update_config("Dashboard", {"Mode": "Story", "Map": "School Grounds",
+                                             "Act": "Act 1", "Difficulty": "Normal"})
+        window = dashboard.DashboardWindow()
+        runtime = Mock()
+        runtime.values = {}
+        try:
+            with patch("python_macro.capture.single_roblox_window",
+                       return_value=(101, "Roblox", 4001)), \
+                 patch.object(dashboard, "RuntimeWindow", return_value=runtime):
+                window._start_macro()
+            self.assertEqual(runtime.values["roblox_hwnd"], "101")
+            self.assertEqual(runtime.values["roblox_pid"], "4001")
+            self.assertEqual(dashboard.read_dashboard_values()["roblox_pid"], "")
+            runtime.show.assert_called_once()
+        finally:
+            window.close()
+
     def test_setup_unit_slots_are_zero_through_six(self):
         values = dashboard.read_dashboard_values()
         dialog = dashboard.UnitSetupDialog(values)
