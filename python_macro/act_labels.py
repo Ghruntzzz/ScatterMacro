@@ -19,6 +19,14 @@ class ActLabelLocator:
         pixels = zlib.decompress(base64.b85decode(_ATLAS))
         self.gray = np.frombuffer(pixels, dtype=np.uint8).reshape(7 * _ROW_HEIGHT, _WIDTH)
         self.min_score = min_score
+        self.tiles = {}
+        for idx, name in enumerate(_ORDER):
+            target = self.gray[_ROW_HEIGHT * idx:_ROW_HEIGHT * (idx + 1)]
+            self.tiles[name] = []
+            for scale in (0.70, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.55, 1.7):
+                tw, th = round(_WIDTH * scale), round(_ROW_HEIGHT * scale)
+                method = cv2.INTER_AREA if scale < 1 else cv2.INTER_LINEAR
+                self.tiles[name].append(cv2.resize(target, (tw, th), interpolation=method))
 
     def __call__(self, frame, act):
         if act not in _ORDER:
@@ -31,15 +39,11 @@ class ActLabelLocator:
             gray = frame
         else:
             raise ValueError("Expected Roblox client capture")
-        idx = _ORDER.index(act)
-        target = self.gray[_ROW_HEIGHT * idx:_ROW_HEIGHT * (idx + 1)]
         best = None
-        for scale in (0.70, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.55, 1.7):
-            tw, th = round(_WIDTH * scale), round(_ROW_HEIGHT * scale)
+        for template in self.tiles[act]:
+            th, tw = template.shape[:2]
             if tw >= gray.shape[1] or th >= gray.shape[0]:
                 continue
-            method = cv2.INTER_AREA if scale < 1 else cv2.INTER_LINEAR
-            template = cv2.resize(target, (tw, th), interpolation=method)
             scores = cv2.matchTemplate(gray, template, cv2.TM_CCOEFF_NORMED)
             _, score, _, loc = cv2.minMaxLoc(scores)
             if best is None or score > best[0]:

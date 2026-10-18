@@ -2,8 +2,9 @@ from threading import Event
 from pathlib import Path
 import sys
 
-from PySide6.QtCore import QThread, Signal
-from PySide6.QtWidgets import QDialog, QPlainTextEdit, QPushButton, QVBoxLayout
+from PySide6.QtCore import QThread, Signal, Qt, QTimer
+from PySide6.QtGui import QPainter, QPen, QColor
+from PySide6.QtWidgets import QDialog, QPlainTextEdit, QPushButton, QVBoxLayout, QWidget
 
 from python_macro.capture import roblox_windows
 from python_macro.input import RobloxClient
@@ -15,6 +16,7 @@ from python_macro.act_labels import ActLabelLocator
 
 class StoryWorker(QThread):
     message = Signal(str)
+    click_target = Signal(int, int)
 
     def __init__(self, map_name, parent, act_name="Act 1", difficulty="Normal",
                  selected_hwnd="", selected_pid="", reader=None):
@@ -30,7 +32,11 @@ class StoryWorker(QThread):
     def run(self):
         try:
             from python_macro.capture import selected_roblox_window
-            target = selected_roblox_window(self.selected_hwnd, self.selected_pid)
+            if self.selected_hwnd and self.selected_pid:
+                target = selected_roblox_window(self.selected_hwnd, self.selected_pid)
+            else:
+                from python_macro.capture import single_roblox_window
+                target = single_roblox_window()
             self.message.emit("Opening Story mode.")
             if self.stop.wait(0.5):
                 return
@@ -43,7 +49,9 @@ class StoryWorker(QThread):
                            self.stop, self.message.emit, scroll=client.scroll,
                            find_play=play_icon, act_name=self.act_name,
                            difficulty=self.difficulty, find_act=ActLabelLocator(),
-                           find_start=StartButtonLocator(root / "assets" / "start-button-template.png"))
+                           find_start=StartButtonLocator(root / "assets" / "start-button-template.png"),
+                           verify_clicks=True,
+                           highlight=lambda x, y, shape: self.click_target.emit(x, y))
         except Exception as exc:
             self.message.emit(f"Navigation stopped: {exc}")
         finally:
@@ -81,3 +89,48 @@ class StoryNavigationDialog(QDialog):
             event.ignore()
         else:
             super().closeEvent(event)
+
+
+class ClickTargetOverlay(QWidget):
+    """Non-activating, mouse-transparent ring drawn over the intended click."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent, Qt.Tool | Qt.FramelessWindowHint |
+                         Qt.WindowStaysOnTopHint | Qt.WindowDoesNotAcceptFocus)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setAttribute(Qt.WA_TransparentForMouseEvents)
+        self.setFixedSize(54, 54)
+        self.timer = QTimer(self)
+        self.timer.setSingleShot(True)
+        self.timer.timeout.connect(self.hide)
+
+    def show_at(self, x, y):
+        # WS_EX_TRANSPARENT makes the Win32 overlay click-through too.
+        if sys.platform == "win32":
+            import ctypes
+            hwnd = int(self.winId())
+            user = ctypes.windll.user32
+            get_style = user.GetWindowLongPtrW
+            set_style = user.SetWindowLongPtrW
+            get_style.argtypes = [ctypes.c_void_p, ctypes.c_int]
+            get_style.restype = ctypes.c_ssize_t
+            set_style.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_ssize_t]
+            set_style.restype = ctypes.c_ssize_t
+            style = get_style(hwnd, -20)
+            set_style(hwnd, -20, style | 0x20 | 0x80000 | 0x08000000)
+        self.move(int(x) - 27, int(y) - 27)
+        self.show()
+        self.raise_()
+        self.timer.start(750)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setPen(QPen(QColor("#ffdf4d"), 3))
+        painter.drawEllipse(8, 8, 38, 38)
+        painter.drawLine(27, 0, 27, 14)
+        painter.drawLine(27, 40, 27, 53)
+        painter.drawLine(0, 27, 14, 27)
+        painter.drawLine(40, 27, 53, 27)
+        painter.setBrush(QColor("#ffdf4d"))
+        painter.drawEllipse(24, 24, 6, 6)

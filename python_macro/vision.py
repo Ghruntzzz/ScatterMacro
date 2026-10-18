@@ -38,7 +38,8 @@ def text_variants(crop: np.ndarray, scale: int = 4):
         gray = cv2.cvtColor(crop, cv2.COLOR_BGRA2GRAY if crop.shape[2] == 4 else cv2.COLOR_BGR2GRAY)
     else:
         raise ValueError("Expected grayscale, BGR, or BGRA capture")
-    gray = cv2.resize(gray, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
+    if scale != 1:
+        gray = cv2.resize(gray, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
     yield gray
     contrast = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(gray)
     yield contrast
@@ -53,6 +54,8 @@ class PlayIconLocator:
         self.template = play_template()
         self.min_score = min_score
         self.tiles = []
+        self.misses = 0
+        self.shrink = 0.65
         for scale in (0.65, 0.70, 0.775, 0.85, 0.925, 1.0, 1.075, 1.15,
                       1.225, 1.30, 1.375, 1.45, 1.525, 1.60, 1.75, 1.90):
             size = (round(self.template.shape[1] * scale), round(self.template.shape[0] * scale))
@@ -63,20 +66,48 @@ class PlayIconLocator:
         if frame.ndim != 3 or frame.shape[2] not in (3, 4):
             raise ValueError("Expected BGR or BGRA Roblox screenshot")
         image = cv2.cvtColor(frame, cv2.COLOR_BGRA2GRAY if frame.shape[2] == 4 else cv2.COLOR_BGR2GRAY)
-        height, width = image.shape[:2]
-        best = None
-        for template in self.tiles:
-            th, tw = template.shape[:2]
-            if tw >= width or th >= height:
+        # Coarse multi-scale search at reduced resolution, then refine only
+        # the strongest three candidates at native resolution.
+        small = cv2.resize(image, None, fx=self.shrink, fy=self.shrink,
+                           interpolation=cv2.INTER_AREA)
+        candidates = []
+        for idx, tile in enumerate(self.tiles):
+            fast = cv2.resize(tile, None, fx=self.shrink, fy=self.shrink,
+                              interpolation=cv2.INTER_AREA)
+            if fast.shape[0] >= small.shape[0] or fast.shape[1] >= small.shape[1]:
                 continue
-            _, score, _, origin = cv2.minMaxLoc(cv2.matchTemplate(image, template, cv2.TM_CCOEFF_NORMED))
+            _, score, _, origin = cv2.minMaxLoc(cv2.matchTemplate(small, fast, cv2.TM_CCOEFF_NORMED))
+            candidates.append((score, idx, origin))
+        best = None
+        for _, idx, origin in sorted(candidates, reverse=True)[:3]:
+            tile = self.tiles[idx]
+            h, w = tile.shape[:2]
+            x, y = round(origin[0] / self.shrink), round(origin[1] / self.shrink)
+            left, top = max(0, x - 5), max(0, y - 5)
+            right, bottom = min(image.shape[1], x + w + 6), min(image.shape[0], y + h + 6)
+            roi = image[top:bottom, left:right]
+            if roi.shape[1] < w or roi.shape[0] < h:
+                continue
+            _, score, _, p = cv2.minMaxLoc(cv2.matchTemplate(roi, tile, cv2.TM_CCOEFF_NORMED))
             if best is None or score > best[0]:
-                best = (score, origin, tw, th)
+                best = (float(score), (left + p[0], top + p[1]), w, h)
         if best is None or best[0] < self.min_score:
-            return None
+            self.misses += 1
+            if self.misses % 5:
+                return None
+            # Recover if downsampling discarded unusual button detail.
+            for tile in self.tiles:
+                h, w = tile.shape[:2]
+                if h >= image.shape[0] or w >= image.shape[1]:
+                    continue
+                _, score, _, pos = cv2.minMaxLoc(cv2.matchTemplate(image, tile, cv2.TM_CCOEFF_NORMED))
+                if best is None or score > best[0]:
+                    best = (float(score), pos, w, h)
+            if best is None or best[0] < self.min_score:
+                return None
+        self.misses = 0
         score, (left, top), tw, th = best
-        # The caption is at the bottom of the reference. Click the icon face.
-        return left + tw // 2, top + round(th * 0.43), float(score)
+        return left + tw // 2, top + round(th * 0.43), score
 
 class StartButtonLocator:
     """Recognize the supplied green Start button and click inside its center."""

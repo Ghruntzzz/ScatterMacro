@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from python_macro.capture import selected_roblox_window
+from python_macro.capture import selected_roblox_window, single_roblox_window
 
 
 class RobloxSelectionTests(unittest.TestCase):
@@ -20,3 +20,14 @@ class RobloxSelectionTests(unittest.TestCase):
                    return_value=[(900, "Roblox", 800)]):
             with self.assertRaises(RuntimeError):
                 selected_roblox_window(100, 200)
+
+
+class RobloxAutoDetectionTests(unittest.TestCase):
+    def test_only_one_window_auto_selected(self):
+        self.assertEqual(single_roblox_window([(10, "Roblox", 20)]), (10, "Roblox", 20))
+
+    def test_missing_and_multiple_windows_fail_safely(self):
+        with self.assertRaisesRegex(RuntimeError, "No Roblox"):
+            single_roblox_window([])
+        with self.assertRaisesRegex(RuntimeError, "Multiple Roblox"):
+            single_roblox_window([(10, "Roblox", 20), (30, "Roblox", 40)])

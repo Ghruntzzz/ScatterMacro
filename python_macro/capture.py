@@ -48,7 +48,7 @@ def capture_client(hwnd):
 
 
 def selected_roblox_window(hwnd, pid, windows=None):
-    """Resolve HWND AND PID: never silently retarget another Roblox instance."""
+    """Validate HWND and PID for the detected session, never retarget silently."""
     windows = roblox_windows() if windows is None else windows
     for win in windows:
         if int(win[0]) == int(hwnd) and int(win[2]) == int(pid) and int(pid) > 0:
@@ -56,3 +56,13 @@ def selected_roblox_window(hwnd, pid, windows=None):
     raise RuntimeError(
         "Selected Roblox window closed or changed. Refresh and select a Roblox window."
     )
+
+
+def single_roblox_window(windows=None):
+    """Auto-detect exactly one game. Refuse ambiguous or missing sessions."""
+    windows = roblox_windows() if windows is None else windows
+    if not windows:
+        raise RuntimeError("No Roblox window is open. Open Roblox before starting.")
+    if len(windows) != 1:
+        raise RuntimeError("Multiple Roblox windows are open. Close extra instances before starting.")
+    return windows[0]

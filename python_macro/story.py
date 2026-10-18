@@ -46,7 +46,7 @@ def is_act_label(text, act):
 def read_targets(frame, reader, predicate, *, thorough=True, stop=None):
     matches = reader.read(
         frame, Region(0, 0, frame.shape[1], frame.shape[0]),
-        scale=2, min_confidence=0.65,
+        scale=2 if thorough else 1, min_confidence=0.65,
         max_variants=3 if thorough else 1,
         cancelled=stop.is_set if stop is not None else None,
         accept=lambda found: sum(predicate(match.text) for match in found) == 1,
@@ -86,12 +86,21 @@ def select_text(label, predicate, capture, reader, click, stop, timeout):
 def navigate_story(map_name, capture, reader, click, stop, log, timeout=30,
                    scroll=None, max_map_scrolls=MAX_MAP_SCROLLS, find_play=None,
                    skip_play=False, act_name=None, difficulty="Normal", find_act=None,
-                   find_start=None):
+                   find_start=None, verify_clicks=False, highlight=None):
     """Navigate using captured Roblox client coordinates and cancellable input.
 
     act_name=None retains the legacy map-only contract for existing callers;
     the live Story worker always supplies the selected dashboard act.
     """
+    if verify_clicks:
+        from python_macro.story_verified import navigate_story_checked
+        return navigate_story_checked(
+            map_name, capture, reader, click, stop, log, timeout=timeout,
+            scroll=scroll, max_map_scrolls=max_map_scrolls,
+            find_play=find_play, skip_play=skip_play, act_name=act_name,
+            difficulty=difficulty, find_act=find_act, find_start=find_start,
+            highlight=highlight,
+        )
     if not normalize(map_name):
         raise ValueError("Choose a Story map first.")
     act = validate_act(act_name) if act_name is not None else None

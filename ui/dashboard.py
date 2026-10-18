@@ -390,50 +390,8 @@ class DashboardWindow(QWidget):
         self._label(route, "ACTIVE ROUTE", 22, 16, 110, 18, f"color: {WINE}; font: 700 9px 'Bahnschrift';")
         self.route_value = self._label(route, "", 160, 15, 690, 20, f"color: {TEXT}; font: 700 10px 'Bahnschrift';")
         self.route_value.setText(f"Mode: {self.values['mode']} | Map: {self.values['map']}")
-        self.roblox_selector = QComboBox(route)
-        self.roblox_selector.setGeometry(850, 10, 195, 32)
-        self.roblox_selector.setToolTip("Select the only Roblox window used for embedding and macro input.")
-        self.refresh_roblox_button = QPushButton("REFRESH", route)
-        self.refresh_roblox_button.setGeometry(1050, 10, 98, 32)
-        self.refresh_roblox_button.clicked.connect(self._refresh_roblox_windows)
-        self.roblox_selector.currentIndexChanged.connect(self._save_roblox_window_selection)
-        self._refresh_roblox_windows()
-
-    def _refresh_roblox_windows(self) -> None:
-        from python_macro.capture import roblox_windows
-        from PySide6.QtCore import QSignalBlocker
-        wanted = (self.values.get("roblox_hwnd", ""),
-                  self.values.get("roblox_pid", ""))
-        with QSignalBlocker(self.roblox_selector):
-            self.roblox_selector.clear()
-            self.roblox_selector.addItem("Select Roblox window", None)
-            try:
-                windows = roblox_windows()
-            except (OSError, AttributeError):
-                windows = []
-            for hwnd, title, pid in windows:
-                self.roblox_selector.addItem(
-                    f"{title} · PID {pid} · HWND {hwnd}", (str(hwnd), str(pid))
-                )
-            for index in range(1, self.roblox_selector.count()):
-                if self.roblox_selector.itemData(index) == wanted:
-                    self.roblox_selector.setCurrentIndex(index)
-                    break
-            else:
-                # A single window is unambiguous on first run. Do not
-                # automatically retarget if a stored window has disappeared.
-                if not any(wanted) and len(windows) == 1:
-                    self.roblox_selector.setCurrentIndex(1)
-        self._save_roblox_window_selection()
-
-    def _save_roblox_window_selection(self) -> None:
-        selected = self.roblox_selector.currentData()
-        hwnd, pid = selected if selected else ("", "")
-        # Keep stale selection until the user explicitly chooses a new one.
-        if not selected and self.values.get("roblox_hwnd"):
-            return
-        self.values["roblox_hwnd"], self.values["roblox_pid"] = hwnd, pid
-        update_config("Roblox", {"SelectedWindowHWND": hwnd, "SelectedWindowPID": pid})
+        self._label(route, "ROBLOX AUTO-DETECTED ON START", 850, 15, 300, 22,
+                    f"color: {MUTED}; font: 700 10px 'Bahnschrift';")
 
     def _configuration(self) -> None:
         config = self._card(18, 208, 680, 316, 8)
@@ -641,17 +599,14 @@ class DashboardWindow(QWidget):
         if self.mode_box.currentText() != "Story":
             self._set_status("Setup saved. This mode's automation is not connected yet.")
             return
-        from python_macro.capture import selected_roblox_window
-        hwnd = self.values.get("roblox_hwnd", "")
-        pid = self.values.get("roblox_pid", "")
-        if not hwnd or not pid:
-            self._set_status("Choose a Roblox window and refresh the list first.")
-            return
+        from python_macro.capture import single_roblox_window
         try:
-            selected_roblox_window(hwnd, pid)
+            hwnd, _, pid = single_roblox_window()
         except RuntimeError as error:
             self._set_status(str(error))
             return
+        # Session-only binding: do not persist/reuse a stale process ID.
+        self.values["roblox_hwnd"], self.values["roblox_pid"] = str(hwnd), str(pid)
         self.runtime_window = RuntimeWindow()
         self.runtime_window.setup_dashboard = self
         self.runtime_window.show()
@@ -938,7 +893,7 @@ class RuntimeWindow(DashboardWindow):
         self.session_value = self._label(
             stats_panel, "Session  --:--:--", 16, 329, 178, 18,
             f"color: {MUTED}; font: 9px 'Segoe UI';")
-        self._label(stats_panel, f"Roblox PID: {self.values.get('roblox_pid', '?')}",
+        self._label(stats_panel, "Roblox: auto-detected",
                     16, 278, 178, 16, f"color: {MUTED}; font: 9px 'Segoe UI';")
 
         action = self._card(18, 406, 210, 528, 8)
@@ -1191,16 +1146,32 @@ class RuntimeWindow(DashboardWindow):
                                   selected_hwnd=self.values.get("roblox_hwnd", ""),
                                   selected_pid=self.values.get("roblox_pid", ""), reader=self.story_reader)
         self.worker.message.connect(self.log.appendPlainText)
+        self.worker.click_target.connect(self._show_click_target)
         self.worker.finished.connect(self._story_finished)
         self.runtime_status.setText("RUNNING")
         self.worker.start()
+
+    def _show_click_target(self, x: int, y: int) -> None:
+        """Highlight the next Roblox client-relative target without taking focus."""
+        from ctypes import wintypes
+        from ui.story_navigation import ClickTargetOverlay
+        if not hasattr(self, "_click_overlay"):
+            self._click_overlay = ClickTargetOverlay(self)
+        point = wintypes.POINT(int(x), int(y))
+        if ctypes.windll.user32.ClientToScreen(
+                int(self.values["roblox_hwnd"]), ctypes.byref(point)):
+            self._click_overlay.show_at(point.x, point.y)
 
     def _stop_story(self) -> None:
         if self.worker is not None and self.worker.isRunning():
             self.worker.stop.set()
             self.runtime_status.setText("STOPPING")
+        if hasattr(self, "_click_overlay"):
+            self._click_overlay.hide()
 
     def _story_finished(self) -> None:
+        if hasattr(self, "_click_overlay"):
+            self._click_overlay.hide()
         self.runtime_status.setText("READY")
         if self.worker is not None:
             self.worker.deleteLater()
@@ -1215,6 +1186,8 @@ class RuntimeWindow(DashboardWindow):
         self.setup_dashboard.show()
 
     def closeEvent(self, event) -> None:
+        if hasattr(self, "_click_overlay"):
+            self._click_overlay.hide()
         if hasattr(self, "hotkeys"):
             self.hotkeys.close()
         if self.worker is not None and self.worker.isRunning():
