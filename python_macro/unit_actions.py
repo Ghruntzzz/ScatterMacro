@@ -129,7 +129,7 @@ class UnitIndexer:
             raise InterruptedError()
 
     def key(self, value):
-        if self.stop.is_set() or not self.client.hold_key(value, 0.08):
+        if self.stop.is_set() or not self.client.hold_key(value, 0.15):
             raise InterruptedError()
 
     def next_ready(self, wave):
@@ -155,7 +155,7 @@ class UnitIndexer:
             self.close()
             frame = self.capture()
         self.key(str(entry["unit"]))
-        self.wait(0.15)
+        self.wait(0.25)
         self.click((int(entry["x"]), int(entry["y"])), frame)
         self.wait(0.35)
         frame, selected = self.snapshot()

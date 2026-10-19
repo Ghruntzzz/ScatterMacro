@@ -16,7 +16,7 @@ class FastStop(Event):
 
 
 class StoryIngameTests(unittest.TestCase):
-    def test_camera_keys_use_matching_scan_code_down_and_up(self):
+    def test_camera_and_unit_keys_use_matching_scan_code_down_and_up(self):
         client = RobloxClient.__new__(RobloxClient)
         client.user = Mock()
         packets = []
@@ -25,13 +25,17 @@ class StoryIngameTests(unittest.TestCase):
             packets.append((key.wVk, key.wScan, key.dwFlags))
             return 1
         client.user.SendInput.side_effect = send
-        for key, scan in (("I",0x17),("O",0x18)):
+        for key, scan in (("I",0x17),("O",0x18),("1",2),("2",3),("3",4),
+                          ("4",5),("5",6),("6",7),("R",0x13),("T",0x14)):
             client.user.MapVirtualKeyW.return_value = scan
             client._key(key)
             client._key(key, release=True)
             self.assertEqual(packets[-2:], [(0,scan,8),(0,scan,10)])
-        client._key("T")
-        self.assertEqual(packets[-1], (ord("T"),0,0))
+        client.user.MapVirtualKeyW.return_value = 0
+        count = len(packets)
+        with self.assertRaisesRegex(RuntimeError, "could not map"):
+            client._key("1")
+        self.assertEqual(len(packets), count)
 
     def test_match_requires_all_selected_details(self):
         found = ["Story East Town - Act 1", "Normal Mode"]

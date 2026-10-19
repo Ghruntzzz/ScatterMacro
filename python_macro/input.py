@@ -179,16 +179,15 @@ class RobloxClient:
         return self._click(x, y, shape, method="input")
 
     def _key(self, key, release=False):
-        # Camera zoom uses scan-code input for games reading physical key state.
-        # Keep the unit-selection/upgrade key path unchanged.
-        scan = self.user.MapVirtualKeyW(ord(key), 0) if key in ("I", "O") else 0
-        if key in ("I", "O") and not scan:
-            raise RuntimeError("Windows could not map the camera zoom key.")
+        # Roblox may read physical key state for slots and unit controls too.
+        scan = self.user.MapVirtualKeyW(ord(key), 0)
+        if not scan:
+            raise RuntimeError("Windows could not map the requested key.")
         packet = INPUT(type=1, data=INPUT_UNION(ki=KEYBDINPUT(
             wVk=0 if scan else ord(key), wScan=scan,
             dwFlags=(0x0008 if scan else 0) | (2 if release else 0))))
         if self.user.SendInput(1, ctypes.byref(packet), ctypes.sizeof(INPUT)) != 1:
-            raise RuntimeError("Windows rejected a camera key. Check Roblox focus.")
+            raise RuntimeError("Windows rejected keyboard input. Check Roblox focus.")
 
     def hold_key(self, key, seconds):
         if self.stop.is_set():
