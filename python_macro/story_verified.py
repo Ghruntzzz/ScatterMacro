@@ -73,6 +73,28 @@ def click_and_confirm(label, locate, advanced, capture, click, stop, log,
     raise RuntimeError(f"Timed out waiting for {label} to appear or advance.")
 
 
+def click_once(label, locate, capture, click, stop, highlight=None, timeout=30):
+    """Wait for the target, send one click, then let the next step wait for its UI."""
+    deadline = time.monotonic() + timeout
+    while not stop.is_set() and time.monotonic() < deadline:
+        frame = capture()
+        target = locate(frame)
+        if stop.is_set():
+            return False
+        if target is not None:
+            x, y = int(target[0]), int(target[1])
+            if highlight is not None:
+                highlight(x, y, frame.shape)
+            if stop.is_set():
+                return False
+            return click(x, y, frame.shape) is not False and not stop.is_set()
+        if stop.wait(0.1):
+            return False
+    if stop.is_set():
+        return False
+    raise RuntimeError(f"Could not find {label}.")
+
+
 class FastText:
     """One OCR pass per captured image; periodic higher-quality recovery."""
 
@@ -202,10 +224,8 @@ def navigate_story_checked(map_name, capture, reader, click, stop, log, timeout=
         return
 
     log(f"Selecting {act}.")
-    if not press(act, act_target,
-                 lambda after, before:
-                 changed_screen(before, after, fraction=0.02)
-                 and text_target("Select Stage")(after) is not None):
+    if not click_once(act, act_target, capture, click, stop,
+                      highlight=highlight, timeout=timeout):
         return
     if act not in ("Mastery", "Infinite"):
         if difficulty == "Hard":

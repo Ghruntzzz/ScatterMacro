@@ -4,7 +4,7 @@ from unittest.mock import Mock
 
 import numpy as np
 
-from python_macro.story_verified import click_and_confirm, changed_screen, FastText
+from python_macro.story_verified import click_and_confirm, click_once, changed_screen, FastText
 
 
 class FastStop(Event):
@@ -17,6 +17,28 @@ def frame(value=0):
 
 
 class VerifiedStoryTests(unittest.TestCase):
+    def test_act_is_clicked_once_even_when_screen_does_not_change(self):
+        capture = Mock(return_value=frame())
+        click = Mock(return_value=True)
+        locate = Mock(side_effect=[None, (25, 30)])
+        self.assertTrue(click_once("Act 1", locate, capture, click, FastStop()))
+        click.assert_called_once_with(25, 30, frame().shape)
+        self.assertEqual(capture.call_count, 2)
+
+    def test_act_does_not_retry_rejected_click(self):
+        click = Mock(return_value=False)
+        self.assertFalse(click_once("Act 1", lambda image: (25,30),
+                                    lambda: frame(), click, FastStop()))
+        click.assert_called_once()
+
+    def test_act_stop_during_detection_prevents_click(self):
+        stop, click = FastStop(), Mock()
+        def locate(image):
+            stop.set()
+            return (25,30)
+        self.assertFalse(click_once("Act 1", locate, lambda: frame(), click, stop))
+        click.assert_not_called()
+
     def test_recovery_pass_can_stop_at_unique_expected_text(self):
         reader = Mock()
         reader.read.return_value = []

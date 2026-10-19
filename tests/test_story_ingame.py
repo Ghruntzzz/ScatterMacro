@@ -16,6 +16,23 @@ class FastStop(Event):
 
 
 class StoryIngameTests(unittest.TestCase):
+    def test_camera_keys_use_matching_scan_code_down_and_up(self):
+        client = RobloxClient.__new__(RobloxClient)
+        client.user = Mock()
+        packets = []
+        def send(count, pointer, size):
+            key = pointer._obj.ki
+            packets.append((key.wVk, key.wScan, key.dwFlags))
+            return 1
+        client.user.SendInput.side_effect = send
+        for key, scan in (("I",0x17),("O",0x18)):
+            client.user.MapVirtualKeyW.return_value = scan
+            client._key(key)
+            client._key(key, release=True)
+            self.assertEqual(packets[-2:], [(0,scan,8),(0,scan,10)])
+        client._key("T")
+        self.assertEqual(packets[-1], (ord("T"),0,0))
+
     def test_match_requires_all_selected_details(self):
         found = ["Story East Town - Act 1", "Normal Mode"]
         self.assertTrue(matches_story(found, "East Town", "Act 1", "Normal"))

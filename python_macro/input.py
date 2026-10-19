@@ -71,6 +71,8 @@ class RobloxClient:
         self.user.SetCursorPos.restype = wintypes.BOOL
         self.user.SendInput.argtypes = [wintypes.UINT, ctypes.POINTER(INPUT), ctypes.c_int]
         self.user.SendInput.restype = wintypes.UINT
+        self.user.MapVirtualKeyW.argtypes = [wintypes.UINT, wintypes.UINT]
+        self.user.MapVirtualKeyW.restype = wintypes.UINT
         self.user.mouse_event.argtypes = [wintypes.DWORD, wintypes.DWORD,
                                          wintypes.DWORD, wintypes.DWORD, ctypes.c_size_t]
         self.user.mouse_event.restype = None
@@ -177,8 +179,14 @@ class RobloxClient:
         return self._click(x, y, shape, method="input")
 
     def _key(self, key, release=False):
+        # Camera zoom uses scan-code input for games reading physical key state.
+        # Keep the unit-selection/upgrade key path unchanged.
+        scan = self.user.MapVirtualKeyW(ord(key), 0) if key in ("I", "O") else 0
+        if key in ("I", "O") and not scan:
+            raise RuntimeError("Windows could not map the camera zoom key.")
         packet = INPUT(type=1, data=INPUT_UNION(ki=KEYBDINPUT(
-            wVk=ord(key), dwFlags=2 if release else 0)))
+            wVk=0 if scan else ord(key), wScan=scan,
+            dwFlags=(0x0008 if scan else 0) | (2 if release else 0))))
         if self.user.SendInput(1, ctypes.byref(packet), ctypes.sizeof(INPUT)) != 1:
             raise RuntimeError("Windows rejected a camera key. Check Roblox focus.")
 
@@ -201,6 +209,8 @@ class RobloxClient:
     def setup_camera(self):
         if not self.hold_key("I", 3):
             return False
+        if self.stop.wait(0.2):
+            return False
         frame = self.capture()
         x, y = frame.shape[1] // 2, frame.shape[0] // 2
         point, _ = self._validated_point(x, y, frame.shape)
@@ -218,6 +228,8 @@ class RobloxClient:
                 self._send_mouse(MOUSE_MOVE, dy=60)
         finally:
             self._send_mouse(0x0010)
+        if self.stop.wait(0.2):
+            return False
         return self.hold_key("O", 3)
 
     def click_event(self, x, y, shape):
