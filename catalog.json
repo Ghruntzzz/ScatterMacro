@@ -8,12 +8,12 @@
     {
       "id": "anime-expeditions",
       "name": "Anime Expeditions",
-      "version": "0.1.38",
+      "version": "0.1.39",
       "setup_only": false,
       "entrypoint": "AnimeExpeditions.exe",
-      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.38/AnimeExpeditions-0.1.38-windows.zip",
-      "sha256": "68535b1ea28e5b2df93e53bcb9f428ba20032e1eb2e0b7f9d4b9bca7b6330469",
-      "description": "Image-based upgrade levels and maxed detection using bright upgrade bars. Faster priority reading, K auto upgrade without repeated OCR, and image-only panel closing."
+      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.39/AnimeExpeditions-0.1.39-windows.zip",
+      "sha256": "5f3f066f8b8560debfbe437935dafbb1e472453a50fcb6091a8a0025698a125d",
+      "description": "Unit panel placement confirmation, three attempts at the saved position, then nearby six-pixel retries. Preserves saved positions and stops retrying once the panel appears."
     }
   ]
 }
