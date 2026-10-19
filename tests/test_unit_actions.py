@@ -24,6 +24,10 @@ class UnitActionTests(unittest.TestCase):
     def test_priority_and_upgrades_are_unambiguous(self):
         self.assertEqual(priority_value(["Priority", "First"]), "First")
         self.assertEqual(priority_value(["Priority Last"]), "Last")
+        self.assertEqual(priority_value(["Priority", "None"]), "None")
+        self.assertEqual(priority_value(["Priority None"]), "None")
+        self.assertIsNone(priority_value([]))
+        self.assertIsNone(priority_value(["None", "First"]))
         self.assertIsNone(priority_value(["First", "Last"]))
         self.assertIsNone(priority_value(["F1rst"]))
         self.assertEqual(upgrade_value(["Upgrade 0/7"]), (0,7))
@@ -90,6 +94,20 @@ class UnitActionTests(unittest.TestCase):
         client.hold_key.assert_not_called()
         client.direct_click.assert_not_called()
         self.assertEqual(worker.completed,set())
+
+    def test_none_priority_skips_r_but_keeps_auto_and_upgrade(self):
+        worker=UnitIndexer([entry()],Mock(),Mock(),Mock(),FastStop(),Mock())
+        image=np.zeros((100,100,3),np.uint8)
+        panel={"priority":"None", "upgrade":(2,7), "close":(80,10)}
+        worker.snapshot=Mock(side_effect=[(image,None),(image,panel)])
+        worker.read_until=Mock(return_value=(image,panel))
+        worker.close=Mock()
+        worker.client.hold_key.return_value=True
+        worker.client.direct_click.return_value=True
+        worker.run(0)
+        self.assertEqual([call.args[0] for call in worker.client.hold_key.call_args_list],
+                         ["1","K","K"])
+        self.assertEqual(worker.completed,{0})
 
     def test_icon_detection_rejects_multiple_buttons(self):
         assets=Path(__file__).resolve().parents[1]/"assets"

@@ -59,8 +59,8 @@ jobs:
       - name: Upload tested Windows build
         uses: actions/upload-artifact@v4
         with:
-          name: AnimeExpeditions-0.1.36-windows
-          path: dist/AnimeExpeditions-0.1.36-windows.zip
+          name: AnimeExpeditions-0.1.37-windows
+          path: dist/AnimeExpeditions-0.1.37-windows.zip
           if-no-files-found: error
           retention-days: 7
       - name: Publish and verify macro archive
@@ -69,12 +69,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '0.1.36'
+          $version = '0.1.37'
           $tag = "anime-expeditions-v$version"
           $name = "AnimeExpeditions-$version-windows.zip"
           $archive = "dist/$name"
           if (!(Test-Path $archive)) { throw "Missing macro ZIP: $archive" }
-          gh release create $tag $archive --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Anime Expeditions $version - K Auto Upgrade" --notes "Auto upgrade now uses scan-code K instead of clicking the icon. Setting 0 sends no auto-upgrade input; settings 1-6 press K exactly that many times after priority selection. Manual upgrades via T and red X closing remain unchanged. All 153 automated tests passed."
+          gh release create $tag $archive --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Anime Expeditions $version - None Priority Support" --notes "Recognizes None as a valid unit priority rather than an unreadable panel. Two confirmed None readings skip priority cycling while retaining K auto upgrade, T manual upgrades and panel closing. First and other target priorities are unchanged. All 154 automated tests passed."
           if ($LASTEXITCODE -ne 0) { throw 'Macro release upload failed' }
           New-Item -ItemType Directory -Force 'dist/verified' | Out-Null
           gh release download $tag --repo $env:GITHUB_REPOSITORY --pattern $name --dir 'dist/verified'
@@ -86,7 +86,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '0.1.36'
+          $version = '0.1.37'
           $archive = "dist/AnimeExpeditions-$version-windows.zip"
           $sha256 = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
           $url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/anime-expeditions-v$version/AnimeExpeditions-$version-windows.zip"
@@ -99,7 +99,7 @@ jobs:
           $macro[0].version = $version
           $macro[0].url = $url
           $macro[0].sha256 = $sha256
-          $macro[0].description = "Auto upgrade uses K once per configured level, with 0 disabled. Retains priority R, manual upgrade T, ordered indexing, one-second camera holds and session wave stats."
+          $macro[0].description = "Supports units displaying None priority, skipping priority cycling after confirmation while preserving auto upgrade, manual upgrades and panel closing."
           $catalog | ConvertTo-Json -Depth 20 | Set-Content catalog.json -Encoding utf8
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

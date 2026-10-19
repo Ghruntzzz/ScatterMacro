@@ -14,7 +14,7 @@ TARGETS = ("First", "Last", "Closest", "Strongest", "Boss", "Weakest",
 
 
 def priority_value(texts):
-    values = {target for text in texts for target in TARGETS
+    values = {target for text in texts for target in (*TARGETS, "None")
               if normalize(text) in (normalize(target), "priority" + normalize(target))}
     return next(iter(values)) if len(values) == 1 else None
 
@@ -166,6 +166,14 @@ class UnitIndexer:
         self.read_until(lambda panel: panel["priority"] is not None)
         for _ in range(18):
             _, panel = self.read_until(lambda panel: panel["priority"] is not None)
+            if panel["priority"] == "None":
+                # Non-targeting units have no priority to cycle. Confirm this
+                # is a real label, not a transient OCR miss (Python None).
+                self.wait(0.15)
+                _, confirmed = self.read_until(lambda panel: panel["priority"] is not None)
+                if confirmed["priority"] == "None":
+                    break
+                continue
             if panel["priority"] == desired:
                 break
             old = panel["priority"]
@@ -175,7 +183,7 @@ class UnitIndexer:
         else:
             raise RuntimeError(f"Could not set target priority for Index {index+1}.")
         for _ in range(auto):
-            self.read_until(lambda panel: panel["priority"] == desired)
+            self.read_until(lambda panel: panel["priority"] in (desired, "None"))
             self.key("K")
             self.wait(0.2)
         if goal:
