@@ -8,12 +8,12 @@
     {
       "id": "anime-expeditions",
       "name": "Anime Expeditions",
-      "version": "0.1.39",
+      "version": "0.1.40",
       "setup_only": false,
       "entrypoint": "AnimeExpeditions.exe",
-      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.39/AnimeExpeditions-0.1.39-windows.zip",
-      "sha256": "5f3f066f8b8560debfbe437935dafbb1e472453a50fcb6091a8a0025698a125d",
-      "description": "Unit panel placement confirmation, three attempts at the saved position, then nearby six-pixel retries. Preserves saved positions and stops retrying once the panel appears."
+      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.40/AnimeExpeditions-0.1.40-windows.zip",
+      "sha256": "5ac8f53862d853982e9c189773f2b528dc110bb60968e28d659144f5d1fbde56",
+      "description": "Story repeat runs, background wave monitoring, faster indexes, auto ability checks, and reward-only Discord notifications. Saved custom hotkeys and live theme settings."
     }
   ]
 }
