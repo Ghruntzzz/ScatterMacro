@@ -8,12 +8,12 @@
     {
       "id": "anime-expeditions",
       "name": "Anime Expeditions",
-      "version": "0.1.32",
+      "version": "0.1.33",
       "setup_only": false,
       "entrypoint": "AnimeExpeditions.exe",
-      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.32/AnimeExpeditions-0.1.32-windows.zip",
-      "sha256": "28caba54f4c7e69100205fc8831ea1c64cbf2f4bf568e1ccea1871baf4a8887b",
-      "description": "Story navigation and in-game setup with wave-gated numerical indexing, priority, auto upgrade, manual upgrades and panel closing. Wave/yen monitoring and F2 stop. Live-game validation still needed."
+      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.33/AnimeExpeditions-0.1.33-windows.zip",
+      "sha256": "a89210cdf67a5f3499dd292fecd02ae9f155fc1b99fae10c2bd11b127fe0c67f",
+      "description": "Single-click act selection and scan-code camera zoom with separate I, downward camera movement, and O steps. Story in-game operations and ordered indexing retained."
     }
   ]
 }
