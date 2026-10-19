@@ -43,14 +43,16 @@ class VerifiedStoryTests(unittest.TestCase):
                 state["new"] = True
             return True
         sent = []
+        log = Mock()
         self.assertTrue(click_and_confirm(
             "Story", locate, lambda after, before: state["new"], lambda: frame(),
-            click, FastStop(), Mock(), highlight=lambda x, y, size: sent.append((x, y)),
+            click, FastStop(), log, highlight=lambda x, y, size: sent.append((x, y)),
             settle_seconds=0.0,
         ))
         self.assertEqual(state["clicks"], 2)
         self.assertEqual(sent, [(15, 30), (25, 30)])
         self.assertEqual(targets, [15, 25])
+        log.assert_not_called()
 
     def test_stale_location_is_not_clicked(self):
         attempts = []
@@ -84,7 +86,7 @@ class VerifiedStoryTests(unittest.TestCase):
 
     def test_no_advancement_has_bounded_retries(self):
         click = Mock(return_value=True)
-        with self.assertRaisesRegex(RuntimeError, "did not advance after 3"):
+        with self.assertRaisesRegex(RuntimeError, "Start did not respond"):
             click_and_confirm(
                 "Start", lambda image: (15, 30), lambda after, before: False,
                 lambda: frame(), click, FastStop(), Mock(), settle_seconds=0.0)

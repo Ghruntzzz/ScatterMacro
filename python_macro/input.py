@@ -182,7 +182,7 @@ class RobloxClient:
         """Direct AHK-style Event fallback, also without hover/jitter."""
         return self._direct_click(x, y, shape, method="event")
 
-    def _prepare_click_target(self, x, y, shape, absolute=False):
+    def _prepare_click_target(self, x, y, shape, absolute=False, settle_seconds=None):
         """Hover, inject actual mouse-motion wiggle, then settle on target.
 
         A moved visible cursor does not prove that a game has processed the
@@ -226,7 +226,7 @@ class RobloxClient:
 
         self._move(point.x, point.y)
         self._send_mouse(MOUSE_MOVE)
-        if self.stop.wait(PRECLICK_SETTLE_SECONDS):
+        if self.stop.wait(PRECLICK_SETTLE_SECONDS if settle_seconds is None else settle_seconds):
             return None
         new_point, _ = self._validated_point(x, y, shape)
         if (new_point.x, new_point.y) != (point.x, point.y):
@@ -235,8 +235,12 @@ class RobloxClient:
         self.check_focus()
         return point
 
-    def _direct_click(self, x, y, shape, method):
-        point = self._prepare_click_target(x, y, shape)
+    def start_click(self, x, y, shape):
+        """Allow the lobby Start hover/animation to settle before pressing."""
+        return self._direct_click(x, y, shape, method="input", settle_seconds=0.35)
+
+    def _direct_click(self, x, y, shape, method, settle_seconds=None):
+        point = self._prepare_click_target(x, y, shape, settle_seconds=settle_seconds)
         if point is None or self.stop.is_set():
             return False
         self._button_event(MOUSE_LEFT_DOWN, method)

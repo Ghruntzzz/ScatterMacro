@@ -48,18 +48,16 @@ def click_and_confirm(label, locate, advanced, capture, click, stop, log,
                 return False
             continue
         if attempt >= attempts:
-            raise RuntimeError(f"{label} did not advance after {attempts} verified click attempts.")
+            raise RuntimeError(f"{label} did not respond. Check the game and try again.")
         x, y = int(target[0]), int(target[1])
         attempt += 1
         if highlight is not None:
             highlight(x, y, before.shape)
-        log(f"{label}: click attempt {attempt}/{attempts} at ({x}, {y}).")
         if stop.is_set() or click(x, y, before.shape) is False:
             return False
         # Check once immediately, including in very short test/retry windows.
         after = capture()
         if advanced(after, before):
-            log(f"{label}: navigation confirmed.")
             return True
         until = min(deadline, time.monotonic() + settle_seconds)
         while not stop.is_set() and time.monotonic() < until:
@@ -67,11 +65,9 @@ def click_and_confirm(label, locate, advanced, capture, click, stop, log,
                 return False
             after = capture()
             if advanced(after, before):
-                log(f"{label}: navigation confirmed.")
                 return True
         if stop.is_set():
             return False
-        log(f"{label}: no confirmed transition; searching again before retry.")
     if stop.is_set():
         return False
     raise RuntimeError(f"Timed out waiting for {label} to appear or advance.")
@@ -109,7 +105,8 @@ class FastText:
 def navigate_story_checked(map_name, capture, reader, click, stop, log, timeout=30,
                            scroll=None, max_map_scrolls=MAX_MAP_SCROLLS, find_play=None,
                            skip_play=False, act_name=None, difficulty="Normal",
-                           find_act=None, find_start=None, highlight=None):
+                           find_act=None, find_start=None, highlight=None, start_click=None,
+                           find_story=None):
     if not normalize(map_name):
         raise ValueError("Choose a Story map first.")
     act = validate_act(act_name) if act_name is not None else None
@@ -118,7 +115,28 @@ def navigate_story_checked(map_name, capture, reader, click, stop, log, timeout=
     ocr = FastText(reader, stop)
 
     def text_target(label):
-        return lambda frame: ocr.unique(frame, lambda t: normalize(t) == normalize(label))
+        if label == "Story" and find_story is not None:
+            return find_story
+        predicate = lambda t: normalize(t) == normalize(label)
+        def locate(frame):
+            if label == "Story" and frame is not ocr.last_frame:
+                # The lobby navigation is normally in the upper part of the
+                # client. Fall back to full-screen OCR if this fast scan misses.
+                matches = reader.read(
+                    frame, Region(0, 0, frame.shape[1], max(1, round(frame.shape[0] * 0.55))),
+                    scale=1, max_variants=1, min_confidence=0.65,
+                    cancelled=stop.is_set,
+                    accept=lambda found: sum(predicate(m.text) for m in found) == 1,
+                )
+                options = [m for m in matches if predicate(m.text)]
+                if len(options) == 1:
+                    points = options[0].corners
+                    return (round(sum(p[0] for p in points) / len(points)),
+                            round(sum(p[1] for p in points) / len(points)))
+                if len(options) > 1:
+                    return None
+            return ocr.unique(frame, predicate)
+        return locate
 
     def act_target(frame):
         if find_act is not None:
@@ -126,7 +144,8 @@ def navigate_story_checked(map_name, capture, reader, click, stop, log, timeout=
         return ocr.unique(frame, lambda t: is_act_label(t, act))
 
     def press(label, locate, advanced):
-        return click_and_confirm(label, locate, advanced, capture, click, stop, log,
+        send_click = start_click if label == "Start" and start_click is not None else click
+        return click_and_confirm(label, locate, advanced, capture, send_click, stop, log,
                                  highlight=highlight, timeout=timeout)
 
     if not skip_play:
@@ -209,4 +228,4 @@ def navigate_story_checked(map_name, capture, reader, click, stop, log, timeout=
                  lambda after, before:
                  start_locator(after) is None and changed_screen(before, after, fraction=0.05)):
         return
-    log("Start confirmed. Waiting for the game to load.")
+    log("Waiting for the game to load.")

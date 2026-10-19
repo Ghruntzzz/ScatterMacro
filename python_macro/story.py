@@ -86,7 +86,8 @@ def select_text(label, predicate, capture, reader, click, stop, timeout):
 def navigate_story(map_name, capture, reader, click, stop, log, timeout=30,
                    scroll=None, max_map_scrolls=MAX_MAP_SCROLLS, find_play=None,
                    skip_play=False, act_name=None, difficulty="Normal", find_act=None,
-                   find_start=None, verify_clicks=False, highlight=None):
+                   find_start=None, verify_clicks=False, highlight=None, start_click=None,
+                   find_story=None):
     """Navigate using captured Roblox client coordinates and cancellable input.
 
     act_name=None retains the legacy map-only contract for existing callers;
@@ -99,7 +100,7 @@ def navigate_story(map_name, capture, reader, click, stop, log, timeout=30,
             scroll=scroll, max_map_scrolls=max_map_scrolls,
             find_play=find_play, skip_play=skip_play, act_name=act_name,
             difficulty=difficulty, find_act=find_act, find_start=find_start,
-            highlight=highlight,
+            highlight=highlight, start_click=start_click, find_story=find_story,
         )
     if not normalize(map_name):
         raise ValueError("Choose a Story map first.")

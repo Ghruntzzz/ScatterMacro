@@ -111,6 +111,36 @@ class PlayIconLocator:
         score, (left, top), tw, th = best
         return left + tw // 2, top + round(th * 0.43), score
 
+class StoryButtonLocator:
+    """Match the supplied Story label at common UI scales without OCR."""
+
+    def __init__(self, path, min_score=0.88):
+        template = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
+        if template is None:
+            raise RuntimeError("Story button reference image is missing.")
+        self.tiles = [cv2.resize(template, None, fx=s, fy=s)
+                      for s in (0.7, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5, 1.75, 2.0)]
+        self.min_score = min_score
+        self.scans = 0
+
+    def __call__(self, frame):
+        self.scans += 1
+        # Periodically search the whole client for nonstandard layouts.
+        height = frame.shape[0] if self.scans % 3 == 0 else max(1, round(frame.shape[0] * 0.55))
+        gray = cv2.cvtColor(np.ascontiguousarray(frame[:height, :, :3]), cv2.COLOR_BGR2GRAY)
+        best = None
+        for tile in self.tiles:
+            h, w = tile.shape
+            if h > gray.shape[0] or w > gray.shape[1]:
+                continue
+            _, score, _, pos = cv2.minMaxLoc(cv2.matchTemplate(gray, tile, cv2.TM_CCOEFF_NORMED))
+            if best is None or score > best[0]:
+                best = (score, pos[0] + w // 2, pos[1] + h // 2)
+        if best is None or best[0] < self.min_score:
+            return None
+        return best[1], best[2], float(best[0])
+
+
 class StartButtonLocator:
     """Recognize the supplied green Start button and click inside its center."""
 
