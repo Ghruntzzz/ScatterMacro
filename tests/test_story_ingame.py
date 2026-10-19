@@ -26,7 +26,7 @@ class StoryIngameTests(unittest.TestCase):
             return 1
         client.user.SendInput.side_effect = send
         for key, scan in (("I",0x17),("O",0x18),("1",2),("2",3),("3",4),
-                          ("4",5),("5",6),("6",7),("R",0x13),("T",0x14)):
+                          ("4",5),("5",6),("6",7),("R",0x13),("T",0x14),("K",0x25)):
             client.user.MapVirtualKeyW.return_value = scan
             client._key(key)
             client._key(key, release=True)

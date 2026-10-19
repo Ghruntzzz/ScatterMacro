@@ -175,16 +175,8 @@ class UnitIndexer:
         else:
             raise RuntimeError(f"Could not set target priority for Index {index+1}.")
         for _ in range(auto):
-            deadline = self.clock()+8
-            while True:
-                frame, panel = self.read_until(lambda panel: panel["priority"] == desired)
-                point = self.panel.auto_position(frame, panel)
-                if point is not None:
-                    break
-                if self.clock() >= deadline:
-                    raise RuntimeError("Could not find auto upgrade on the unit panel.")
-                self.wait(0.15)
-            self.click(point, frame)
+            self.read_until(lambda panel: panel["priority"] == desired)
+            self.key("K")
             self.wait(0.2)
         if goal:
             last, stalled = None, self.clock()+120
