@@ -873,21 +873,23 @@ class RuntimeWindow(DashboardWindow):
 
     def _build(self) -> None:
         stats_panel = self._card(18, 16, 210, 378, 8)
+        from python_macro.session_stats import WaveTotals
+        self.wave_totals = WaveTotals()
         self._section_title(stats_panel, "SESSION STATS", 20)
         self._label(stats_panel, "Current macro session", 16, 58, 178, 18,
                     f"color: {MUTED}; font: 9px 'Segoe UI';")
         stats = [("RUNS", "0"), ("AVG RUN", "--:--:--"),
-                 ("CURRENT RUN", "WAITING")]
+                 ("CURRENT RUN", "WAITING"), ("WAVES COMPLETED", "0")]
         self.stat_values: dict[str, QLabel] = {}
         for index, (label, value) in enumerate(stats):
-            y = 83 + index * 63
-            tile = self._card(0, 0, 178, 56, 6)
+            y = 83 + index * 46
+            tile = self._card(0, 0, 178, 42, 6)
             tile.setParent(stats_panel)
             tile.move(16, y)
             self._label(tile, label, 9, 7, 157, 16,
                         f"color: {MUTED}; font: 700 8px 'Bahnschrift';")
             self.stat_values[label] = self._label(
-                tile, value, 9, 27, 157, 20,
+                tile, value, 9, 21, 157, 20,
                 f"color: {TEXT}; font: 700 11px 'Bahnschrift';")
         self.runtime_status = self._label(
             stats_panel, "●  READY", 16, 301, 178, 22,
@@ -897,8 +899,6 @@ class RuntimeWindow(DashboardWindow):
             f"color: {MUTED}; font: 9px 'Segoe UI';")
         self.hud_value = self._label(stats_panel, "Wave: -- | Yen: --", 16, 278, 178, 18,
                                      f"color: {MUTED}; font: 9px 'Segoe UI';")
-        self._label(stats_panel, "Roblox: auto-detected",
-                    16, 278, 178, 16, f"color: {MUTED}; font: 9px 'Segoe UI';")
 
         action = self._card(18, 406, 210, 528, 8)
         self._section_title(action, "ACTION OUTPUT", 20)
@@ -1159,7 +1159,10 @@ class RuntimeWindow(DashboardWindow):
 
     def _update_hud(self, value):
         self.observed_hud = value
+        if value.get("new_run"):
+            self.wave_totals.start_run()
         wave = value["wave"]
+        self.stat_values["WAVES COMPLETED"].setText(str(self.wave_totals.observe(wave)))
         wave_text = f"{wave[0]}/{wave[1]}" if wave is not None else "--"
         yen_text = str(value["yen"]) if value["yen"] is not None else "--"
         self.hud_value.setText(f"Wave: {wave_text} | Yen: {yen_text}")

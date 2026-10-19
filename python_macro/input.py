@@ -207,7 +207,7 @@ class RobloxClient:
             self._key(key, release=True)
 
     def setup_camera(self):
-        if not self.hold_key("I", 3):
+        if not self.hold_key("I", 1):
             return False
         if self.stop.wait(0.2):
             return False
@@ -230,7 +230,7 @@ class RobloxClient:
             self._send_mouse(0x0010)
         if self.stop.wait(0.2):
             return False
-        return self.hold_key("O", 3)
+        return self.hold_key("O", 1)
 
     def click_event(self, x, y, shape):
         """AHK SendMode Event-like attempt when SendInput did not change the menu."""

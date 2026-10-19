@@ -131,7 +131,10 @@ class DashboardSetupTests(unittest.TestCase):
             self.assertIn("ACTION OUTPUT", labels)
             self.assertNotIn("MACRO RUNTIME", labels)
             self.assertEqual(set(window.stat_values),
-                             {"RUNS", "AVG RUN", "CURRENT RUN"})
+                             {"RUNS", "AVG RUN", "CURRENT RUN", "WAVES COMPLETED"})
+            window._update_hud({"wave": (4,15), "yen": 600})
+            window._update_hud({"wave": (4,15), "yen": 600})
+            self.assertEqual(window.stat_values["WAVES COMPLETED"].text(), "3")
             self.assertEqual((window.log.parentWidget().x(), window.log.parentWidget().y()), (18, 406))
             self.assertEqual(window.log.parentWidget().width(), 210)
             self.assertEqual(window.log.width(), 178)

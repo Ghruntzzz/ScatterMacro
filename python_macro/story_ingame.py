@@ -166,6 +166,7 @@ def run_story_ingame(map_name, act, difficulty, capture, client, reader, stop,
     if stop.is_set():
         return
     log("Game started.")
+    status({"wave": None, "yen": None, "eligible_indexes": [], "new_run": True})
     hud = HudReader(reader, stop, assets)
     indexer = UnitIndexer(entries, client, capture, UnitPanel(reader, stop, assets), stop, log)
     previous_wave = None

@@ -85,6 +85,8 @@ class StoryIngameTests(unittest.TestCase):
         log, readings = Mock(), []
         entries = [{"unit":"1", "x":"5", "y":"5", "place_at_wave":"2"}]
         def status(value):
+            if value.get("new_run"):
+                return
             readings.append(value)
             if len(readings) == 2:
                 stop.set()
@@ -114,7 +116,7 @@ class StoryIngameTests(unittest.TestCase):
         client._send_mouse = Mock()
         client.check_focus = Mock()
         self.assertTrue(client.setup_camera())
-        self.assertEqual([call.args for call in client.hold_key.call_args_list], [("I",3),("O",3)])
+        self.assertEqual([call.args for call in client.hold_key.call_args_list], [("I",1),("O",1)])
         self.assertEqual(client._send_mouse.call_args_list[0].args, (0x0008,))
         self.assertEqual(client._send_mouse.call_args_list[-1].args, (0x0010,))
         client.check_focus.side_effect = RuntimeError("lost focus")
