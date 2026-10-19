@@ -8,12 +8,12 @@
     {
       "id": "anime-expeditions",
       "name": "Anime Expeditions",
-      "version": "0.1.35",
+      "version": "0.1.36",
       "setup_only": false,
       "entrypoint": "AnimeExpeditions.exe",
-      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.35/AnimeExpeditions-0.1.35-windows.zip",
-      "sha256": "0db91ebad80addc055e794cf511e46f319ad57ccb3d5b75860aa80aa009b7668",
-      "description": "Scan-code input for unit slots 1-6, priority R and upgrade T, with a brief slot-selection settle before placement. Story navigation, ordered indexing, one-second camera holds and wave stats retained."
+      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.36/AnimeExpeditions-0.1.36-windows.zip",
+      "sha256": "a6348b832b9ef8d78d4f308d1e8574731c707e4bec3d329f26390923fd5af7f2",
+      "description": "Auto upgrade uses K once per configured level, with 0 disabled. Retains priority R, manual upgrade T, ordered indexing, one-second camera holds and session wave stats."
     }
   ]
 }
