@@ -47,11 +47,11 @@ class UnitManagerTests(unittest.TestCase):
         self.assertEqual(self.entries[7]['unit'], '3')
         self.assertEqual(self.entries[0]['unit'], '0')
 
-    def test_busy_prevents_save(self):
+    def test_busy_saves_for_next_run(self):
         self.busy.return_value = True
         self.widget.fields['upgrade'].setCurrentText('5')
-        self.save.assert_not_called()
-        self.assertEqual(self.widget.fields['upgrade'].currentText(), '0')
+        self.save.assert_called_once()
+        self.assertEqual(self.widget.fields['upgrade'].currentText(), '5')
 
     def test_last_page_and_clear(self):
         self.widget.select(103)
@@ -88,7 +88,7 @@ class UnitManagerTests(unittest.TestCase):
         self.widget.select(2)
         self.busy.return_value = True
         self.widget.paste_index()
-        self.assertEqual(self.entries[2]["unit"], "0")
+        self.assertEqual(self.entries[2]["unit"], "2")
 
     def test_cards_select_real_index_and_show_coordinates_at_zero(self):
         self.widget.fields["x"].setValue(0)
@@ -158,7 +158,7 @@ class UnitManagerTests(unittest.TestCase):
         self.widget.show()
         QApplication.processEvents()
         # The wave field occupies the same form column as other controls.
-        self.assertEqual(field.width(), self.widget.fields["unit"].width())
+        self.assertEqual(field.width(), self.widget.fields["auto_upgrade"].width())
         self.assertEqual(field.height(), self.widget.fields["unit"].height())
 
     def test_place_at_wave_textbox_saves_and_appears_on_cards(self):

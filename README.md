@@ -22,11 +22,26 @@ Select Install on Anime Expeditions, then Open. The installed setup app provides
 - Per-route modern PySide6 Unit Manager in the runtime dashboard: 104 selectable indexes,\n  unit slots 0–6, target/upgrade editing, copy/paste, reset, and client-relative position capture.\n  Numbered placement markers appear on the Roblox screenshot through Set position\n  or the read-only View markers control. Upgrade and auto-upgrade are dropdowns;\n  X/Y fields have no spinner arrows. The runtime omits the extra Stop button,\n  but the F2 stop hotkey remains available. Changes auto-save to the route's INI.
 - Saved keybind preferences and other settings.
 
-Current flow: Install -> Open -> choose route -> configure unit indexes and
-settings -> Save Setup. Nothing is sent to Roblox. Navigation, detection, camera
-setup, placing/upgrading units, card selection, rewards, repeat stage, global
-hotkeys, wave reading, unit placement, and webhook delivery are not connected yet.\nA tested wave-gating helper can defer a unit index until its requested wave\nwithout blocking later ready indexes, but has not yet been wired into live play. Settings for those features
-are preparation, not a claim that automation is running.
+Current Story flow: choose a route -> Start opens the runtime -> press the start
+shortcut. F1 starts and F2 stops by default; both can be changed and saved in
+Settings. Matching in-game details skip lobby navigation. The first run sets
+the camera, then starts the game and processes indexes in numerical order.
+Wave monitoring continues while units upgrade. Tabbing away pauses game inputs
+without ending the macro; returning to Roblox resumes them.
+
+The runtime clicks through detected reward prompts, counts each Victory/Defeat
+once, sends enabled Discord notifications, and retries Repeat Stage until the
+next Start Game appears. Repeats do not redo camera setup or match-detail reading.
+Discord's optional Show rewards earned attaches only the current Gained Rewards
+area, never the full game screen. Visible reward tiles are extracted dynamically,
+not from a fixed item list; offscreen/scrolling rewards are not yet collected.
+The latest capture is stored in the macro config folder under rewards/latest.
+
+Auto Ability Check takes a wave number (blank disables it). At that wave the
+macro opens the placed unit and enables a detected red/off ability switch.
+Changes to unit indexes during a run are saved for the next run. Settings Apply
+and Save update the visible theme. Private server links are stored only;
+automatic reconnect and automation for modes other than Story are future work.
 
 ## Installation and updates
 
@@ -70,7 +85,11 @@ python anime_main.py --config-dir <your-config-folder>.
 Never commit webhook URLs, private server links, or personal configurations.
 Previous AHK installations are not migrated or removed.
 
-## Story click and map-list navigation
+## Historical implementation notes
+
+The following notes describe older releases; the current behavior is above.
+
+### Story click and map-list navigation
 
 Story clicks now hover, perform a short two-pixel cursor jitter, return to the
 target center, and only then click. If the chosen map is not visible after

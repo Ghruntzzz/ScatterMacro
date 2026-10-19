@@ -59,8 +59,8 @@ jobs:
       - name: Upload tested Windows build
         uses: actions/upload-artifact@v4
         with:
-          name: AnimeExpeditions-0.1.39-windows
-          path: dist/AnimeExpeditions-0.1.39-windows.zip
+          name: AnimeExpeditions-0.1.40-windows
+          path: dist/AnimeExpeditions-0.1.40-windows.zip
           if-no-files-found: error
           retention-days: 7
       - name: Publish and verify macro archive
@@ -69,12 +69,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '0.1.39'
+          $version = '0.1.40'
           $tag = "anime-expeditions-v$version"
           $name = "AnimeExpeditions-$version-windows.zip"
           $archive = "dist/$name"
           if (!(Test-Path $archive)) { throw "Missing macro ZIP: $archive" }
-          gh release create $tag $archive --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Anime Expeditions $version - Placement Confirmation" --notes "Confirms placement using the unit panel. Tries the saved position three times before trying four nearby positions six pixels away. A visible panel stops placement retries even when its text is unreadable. Saved coordinates remain unchanged. All 161 automated tests passed; live-game validation remains necessary."
+          gh release create $tag $archive --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Anime Expeditions $version - Story Runs and Settings" --notes "Faster indexing with independent wave and end-screen monitoring. Tabbing away pauses inputs instead of stopping. Matching in-game details skip navigation; repeat runs skip camera setup. Reward prompts, Victory/Defeat counts, Repeat Stage, and wave-triggered Auto Ability Check are connected. Discord notifications support optional reward-area-only attachments before repeat. F1/F2 remain defaults with saved custom shortcuts; theme Apply and Save update the dashboard. Removed redundant Updates, deployment copy, and session fields. Private server reconnect and other mode automation remain future work. Automated and supplied-image checks passed; live gameplay and real Discord delivery still need user validation."
           if ($LASTEXITCODE -ne 0) { throw 'Macro release upload failed' }
           New-Item -ItemType Directory -Force 'dist/verified' | Out-Null
           gh release download $tag --repo $env:GITHUB_REPOSITORY --pattern $name --dir 'dist/verified'
@@ -86,7 +86,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '0.1.39'
+          $version = '0.1.40'
           $archive = "dist/AnimeExpeditions-$version-windows.zip"
           $sha256 = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
           $url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/anime-expeditions-v$version/AnimeExpeditions-$version-windows.zip"
@@ -99,7 +99,7 @@ jobs:
           $macro[0].version = $version
           $macro[0].url = $url
           $macro[0].sha256 = $sha256
-          $macro[0].description = "Unit panel placement confirmation, three attempts at the saved position, then nearby six-pixel retries. Preserves saved positions and stops retrying once the panel appears."
+          $macro[0].description = "Story repeat runs, background wave monitoring, faster indexes, auto ability checks, and reward-only Discord notifications. Saved custom hotkeys and live theme settings."
           $catalog | ConvertTo-Json -Depth 20 | Set-Content catalog.json -Encoding utf8
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
 EMPTY_INDEX = {
     "unit": "0", "priority": "First", "upgrade": "0",
     "auto_upgrade": "0", "x": "", "y": "", "place_at_wave": "",
+    "auto_ability_wave": "",
 }
 PAGE_SIZE = 6
 TARGETS = ["First", "Last", "Closest", "Strongest", "Boss",
@@ -152,13 +153,24 @@ class UnitManager(QWidget):
             ("upgrade", "Upgrade level"), ("auto_upgrade", "Auto upgrade"),
             ("x", "Position X"), ("y", "Position Y"),
             ("place_at_wave", "Place at wave"),
+            ("auto_ability_wave", "Auto Ability Check"),
         ]
         grid = QGridLayout()
         grid.setHorizontalSpacing(10)
         grid.setVerticalSpacing(4)
+        positions = QGridLayout()
+        positions.setHorizontalSpacing(6)
+        grid.addLayout(positions, 4, 0, 4, 1, Qt.AlignTop)
         for i, (key, name) in enumerate(labels):
             col, row = i % 2, (i // 2) * 2
-            grid.addWidget(self._text(name, "subtitle"), row, col)
+            target_grid = grid
+            if key in ("x", "y"):
+                target_grid, row, col = positions, 0, int(key == "y")
+            elif key == "place_at_wave":
+                row, col = 4, 1
+            elif key == "auto_ability_wave":
+                row, col = 6, 1
+            target_grid.addWidget(self._text(name, "subtitle"), row, col)
             if key in ("unit", "priority", "upgrade", "auto_upgrade"):
                 options = {"unit": [str(n) for n in range(7)],
                            "priority": TARGETS,
@@ -167,27 +179,27 @@ class UnitManager(QWidget):
                 field = QComboBox()
                 field.addItems(options[key])
                 field.currentTextChanged.connect(self.changed)
-            elif key == "place_at_wave":
+            elif key in ("place_at_wave", "auto_ability_wave"):
                 field = QLineEdit()
-                field.setObjectName("place-at-wave")
-                field.setPlaceholderText("Any")
-                field.setToolTip("Enter a wave from 1 to 9999, or leave blank to place when ready.")
+                field.setObjectName(key.replace("_", "-"))
+                field.setPlaceholderText("Any" if key == "place_at_wave" else "Wave (blank = off)")
+                field.setToolTip("Wave 1-9999. Ability check opens this index's placed unit and enables a red/off auto ability switch. Blank disables the check." if key == "auto_ability_wave" else "Blank places when ready.")
                 field.setValidator(QRegularExpressionValidator(
                     QRegularExpression(r"(?:[1-9][0-9]{0,3})?"), field
                 ))
                 field.editingFinished.connect(self.changed)
-                self.wave_input = field
+                if key == "place_at_wave":
+                    self.wave_input = field
             else:
                 field = QSpinBox()
                 field.setRange(-1, 10000)
                 field.setSpecialValueText("Not set")
                 field.setButtonSymbols(QAbstractSpinBox.NoButtons)
                 field.setKeyboardTracking(False)
-                field.setFixedWidth(100)
+                field.setFixedWidth(80)
                 field.valueChanged.connect(self.changed)
             self.fields[key] = field
-            grid.addWidget(field, row + 1, col)
-        grid.addWidget(self._text("Blank = no wave delay", "subtitle"), 7, 1)
+            target_grid.addWidget(field, row + 1, col)
         editor.addLayout(grid)
 
         position_actions = QHBoxLayout()
@@ -307,18 +319,18 @@ class UnitManager(QWidget):
         self.next.setEnabled((self.page + 1) * PAGE_SIZE < count)
 
     def _commit(self, entry):
-        if self.busy():
-            self.log("Stop the macro before editing unit indexes.")
-            return False
         entry = {**EMPTY_INDEX, **entry}
         try:
             from python_macro.deployment import requested_wave
             requested_wave(entry["place_at_wave"])
+            requested_wave(entry["auto_ability_wave"])
             self.save(self.selected, entry)
         except (OSError, ValueError) as error:
             self.log(f"Could not save index: {error}")
             return False
         self.entries[self.selected] = dict(entry)
+        if self.busy():
+            self.log("Settings saved for the next run.")
         self.refresh_cards()
         return True
 

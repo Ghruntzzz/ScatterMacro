@@ -1,5 +1,6 @@
 """Foreground-only Win32 input with a confirmed cursor and checked mouse injection."""
 import ctypes
+import time
 from ctypes import wintypes
 
 HOVER_SECONDS = 0.25
@@ -57,6 +58,7 @@ class RobloxClient:
     def __init__(self, hwnd, stop, selected_pid=None):
         self.hwnd, self.stop = hwnd, stop
         self.selected_pid = int(selected_pid) if selected_pid is not None else None
+        self.focus_pause_time = 0.0
         self.user = ctypes.WinDLL("user32", use_last_error=True)
         self.user.GetForegroundWindow.restype = wintypes.HWND
         self.user.GetClientRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
@@ -91,8 +93,30 @@ class RobloxClient:
         if getattr(self, "selected_pid", None) is not None:
             from python_macro.capture import selected_roblox_window
             selected_roblox_window(self.hwnd, self.selected_pid)
-        if self.user.GetForegroundWindow() != self.hwnd:
-            raise RuntimeError("Roblox lost focus. Bring Roblox forward and try again.")
+        if self.user.GetForegroundWindow() == self.hwnd:
+            return
+        # Release held controls before waiting so tabbing out cannot leave a
+        # key or camera drag held in another application.
+        keys = tuple(getattr(self, "_held_keys", ()))
+        right_down = getattr(self, "_right_down", False)
+        for key in keys:
+            self._key(key, release=True)
+        if right_down:
+            self._send_mouse(0x0010)
+        started = time.monotonic()
+        try:
+            while self.user.GetForegroundWindow() != self.hwnd:
+                if self.stop.wait(0.1):
+                    raise InterruptedError()
+        finally:
+            self.focus_pause_time = getattr(self, 'focus_pause_time', 0.0) + time.monotonic()-started
+        if self.stop.is_set():
+            raise InterruptedError()
+        for key in keys:
+            self._key(key)
+        if right_down:
+            self._send_mouse(0x0008)
+        return True
 
     def focus_roblox(self):
         """Request real foreground focus and verify it before sending input.
@@ -102,10 +126,14 @@ class RobloxClient:
         """
         if self.stop.is_set():
             return False
+        if getattr(self, "_focus_established", False):
+            self.check_focus()
+            return not self.stop.is_set()
         if getattr(self, "selected_pid", None) is not None:
             from python_macro.capture import selected_roblox_window
             selected_roblox_window(self.hwnd, self.selected_pid)
         if self.user.GetForegroundWindow() == self.hwnd:
+            self._focus_established = True
             return True
         if self.user.IsIconic(self.hwnd):
             self.user.ShowWindow(self.hwnd, 9)  # SW_RESTORE
@@ -116,6 +144,7 @@ class RobloxClient:
             if self.stop.wait(FOCUS_SETTLE_SECONDS):
                 return False
             if self.user.GetForegroundWindow() == self.hwnd:
+                self._focus_established = True
                 return True
         raise RuntimeError(
             "Windows did not focus Roblox. Click the Roblox window once, "
@@ -137,14 +166,22 @@ class RobloxClient:
         point = wintypes.POINT(x, y)
         if not self.user.ClientToScreen(self.hwnd, ctypes.byref(point)):
             raise RuntimeError("Cannot locate Roblox client.")
-        if self.user.GetAncestor(self.user.WindowFromPoint(point), 2) != self.hwnd:
-            raise RuntimeError("Another window covers the Play button. Keep Roblox visible.")
+        while self.user.GetAncestor(self.user.WindowFromPoint(point), 2) != self.hwnd:
+            self.check_focus()
+            if self.stop.wait(.05):
+                raise InterruptedError()
+            point = wintypes.POINT(x, y)
+            if not self.user.ClientToScreen(self.hwnd, ctypes.byref(point)):
+                raise RuntimeError("Cannot locate Roblox client.")
         return point, rect
 
     def _move(self, x, y):
+        self.check_focus()
         point = wintypes.POINT(x, y)
-        if self.user.GetAncestor(self.user.WindowFromPoint(point), 2) != self.hwnd:
-            raise RuntimeError("The Roblox click target is covered.")
+        while self.user.GetAncestor(self.user.WindowFromPoint(point), 2) != self.hwnd:
+            self.check_focus()
+            if self.stop.wait(.05):
+                raise InterruptedError()
         if not self.user.SetCursorPos(x, y):
             raise RuntimeError("Windows could not position the mouse cursor.")
 
@@ -174,6 +211,8 @@ class RobloxClient:
                 f"Windows rejected mouse input (SendInput={count}, error={error}). "
                 "Check Roblox focus, overlays, and whether Roblox runs as administrator."
             )
+        if flags in (0x0008, 0x0010):
+            self._right_down = flags == 0x0008
 
     def click(self, x, y, shape):
         return self._click(x, y, shape, method="input")
@@ -188,6 +227,12 @@ class RobloxClient:
             dwFlags=(0x0008 if scan else 0) | (2 if release else 0))))
         if self.user.SendInput(1, ctypes.byref(packet), ctypes.sizeof(INPUT)) != 1:
             raise RuntimeError("Windows rejected keyboard input. Check Roblox focus.")
+        if not hasattr(self, "_held_keys"):
+            self._held_keys = set()
+        if release:
+            self._held_keys.discard(key)
+        else:
+            self._held_keys.add(key)
 
     def hold_key(self, key, seconds):
         if self.stop.is_set():
@@ -293,7 +338,10 @@ class RobloxClient:
         if (new_point.x, new_point.y) != (point.x, point.y):
             raise RuntimeError("Roblox client shifted while preparing the click.")
         self._check_cursor(point.x, point.y)
-        self.check_focus()
+        if self.check_focus():
+            point, _ = self._validated_point(x, y, shape)
+            self._move(point.x, point.y)
+            self._check_cursor(point.x, point.y)
         return point
 
     def start_click(self, x, y, shape):

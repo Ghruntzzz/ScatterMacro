@@ -47,7 +47,7 @@ class DashboardSetupTests(unittest.TestCase):
                 self.assertFalse(hasattr(window, "roblox_selector"))
                 from PySide6.QtWidgets import QLabel
                 labels = [label.text() for label in window.findChildren(QLabel)]
-                self.assertIn("ROBLOX AUTO-DETECTED ON START", labels)
+                self.assertNotIn("ROBLOX AUTO-DETECTED ON START", labels)
                 self.assertEqual(dashboard.read_dashboard_values()["roblox_pid"], "")
             finally:
                 window.close()
@@ -131,7 +131,7 @@ class DashboardSetupTests(unittest.TestCase):
             self.assertIn("ACTION OUTPUT", labels)
             self.assertNotIn("MACRO RUNTIME", labels)
             self.assertEqual(set(window.stat_values),
-                             {"RUNS", "AVG RUN", "CURRENT RUN", "WAVES COMPLETED"})
+                             {"RUNS", "AVG RUN", "VICTORIES", "DEFEATS", "WAVES COMPLETED"})
             window._update_hud({"wave": (4,15), "yen": 600})
             window._update_hud({"wave": (4,15), "yen": 600})
             self.assertEqual(window.stat_values["WAVES COMPLETED"].text(), "3")

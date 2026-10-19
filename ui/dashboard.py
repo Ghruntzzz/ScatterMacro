@@ -3,12 +3,13 @@ from __future__ import annotations
 import configparser
 import ctypes
 import os
+import re
 import sys
 from pathlib import Path
 
 from PySide6.QtCore import QPoint, QRect, QTimer, Qt, QRegularExpression
-from PySide6.QtGui import QColor, QFont, QFontDatabase, QKeySequence, QRegularExpressionValidator, QLinearGradient, QPainter, QPainterPath, QPixmap, QRadialGradient, QRegion
-from PySide6.QtWidgets import QApplication, QComboBox, QDialog, QDialogButtonBox, QFrame, QHeaderView, QLabel, QLineEdit, QMessageBox, QPlainTextEdit, QPushButton, QSpinBox, QTableWidget, QVBoxLayout, QWidget
+from PySide6.QtGui import QColor, QFont, QFontDatabase, QIcon, QKeySequence, QRegularExpressionValidator, QLinearGradient, QPainter, QPainterPath, QPixmap, QRadialGradient, QRegion
+from PySide6.QtWidgets import QApplication, QComboBox, QDialog, QDialogButtonBox, QFrame, QHeaderView, QLabel, QLineEdit, QMessageBox, QPlainTextEdit, QPushButton, QSpinBox, QTableWidget, QVBoxLayout, QWidget, QSystemTrayIcon, QMenu
 
 
 ROOT = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parents[1]
@@ -136,6 +137,7 @@ def read_dashboard_values() -> dict[str, str]:
         "ping_victory": notifications.get("Victory", "1"),
         "ping_defeat": notifications.get("Defeat", "1"),
         "ping_error": notifications.get("Error", "0"),
+        "show_rewards": notifications.get("ShowRewards", "0"),
     }
 
 
@@ -254,6 +256,7 @@ def load_unit_indexes_from_path(config_path: Path, count: int = 6) -> list[dict[
                 "x": section.get(f"{prefix}X", ""),
                 "y": section.get(f"{prefix}Y", ""),
                 "place_at_wave": section.get(f"{prefix}PlaceAtWave", ""),
+                "auto_ability_wave": section.get(f"{prefix}AutoAbilityWave", ""),
             }
         )
     return indexes
@@ -329,6 +332,7 @@ class DashboardWindow(QWidget):
     def __init__(self) -> None:
         super().__init__()
         self.values = read_dashboard_values()
+        apply_theme_palette(self.values['primary_color'], self.values['accent_color'])
         self.drag_origin: QPoint | None = None
         self.setWindowTitle("Anime Expeditions | Setup")
         self.setFixedSize(1200, 720)
@@ -390,8 +394,6 @@ class DashboardWindow(QWidget):
         self._label(route, "ACTIVE ROUTE", 22, 16, 110, 18, f"color: {WINE}; font: 700 9px 'Bahnschrift';")
         self.route_value = self._label(route, "", 160, 15, 690, 20, f"color: {TEXT}; font: 700 10px 'Bahnschrift';")
         self.route_value.setText(f"Mode: {self.values['mode']} | Map: {self.values['map']}")
-        self._label(route, "ROBLOX AUTO-DETECTED ON START", 850, 15, 300, 22,
-                    f"color: {MUTED}; font: 700 10px 'Bahnschrift';")
 
     def _configuration(self) -> None:
         config = self._card(18, 208, 680, 316, 8)
@@ -411,30 +413,27 @@ class DashboardWindow(QWidget):
     def _private_server(self) -> None:
         side = self._card(714, 208, 468, 316, 8)
         self._section_title(side, "PRIVATE SERVER", 20)
-        self.private_server = self._input(side, "", "Enter private server code", self.values["private_server"], 22, 47, 424)
+        self.private_server = self._input(side, "", "Private server link (saved for future reconnect)", self.values["private_server"], 22, 57, 424)
         self._rule(side, 22, 102, 424)
         self._label(side, "NOTIFICATIONS", 22, 120, 260, 24, f"color: {TEXT}; font: 700 14px 'Bahnschrift';")
         self._label(side, "DISCORD WEBHOOK AND SESSION RESULTS", 22, 147, 320, 18, f"color: {WINE}; font: 700 9px 'Bahnschrift';")
         self.webhook = self._input(side, "WEBHOOK URL", "https://discord.com/api/webhooks/...", self.values["webhook"], 22, 181, 424)
-        self.discord_id = self._input(side, "DISCORD USER ID", "Enter Discord User ID", self.values["discord_id"], 22, 249, 424)
+        self.discord_id = self._input(side, "DISCORD USER ID", "Optional user ID to mention", self.values["discord_id"], 22, 249, 424)
         # Persist these independently as the user types so closing or updating cannot lose them.
         self.private_server.textChanged.connect(lambda _text: self._save_dashboard())
         self.webhook.textChanged.connect(lambda _text: self._save_dashboard())
         self.discord_id.textChanged.connect(lambda _text: self._save_dashboard())
 
     def _deployment(self) -> None:
-        deploy = self._card(18, 540, 1164, 140, 8)
-        self._label(deploy, "DEPLOYMENT", 22, 20, 150, 18, f"color: {WINE}; font: 700 9px 'Bahnschrift';")
-        self._label(deploy, "Story test: Play > Story > selected map. Other modes: setup only.", 22, 48, 530, 20, f"color: {TEXT}; font: 700 10px 'Bahnschrift';")
-        self._label(deploy, "Match and Discord settings save automatically.", 22, 73, 360, 18, f"color: {MUTED}; font: 9px 'Segoe UI';")
-        start = self._button(deploy, "OPEN RUNTIME" if self.mode_box.currentText() == "Story" else "SAVE SETUP", 578, 37, 214, True)
+        deploy = self
+        start = self._button(deploy, "START" if self.mode_box.currentText() == "Story" else "SAVE SETUP", 596, 577, 214, True)
         self.start_button = start
-        settings = self._button(deploy, "SETTINGS", 812, 37, 164)
-        exit_button = self._button(deploy, "EXIT", 996, 37, 154)
+        settings = self._button(deploy, "SETTINGS", 830, 577, 164)
+        exit_button = self._button(deploy, "EXIT", 1014, 577, 154)
         start.clicked.connect(self._start_macro)
         settings.clicked.connect(self._open_settings)
         exit_button.clicked.connect(self._exit_macro)
-        self.status = self._label(deploy, "", 430, 104, 700, 18, f"color: {MUTED}; font: 8px 'Segoe UI';")
+        self.status = self._label(deploy, "", 40, 658, 1120, 24, f"color: {MUTED}; font: 10px 'Segoe UI';")
 
     def _combo(self, parent: QWidget, label: str, items: list[str], selected: str, x: int, y: int, width: int) -> QComboBox:
         title = self._label(parent, label, x, y, width, 18, f"color: {TEXT}; font: 700 9px 'Bahnschrift';")
@@ -514,9 +513,9 @@ class DashboardWindow(QWidget):
         if not hasattr(self, "mode_box"):
             return
         route = f"Mode: {self.mode_box.currentText()}"
-        if self.map_box.isVisible():
+        if not self.map_box.isHidden():
             route += f" | Map: {self.map_box.currentText()}"
-        if self.act_box.isVisible():
+        if not self.act_box.isHidden():
             route += f" | Act: {self.act_box.currentText()}"
         if self.difficulty_box.isEnabled():
             route += f" | {self.difficulty_box.currentText()}"
@@ -539,7 +538,7 @@ class DashboardWindow(QWidget):
         self._refresh_route_controls()
         self._save_dashboard()
         if hasattr(self, "start_button"):
-            self.start_button.setText("OPEN RUNTIME" if _mode == "Story" else "SAVE SETUP")
+            self.start_button.setText("START" if _mode == "Story" else "SAVE SETUP")
 
     def _act_changed(self, _act: str) -> None:
         if self.mode_box.currentText() == "Story":
@@ -604,7 +603,15 @@ class DashboardWindow(QWidget):
             hwnd, _, pid = single_roblox_window()
         except RuntimeError as error:
             self._set_status(str(error))
+            if not hasattr(self, '_roblox_wait_timer') or not self._roblox_wait_timer.isActive():
+                self._roblox_wait_timer = QTimer(self)
+                self._roblox_wait_timer.setInterval(500)
+                self._roblox_wait_remaining = max(1, int(read_dashboard_values()['roblox_timeout']))*2
+                self._roblox_wait_timer.timeout.connect(self._retry_start)
+                self._roblox_wait_timer.start()
             return
+        if hasattr(self, '_roblox_wait_timer'):
+            self._roblox_wait_timer.stop()
         # Session-only binding: do not persist/reuse a stale process ID.
         self.values["roblox_hwnd"], self.values["roblox_pid"] = str(hwnd), str(pid)
         self.runtime_window = RuntimeWindow()
@@ -613,6 +620,15 @@ class DashboardWindow(QWidget):
         self.runtime_window.setup_dashboard = self
         self.runtime_window.show()
         self.hide()
+
+    def _retry_start(self):
+        from python_macro.capture import roblox_windows
+        self._roblox_wait_remaining -= 1
+        if not self.isVisible() or self._roblox_wait_remaining <= 0:
+            self._roblox_wait_timer.stop()
+            self._set_status('Roblox was not found in time. Open it and press Start again.')
+        elif len(roblox_windows()) == 1:
+            self._start_macro()
 
     def _open_unit_setup(self) -> None:
         if not isinstance(self, RuntimeWindow):
@@ -645,7 +661,35 @@ class DashboardWindow(QWidget):
 
     def _exit_macro(self) -> None:
         send_command("Exit")
+        self._force_close = True
         self.close()
+
+    def closeEvent(self, event):
+        if (type(self) is DashboardWindow and not getattr(self, '_force_close', False)
+                and read_dashboard_values()['minimize_to_tray'] == '1'
+                and QSystemTrayIcon.isSystemTrayAvailable()):
+            if not hasattr(self, '_tray'):
+                self._tray = QSystemTrayIcon(QIcon(str(ASSETS / 'scattermacro.ico')), self)
+                menu = QMenu(self)
+                menu.addAction('Open Anime Expeditions', self._restore_from_tray)
+                menu.addAction('Exit', self._exit_macro)
+                self._tray.setContextMenu(menu)
+                self._tray.activated.connect(lambda reason: self._restore_from_tray()
+                    if reason == QSystemTrayIcon.DoubleClick else None)
+            self._tray.show()
+            self.hide()
+            event.ignore()
+            return
+        if hasattr(self, '_tray'):
+            self._tray.hide()
+        super().closeEvent(event)
+
+    def _restore_from_tray(self):
+        self.showNormal()
+        self.raise_()
+        self.activateWindow()
+        if hasattr(self, '_tray'):
+            self._tray.hide()
 
     def _set_status(self, message: str) -> None:
         self.status.setText(message)
@@ -747,20 +791,28 @@ class SettingsWindow(DashboardWindow):
         self._label(notifications, "Choose which Discord pings are sent.", 22, 58, 300, 18, f"color: {MUTED}; font: 9px 'Segoe UI';")
         self.ping_victory = self._toggle(notifications, "Victory", 22, 94, self.values["ping_victory"] == "1")
         self.ping_defeat = self._toggle(notifications, "Defeat", 180, 94, self.values["ping_defeat"] == "1")
+        self.ping_victory.setFixedWidth(140)
+        self.ping_defeat.setFixedWidth(140)
         self.ping_error = self._toggle(notifications, "Errors", 22, 136, self.values["ping_error"] == "1")
+        self.show_rewards = self._toggle(notifications, "Show rewards earned", 22, 178, self.values["show_rewards"] == "1")
 
-        updates = self._card(820, 430, 362, 250, 8)
-        self._section_title(updates, "UPDATES", 20)
-        self._label(updates, "Updates are managed by the launcher.", 22, 62, 300, 20, f"color: {TEXT}; font: 700 10px 'Bahnschrift';")
-        self._label(updates, "Check Updates in ScatterMacro to install new versions.", 22, 92, 320, 18, f"color: {MUTED}; font: 9px 'Segoe UI';")
-        self.automatic_check_toggle = self._toggle(updates, "Automatic update checks", 22, 126, self.values["automatic_check"] == "1")
-        check_updates = self._small_button(updates, "CHECK FOR UPDATES", 22, 176, 188)
-        check_updates.setEnabled(False)
-        save = self._button(updates, "SAVE SETTINGS", 222, 162, 118, True)
+        self.settings_status = self._label(self, "", 840, 455, 320, 150,
+                                          f"color: {TEXT}; font: 11px 'Segoe UI';")
+        self.settings_status.setWordWrap(True)
+        save = self._button(self, "SAVE SETTINGS", 840, 624, 320, True)
         save.setFixedHeight(50)
         save.clicked.connect(self._save_settings)
 
     def _save_settings(self) -> None:
+        from python_macro.hotkeys import validate_hotkeys
+        try:
+            validate_hotkeys(self.start_key.text() or 'F1', self.stop_key.text() or 'F2')
+            timeout = int(self.roblox_timeout.text() or '90')
+            if not 1 <= timeout <= 600:
+                raise ValueError('Roblox timeout must be between 1 and 600 seconds.')
+        except ValueError as error:
+            self.settings_status.setText(str(error))
+            return
         self._apply_theme_colors()
         update_config(
             "Settings",
@@ -780,15 +832,21 @@ class SettingsWindow(DashboardWindow):
                 "Victory": "1" if self.ping_victory.isChecked() else "0",
                 "Defeat": "1" if self.ping_defeat.isChecked() else "0",
                 "Error": "1" if self.ping_error.isChecked() else "0",
+                "ShowRewards": "1" if self.show_rewards.isChecked() else "0",
             },
         )
-        update_config("Updates", {"AutomaticCheck": "1" if self.automatic_check_toggle.isChecked() else "0"})
         send_command("SettingsSaved")
         if self.dashboard:
-            self.dashboard.replace_with_fresh_dashboard()
+            self.dashboard.values = read_dashboard_values()
         self.close()
 
     def _apply_theme_colors(self) -> None:
+        def palette_tokens():
+            colors = [WINE, WINE_DARK, PANEL, FIELD, OUTLINE]
+            return colors + [blend_color(c, target, amount) for c in colors
+                             for target in ('#FFFFFF','#000000')
+                             for amount in (.04,.07,.08,.10,.20,.25,.28,.36,.38,.45)]
+        old = palette_tokens()
         primary = normalize_hex_color(self.primary_color.text(), "#080809")
         accent = normalize_hex_color(self.accent_color.text(), "#5A0F1B")
         self.primary_color.setText(primary)
@@ -797,6 +855,17 @@ class SettingsWindow(DashboardWindow):
         self.accent_swatch.setStyleSheet(f"background: {accent}; border: 1px solid #686167; border-radius: 5px;")
         update_config("Settings", {"PrimaryColor": primary, "AccentColor": accent})
         apply_theme_palette(primary, accent)
+        replacements = dict(zip((c.lower() for c in old), palette_tokens()))
+        for window in (self, self.dashboard):
+            if window is None:
+                continue
+            for widget in [window, *window.findChildren(QWidget)]:
+                style = widget.styleSheet()
+                if style:
+                    widget.setStyleSheet(re.sub(r'#[0-9a-fA-F]{6}',
+                        lambda m: replacements.get(m.group().lower(),m.group()),style))
+            window.update()
+        self.settings_status.setText('Theme applied.')
 
     def _reset_and_save_theme(self) -> None:
         self.primary_color.setText("#080809")
@@ -852,6 +921,7 @@ class RuntimeWindow(DashboardWindow):
 
     def __init__(self) -> None:
         super().__init__()
+        self.setWindowFlag(Qt.WindowStaysOnTopHint, self.values['runtime_on_top'] == '1')
         # This must match the established live Roblox viewport exactly.
         self.setFixedSize(1835, 950)
         # The Roblox client can appear after the first Qt show event. Retry
@@ -875,14 +945,15 @@ class RuntimeWindow(DashboardWindow):
         stats_panel = self._card(18, 16, 210, 378, 8)
         from python_macro.session_stats import WaveTotals
         self.wave_totals = WaveTotals()
+        self.run_counts = {"victory": 0, "defeat": 0}
+        self.run_seconds = 0
+        self.run_finished = False
         self._section_title(stats_panel, "SESSION STATS", 20)
-        self._label(stats_panel, "Current macro session", 16, 58, 178, 18,
-                    f"color: {MUTED}; font: 9px 'Segoe UI';")
         stats = [("RUNS", "0"), ("AVG RUN", "--:--:--"),
-                 ("CURRENT RUN", "WAITING"), ("WAVES COMPLETED", "0")]
+                 ("VICTORIES", "0"), ("DEFEATS", "0"), ("WAVES COMPLETED", "0")]
         self.stat_values: dict[str, QLabel] = {}
         for index, (label, value) in enumerate(stats):
-            y = 83 + index * 46
+            y = 62 + index * 46
             tile = self._card(0, 0, 178, 42, 6)
             tile.setParent(stats_panel)
             tile.move(16, y)
@@ -892,13 +963,8 @@ class RuntimeWindow(DashboardWindow):
                 tile, value, 9, 21, 157, 20,
                 f"color: {TEXT}; font: 700 11px 'Bahnschrift';")
         self.runtime_status = self._label(
-            stats_panel, "●  READY", 16, 301, 178, 22,
+            stats_panel, "●  READY", 16, 319, 178, 22,
             "color: #47e887; font: 700 10px 'Bahnschrift';")
-        self.session_value = self._label(
-            stats_panel, "Session  --:--:--", 16, 329, 178, 18,
-            f"color: {MUTED}; font: 9px 'Segoe UI';")
-        self.hud_value = self._label(stats_panel, "Wave: -- | Yen: --", 16, 278, 178, 18,
-                                     f"color: {MUTED}; font: 9px 'Segoe UI';")
 
         action = self._card(18, 406, 210, 528, 8)
         self._section_title(action, "ACTION OUTPUT", 20)
@@ -914,7 +980,7 @@ class RuntimeWindow(DashboardWindow):
             f"color: {TEXT}; padding: 8px; font: 9px 'Consolas';")
         self.worker = None
         self.return_pending = False
-        self._label(action, "F1: START   |   F2: STOP", 16, 409, 178, 18, f"color: {TEXT}; font: 700 10px 'Bahnschrift';")
+        self._label(action, f"{self.values['start_key']}: START   |   {self.values['stop_key']}: STOP", 16, 409, 178, 28, f"color: {TEXT}; font: 700 9px 'Bahnschrift';")
         # The F2 emergency stop remains active via RuntimeHotkeys; no extra button.
         return_button = self._small_button(action, "RETURN TO DASHBOARD", 16, 449, 178)
         return_button.clicked.connect(self._return_to_dashboard)
@@ -949,11 +1015,14 @@ class RuntimeWindow(DashboardWindow):
             parser.add_section("UnitIndexes")
         from python_macro.deployment import requested_wave
         requested_wave(entry.get("place_at_wave", ""))
+        requested_wave(entry.get("auto_ability_wave", ""))
         for key, suffix in (("unit", "Unit"), ("priority", "Priority"), ("upgrade", "Upgrade"),
                             ("auto_upgrade", "AutoUpgrade"), ("x", "X"), ("y", "Y"),
-                            ("place_at_wave", "PlaceAtWave")):
+                            ("place_at_wave", "PlaceAtWave"), ("auto_ability_wave", "AutoAbilityWave")):
             parser.set("UnitIndexes", f"Index{index + 1}{suffix}", entry.get(key, ""))
         write_ini(parser, self.unit_config_path)
+        if self.worker is not None and self.worker.isRunning():
+            self.worker.update_entry(index, entry)
 
     def _render_unit_manager_page(self) -> None:
         """Redraw only the Unit Manager so page controls stay responsive."""
@@ -1000,10 +1069,11 @@ class RuntimeWindow(DashboardWindow):
         super().showEvent(event)
         from python_macro.hotkeys import RuntimeHotkeys
         if not hasattr(self, "hotkeys"):
-            self.hotkeys = RuntimeHotkeys(int(self.winId()))
+            self.hotkeys = RuntimeHotkeys(int(self.winId()), start_key=self.values['start_key'],
+                                         stop_key=self.values['stop_key'])
         try:
             self.hotkeys.register()
-        except RuntimeError as exc:
+        except (RuntimeError, ValueError) as exc:
             self.log.appendPlainText(str(exc))
         QTimer.singleShot(0, self._start_auto_embed)
 
@@ -1030,9 +1100,6 @@ class RuntimeWindow(DashboardWindow):
 
     def hideEvent(self, event) -> None:
         self._embed_timer.stop()
-        if hasattr(self, "hotkeys"):
-            self.hotkeys.close()
-        self._stop_story()
         super().hideEvent(event)
 
     def nativeEvent(self, event_type, message):
@@ -1040,8 +1107,8 @@ class RuntimeWindow(DashboardWindow):
         from python_macro.hotkeys import RuntimeHotkeys
         if event_type in (b"windows_generic_MSG", b"windows_dispatcher_MSG"):
             msg = wintypes.MSG.from_address(int(message))
-            if msg.message == 0x0312 and self.isVisible() and not self.return_pending:
-                if msg.wParam == RuntimeHotkeys.START:
+            if msg.message == 0x0312 and not self.return_pending:
+                if msg.wParam == RuntimeHotkeys.START and self.isVisible():
                     self._start_story()
                     return True, 0
                 if msg.wParam == RuntimeHotkeys.STOP:
@@ -1077,8 +1144,6 @@ class RuntimeWindow(DashboardWindow):
                 roblox_windows(),
             )
         except (RuntimeError, ValueError):
-            if self.worker is not None and self.worker.isRunning():
-                self.worker.stop.set()
             return False
         hwnd = target[0]
         user = ctypes.windll.user32
@@ -1149,7 +1214,8 @@ class RuntimeWindow(DashboardWindow):
                                   difficulty=self.values["difficulty"],
                                   selected_hwnd=self.values.get("roblox_hwnd", ""),
                                   selected_pid=self.values.get("roblox_pid", ""), reader=self.story_reader,
-                                  entries=self.unit_indexes)
+                                  entries=self.unit_indexes, reward_dir=CONFIG_PATH.parent / "rewards",
+                                  notification_settings=read_dashboard_values())
         self.worker.message.connect(self.log.appendPlainText)
         self.worker.click_target.connect(self._show_click_target)
         self.worker.hud_status.connect(self._update_hud)
@@ -1161,11 +1227,23 @@ class RuntimeWindow(DashboardWindow):
         self.observed_hud = value
         if value.get("new_run"):
             self.wave_totals.start_run()
-        wave = value["wave"]
-        self.stat_values["WAVES COMPLETED"].setText(str(self.wave_totals.observe(wave)))
-        wave_text = f"{wave[0]}/{wave[1]}" if wave is not None else "--"
-        yen_text = str(value["yen"]) if value["yen"] is not None else "--"
-        self.hud_value.setText(f"Wave: {wave_text} | Yen: {yen_text}")
+            self.run_finished = False
+        outcome = value.get("result")
+        if outcome in self.run_counts and not self.run_finished:
+            self.run_finished = True
+            self.run_counts[outcome] += 1
+            self.run_seconds += max(0, value.get("duration", 0))
+            runs = sum(self.run_counts.values())
+            self.stat_values["RUNS"].setText(str(runs))
+            self.stat_values["VICTORIES"].setText(str(self.run_counts["victory"]))
+            self.stat_values["DEFEATS"].setText(str(self.run_counts["defeat"]))
+            average = int(self.run_seconds / runs)
+            self.stat_values["AVG RUN"].setText(f"{average//3600:02d}:{average//60%60:02d}:{average%60:02d}")
+            if outcome == "victory":
+                self.wave_totals.finish_run()
+        if not self.run_finished:
+            self.wave_totals.observe(value.get("wave"))
+        self.stat_values["WAVES COMPLETED"].setText(str(self.wave_totals.total))
 
     def _show_click_target(self, x: int, y: int) -> None:
         """Highlight the next Roblox client-relative target without taking focus."""

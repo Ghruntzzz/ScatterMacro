@@ -1,11 +1,43 @@
 """Story in-game flow, separate from lobby navigation. No blind placement."""
 import re
+import time
 
 import cv2
 
 from python_macro.unit_actions import UnitIndexer, UnitPanel
 from python_macro.story import normalize
 from python_macro.vision import Region, StartButtonLocator
+from python_macro.end_screen import EndScreenReader, save_rewards
+from python_macro.match_monitor import MatchMonitor
+
+
+class RoundEnded(Exception):
+    pass
+
+
+def already_in_match(capture, reader, stop, map_name, act, difficulty, find_play=None):
+    confirmed = 0
+    for _ in range(3):
+        if stop.is_set():
+            return False
+        frame = capture()
+        h, w = frame.shape[:2]
+        matches = reader.read(frame, Region(w//2, 0, w-w//2, h),
+                              scale=2, max_variants=2, min_confidence=.7,
+                              cancelled=stop.is_set)
+        texts = [m.text for m in matches]
+        if not matches_story(texts, map_name, act, difficulty):
+            text = normalize(" ".join(texts))
+            if "story" in text and re.search(r"act[1-9]", text) and ("normalmod" in text or "hardmod" in text):
+                raise RuntimeError("Already in a different Story match. Select its map, act and difficulty in the dashboard.")
+            if find_play is not None and find_play(frame) is not None:
+                return False
+            confirmed = 0
+        else:
+            confirmed += 1
+            if confirmed >= 2:
+                return True
+    return False
 
 
 def matches_story(texts, map_name, act, difficulty):
@@ -106,11 +138,13 @@ class HudReader:
 
 
 def run_story_ingame(map_name, act, difficulty, capture, client, reader, stop,
-                     log, assets, entries=(), status=lambda value: None):
+                     log, assets, entries=(), status=lambda value: None,
+                     monitor_capture=None, reward_dir=None, entries_provider=None,
+                     match_confirmed=False, on_result=lambda *args: None):
     log("Waiting for match details.")
     confirmed = 0
     scans = 0
-    while not stop.is_set():
+    while not match_confirmed and not stop.is_set():
         frame = capture()
         h, w = frame.shape[:2]
         scans += 1
@@ -141,10 +175,17 @@ def run_story_ingame(map_name, act, difficulty, capture, client, reader, stop,
     if not client.setup_camera() or stop.is_set():
         return
     log("Camera ready. Starting game.")
+    run_matches(capture, client, reader, stop, log, assets, entries, status,
+                monitor_capture or capture, reward_dir, entries_provider, allow_active=match_confirmed,
+                on_result=on_result)
+
+
+def start_game(capture, client, stop, assets, active_hud=None):
     find_start = StartButtonLocator(assets / "start-game-template.png")
     # Wait through loading indefinitely; retries are fresh detections, and
     # disappearing for two captures confirms that the button was dismissed.
     clicked, absent = False, 0
+    previous_wave = None
     while not stop.is_set():
         frame = capture()
         target = find_start(frame)
@@ -160,28 +201,114 @@ def run_story_ingame(map_name, act, difficulty, capture, client, reader, stop,
         elif clicked:
             absent += 1
             if absent >= 2:
-                break
+                return True
+        elif active_hud is not None:
+            wave = active_hud.wave(frame)
+            if wave is not None and wave == previous_wave and wave[0] > 0:
+                return True
+            previous_wave = wave
         if stop.wait(0.15):
             return
-    if stop.is_set():
-        return
-    log("Game started.")
-    status({"wave": None, "yen": None, "eligible_indexes": [], "new_run": True})
-    hud = HudReader(reader, stop, assets)
-    indexer = UnitIndexer(entries, client, capture, UnitPanel(reader, stop, assets), stop, log)
-    previous_wave = None
+    return False
+
+
+def finish_match(capture, client, reader, stop, log, status, reward_dir, started, find_start,
+                 on_result=lambda *args: None):
+    end = EndScreenReader(reader, stop)
+    previous, counted = None, False
+    reward_logged = False
+    clicked_repeat = False
     while not stop.is_set():
         frame = capture()
-        wave = hud.wave(frame)
-        yen = None if stop.is_set() else hud.yen(frame)
-        # Two agreeing observations prevent one noisy read releasing wave gates.
-        trusted = wave if wave is not None and wave == previous_wave else None
-        previous_wave = wave
-        next_index = indexer.next_ready(trusted[0] if trusted else None)
-        ready = [next_index] if next_index is not None else []
-        if not stop.is_set():
-            status({"wave": trusted, "yen": yen, "eligible_indexes": ready})
-        if next_index is not None and not stop.is_set():
-            indexer.run(next_index)
-        if stop.wait(0.35):
-            return
+        if clicked_repeat and find_start(frame) is not None:
+            return True
+        reading = end.read(frame)
+        if stop.is_set():
+            return False
+        outcome = reading["outcome"]
+        if outcome and outcome == previous:
+            if not counted:
+                counted = True
+                log(f"{outcome.title()} detected.")
+                duration = time.monotonic()-started
+                status({"result": outcome, "duration": duration})
+                saved = None
+                if reward_dir is not None:
+                    try:
+                        saved = save_rewards(frame, end.rewards(frame, reading), reward_dir)
+                    except OSError:
+                        log("Could not save reward images.")
+                on_result(outcome, duration, saved)
+                # Network delivery may take seconds: locate Repeat again in
+                # a fresh capture rather than clicking stale coordinates.
+                previous = outcome
+                continue
+            if reading["repeat"] is not None:
+                if not clicked_repeat:
+                    log("Repeating stage.")
+                if client.direct_click(*reading["repeat"], frame.shape) is False:
+                    return False
+                clicked_repeat = True
+                if stop.wait(.5):
+                    return False
+        elif reading["reward"] and not counted:
+            if not reward_logged:
+                log("Collecting rewards.")
+                reward_logged = True
+            if client.direct_click(frame.shape[1]//2, int(frame.shape[0]*.78), frame.shape) is False:
+                return False
+            if stop.wait(.5):
+                return False
+        previous = outcome
+        if stop.wait(.1):
+            return False
+    return False
+
+
+def run_matches(capture, client, reader, stop, log, assets, entries, status,
+                monitor_capture, reward_dir, entries_provider=None, allow_active=False,
+                on_result=lambda *args: None):
+    monitor = MatchMonitor(monitor_capture, assets, status)
+    monitor.start()
+    try:
+        while not stop.is_set():
+            active_hud = HudReader(reader, stop, assets) if allow_active else None
+            if not start_game(capture, client, stop, assets, active_hud):
+                return
+            allow_active = False
+            started = time.monotonic()
+            log("Game started.")
+            status({"wave": None, "yen": None, "eligible_indexes": [], "new_run": True})
+            monitor.reset()
+            def checkpoint():
+                state = monitor.snapshot()
+                if state.get("error"):
+                    raise RuntimeError("Screen monitoring failed: " + state["error"])
+                if state["outcome"] or state["reward"]:
+                    raise RoundEnded()
+                return state["wave"]
+            indexer = UnitIndexer(entries_provider() if entries_provider else entries,
+                                  client, capture, UnitPanel(reader, stop, assets),
+                                  stop, log, heartbeat=checkpoint)
+            waiting_logged = False
+            try:
+                while not stop.is_set():
+                    wave = checkpoint()
+                    indexer.check_abilities(wave[0] if wave else None)
+                    next_index = indexer.next_ready(wave[0] if wave else None)
+                    if next_index is not None:
+                        indexer.run(next_index)
+                    elif not waiting_logged and indexer.all_done():
+                        log("Unit setup complete. Waiting for game end.")
+                        waiting_logged = True
+                    if stop.wait(.1):
+                        return
+            except RoundEnded:
+                pass
+            if stop.is_set() or not finish_match(capture, client, reader, stop, log,
+                                                status, reward_dir, started,
+                                                StartButtonLocator(assets / "start-game-template.png"),
+                                                on_result=on_result):
+                return
+    finally:
+        monitor.close()

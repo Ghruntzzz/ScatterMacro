@@ -288,10 +288,31 @@ class ClickTests(unittest.TestCase):
 
     def test_focus_loss_prevents_input(self):
         client = self.client()
-        client.user.GetForegroundWindow.side_effect = [123, 456]
-        with self.assertRaises(RuntimeError):
-            client.click(20, 30, (80, 100, 4))
+        client.user.GetForegroundWindow.return_value = 456
+        client.stop.wait.return_value = True
+        with self.assertRaises(InterruptedError):
+            client.check_focus()
         client.user.SendInput.assert_not_called()
+
+    def test_focus_loss_waits_and_resumes_without_stealing_focus(self):
+        client = self.client()
+        client._focus_established = True
+        client.user.GetForegroundWindow.side_effect = [456, 456, 123]
+        self.assertTrue(client.focus_roblox())
+        client.stop.wait.assert_called_once_with(.1)
+        client.user.SetForegroundWindow.assert_not_called()
+        client.user.SendInput.assert_not_called()
+
+    def test_tab_out_releases_held_key_before_waiting(self):
+        client = self.client()
+        client._held_keys = {"I"}
+        client._key = Mock()
+        client.user.GetForegroundWindow.side_effect = [456,456,123]
+        events = []
+        client._key.side_effect = lambda *a, **k: events.append((a,k))
+        client.stop.wait.side_effect = lambda s: events.append("wait") or False
+        client.check_focus()
+        self.assertEqual(events, [(("I",), {"release":True}), "wait", (("I",), {})])
 
     def test_rejected_injection_raises_instead_of_claiming_click(self):
         client = self.client()

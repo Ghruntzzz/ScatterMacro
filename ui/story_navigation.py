@@ -1,4 +1,4 @@
-from threading import Event
+from threading import Event, Lock
 from pathlib import Path
 import sys
 
@@ -20,7 +20,8 @@ class StoryWorker(QThread):
     hud_status = Signal(object)
 
     def __init__(self, map_name, parent, act_name="Act 1", difficulty="Normal",
-                 selected_hwnd="", selected_pid="", reader=None, entries=()):
+                 selected_hwnd="", selected_pid="", reader=None, entries=(), reward_dir=None,
+                 notification_settings=None):
         super().__init__(parent)
         self.map_name = map_name
         self.act_name = act_name
@@ -30,8 +31,21 @@ class StoryWorker(QThread):
         self.stop = Event()
         self.reader = reader if reader is not None else TextReader()
         self.entries = [dict(entry) for entry in entries]
+        self.entries_lock = Lock()
+        self.reward_dir = reward_dir
+        self.notification_settings = notification_settings or {}
+
+    def update_entry(self, index, entry):
+        with self.entries_lock:
+            self.entries[index] = dict(entry)
+
+    def current_entries(self):
+        with self.entries_lock:
+            return [dict(entry) for entry in self.entries]
 
     def run(self):
+        from python_macro.notifications import Notifier
+        notifier = Notifier(self.notification_settings, self.stop, self.message.emit)
         try:
             from python_macro.capture import selected_roblox_window
             if self.selected_hwnd and self.selected_pid:
@@ -50,7 +64,11 @@ class StoryWorker(QThread):
             from python_macro.chat import ChatLocator, ChatSafeCapture
             capture = ChatSafeCapture(client.capture, client.direct_click,
                                       ChatLocator(root / "assets"), self.stop)
-            navigate_story(self.map_name, capture, self.reader, client.direct_click,
+            from python_macro.story_ingame import already_in_match
+            in_match = already_in_match(capture, self.reader, self.stop,
+                                        self.map_name, self.act_name, self.difficulty, find_play=play_icon)
+            if not in_match:
+                navigate_story(self.map_name, capture, self.reader, client.direct_click,
                            self.stop, self.message.emit, scroll=client.scroll,
                            find_play=play_icon, act_name=self.act_name,
                            difficulty=self.difficulty, find_act=ActLabelLocator(),
@@ -61,14 +79,27 @@ class StoryWorker(QThread):
                            highlight=lambda x, y, shape: self.click_target.emit(x, y))
             if not self.stop.is_set():
                 from python_macro.story_ingame import run_story_ingame
+                from python_macro.capture import capture_client
+                def monitor_capture():
+                    if client.user.GetForegroundWindow() != client.hwnd:
+                        return None
+                    try:
+                        return capture_client(client.hwnd)
+                    except RuntimeError:
+                        if client.user.GetForegroundWindow() != client.hwnd or client.user.IsIconic(client.hwnd):
+                            return None
+                        raise
                 run_story_ingame(self.map_name, self.act_name, self.difficulty,
                                  capture, client, self.reader, self.stop,
                                  self.message.emit, root / "assets", self.entries,
-                                 self.hud_status.emit)
+                                 self.hud_status.emit, monitor_capture=monitor_capture,
+                                 reward_dir=self.reward_dir, entries_provider=self.current_entries,
+                                 match_confirmed=in_match, on_result=notifier.send)
         except InterruptedError:
             self.stop.set()
         except Exception as exc:
-            self.message.emit(f"Navigation stopped: {exc}")
+            self.message.emit(f"Macro needs attention: {exc}")
+            notifier.send('error')
         finally:
             if self.stop.is_set():
                 self.message.emit("Macro stopped.")

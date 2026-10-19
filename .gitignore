@@ -12,3 +12,4 @@ tools/.ahk2exe/
 __pycache__/
 *.spec
 .venv/
+tests-output/

@@ -69,6 +69,7 @@ class UnitPanel:
         self.reader, self.stop = reader, stop
         self.close_icon = Icon(assets / "unit-close.png")
         self.auto_icon = Icon(assets / "unit-auto-upgrade.png")
+        self.ability_icon = Icon(assets / "unit-ability-off.png", threshold=.90)
 
     def read(self, frame, need_upgrade=False):
         close = self.close_icon(frame)
@@ -102,13 +103,48 @@ class UnitPanel:
         found = self.auto_icon(crop)
         return (found[0]+left, found[1]+top) if found is not None else None
 
+    def ability_position(self, frame):
+        close = self.close_icon(frame)
+        if close is None:
+            return None
+        x, y, w, h = close
+        left, top = max(0, x-14*w), max(0, y-h)
+        crop = frame[top:min(frame.shape[0], y+11*h), left:min(frame.shape[1], x+w)]
+        found = self.ability_icon(crop)
+        if found is None:
+            return None
+        cx, cy, tw, th = found
+        # Only the red/off state is clickable. Grayscale matching alone could
+        # also match the enabled switch and inadvertently turn it off.
+        tile = crop[max(0,cy-th//2):cy+th//2, max(0,cx-tw//2):cx+tw//2, :3]
+        hsv = cv2.cvtColor(tile, cv2.COLOR_BGR2HSV)
+        red = ((hsv[:,:,0] < 12) | (hsv[:,:,0] > 170)) & (hsv[:,:,1] > 120) & (hsv[:,:,2] > 120)
+        if np.mean(red) < .08:
+            return None
+        return cx+left, cy+top
+
 
 class UnitIndexer:
-    def __init__(self, entries, client, capture, panel, stop, log, clock=time.monotonic):
+    def __init__(self, entries, client, capture, panel, stop, log, clock=time.monotonic,
+                 heartbeat=lambda: None):
         self.entries = entries
         self.client, self.capture, self.panel = client, capture, panel
-        self.stop, self.log, self.clock = stop, log, clock
+        self.stop, self.log = stop, log
+        def active_clock():
+            paused = getattr(client, 'focus_pause_time', 0.0)
+            return clock() - (paused if isinstance(paused, (float,int)) else 0.0)
+        self.clock = active_clock
         self.completed = set()
+        self.heartbeat = heartbeat
+        self.placed = {}
+        self.ability_checked = set()
+        self.active_index = None
+        self.checking_ability = False
+
+    def checkpoint(self):
+        wave = self.heartbeat()
+        if not self.checking_ability:
+            self.check_abilities(wave[0] if wave else None)
 
     def wait(self, seconds):
         if self.stop.wait(seconds):
@@ -117,6 +153,7 @@ class UnitIndexer:
     def snapshot(self, need_upgrade=False):
         if self.stop.is_set():
             raise InterruptedError()
+        self.checkpoint()
         frame = self.capture()
         panel = self.panel.read(frame, need_upgrade=True) if need_upgrade else self.panel.read(frame)
         if self.stop.is_set():
@@ -135,12 +172,61 @@ class UnitIndexer:
         raise RuntimeError("Could not read the unit panel. Check the selected unit and try again.")
 
     def click(self, point, frame):
+        self.heartbeat()
         if self.stop.is_set() or self.client.direct_click(*point, frame.shape) is False:
             raise InterruptedError()
 
     def key(self, value):
-        if self.stop.is_set() or not self.client.hold_key(value, 0.15):
+        self.heartbeat()
+        if self.stop.is_set() or not self.client.hold_key(value, 0.10):
             raise InterruptedError()
+
+    def all_done(self):
+        return all(i in self.completed or str(e.get("unit", "0")) not in {"1","2","3","4","5","6"}
+                   for i, e in enumerate(self.entries))
+
+    def check_abilities(self, wave):
+        if wave is None or self.checking_ability:
+            return
+        self.checking_ability = True
+        try:
+            for index, point in list(self.placed.items()):
+                required = requested_wave(self.entries[index].get("auto_ability_wave", ""))
+                if required is None or wave < required or index in self.ability_checked:
+                    continue
+                restore = self.placed.get(self.active_index)
+                try:
+                    self.close()
+                    self.click(point, self.capture())
+                    self.wait(.15)
+                    # Confirm the panel before concluding it has no ability.
+                    for _ in range(8):
+                        frame = self.capture()
+                        if self.panel.close_icon(frame) is not None:
+                            break
+                        self.wait(.15)
+                    else:
+                        continue
+                    for _ in range(3):
+                        frame = self.capture()
+                        ability = self.panel.ability_position(frame)
+                        if ability is None:
+                            self.wait(.1)
+                            if self.panel.ability_position(self.capture()) is None:
+                                self.ability_checked.add(index)
+                                break
+                        else:
+                            self.click(ability, frame)
+                            self.wait(.2)
+                finally:
+                    if not self.stop.is_set():
+                        self.heartbeat()
+                        self.close()
+                        if restore is not None:
+                            self.click(restore, self.capture())
+                            self.wait(.15)
+        finally:
+            self.checking_ability = False
 
     def next_ready(self, wave):
         # Strict numerical order: an earlier configured wave blocks later indexes.
@@ -180,10 +266,11 @@ class UnitIndexer:
                     raise RuntimeError(f"Index {index+1} position is outside Roblox.")
                 continue
             self.key(str(entry["unit"]))
-            self.wait(0.25)
+            self.wait(0.15)
+            self.last_place_point = point
             self.click(point, frame)
             for scan in range(4):
-                self.wait(0.2)
+                self.wait(0.12)
                 frame, panel = self.snapshot()
                 panel = self.placement_panel(frame, panel)
                 if panel is not None:
@@ -206,6 +293,8 @@ class UnitIndexer:
             self.close()
             frame = self.capture()
         panel = self.place(index, entry)
+        self.placed[index] = getattr(self, "last_place_point", (int(entry["x"]), int(entry["y"])))
+        self.active_index = index
         for _ in range(18):
             if self.stop.is_set():
                 raise InterruptedError()
@@ -224,13 +313,13 @@ class UnitIndexer:
                 break
             old = panel["priority"]
             self.key("R")
-            self.wait(0.25)
+            self.wait(0.12)
             _, panel = self.read_until(lambda panel: panel["priority"] not in (None, old))
         else:
             raise RuntimeError(f"Could not set target priority for Index {index+1}.")
         for _ in range(auto):
             self.key("K")
-            self.wait(0.2)
+            self.wait(0.1)
         if goal:
             last, stalled = None, self.clock()+120
             while not self.stop.is_set():
@@ -249,11 +338,12 @@ class UnitIndexer:
                 if self.clock() >= stalled:
                     raise RuntimeError("Upgrade did not progress. Check available yen and the unit panel.")
                 self.key("T")
-                self.wait(0.45)
+                self.wait(0.2)
         if self.stop.is_set():
             raise InterruptedError()
         self.close()
         self.completed.add(index)
+        self.active_index = None
         self.log(f"Index {index+1} complete.")
 
     def close(self):

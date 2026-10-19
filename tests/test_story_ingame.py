@@ -88,27 +88,13 @@ class StoryIngameTests(unittest.TestCase):
         client.start_click.return_value = True
         log, readings = Mock(), []
         entries = [{"unit":"1", "x":"5", "y":"5", "place_at_wave":"2"}]
-        def status(value):
-            if value.get("new_run"):
-                return
-            readings.append(value)
-            if len(readings) == 2:
-                stop.set()
-        with patch("python_macro.story_ingame.StartButtonLocator") as locator, \
-             patch("python_macro.story_ingame.HudReader") as hud, \
-             patch("python_macro.story_ingame.UnitIndexer") as indexing, \
-             patch("python_macro.story_ingame.UnitPanel"):
-            indexing.return_value.next_ready.side_effect = [None, 0]
-            locator.return_value.side_effect = [(50,50,0.99), None, None]
-            hud.return_value.wave.return_value = (2,15)
-            hud.return_value.yen.return_value = 600
+        status = Mock()
+        with patch("python_macro.story_ingame.run_matches") as matches:
             run_story_ingame("East Town","Act 1","Normal", Mock(return_value=image),
                              client, reader, stop, log, Path("assets"), entries, status)
         self.assertEqual(reader.read.call_count, 2)
         client.setup_camera.assert_called_once()
-        client.start_click.assert_called_once()
-        self.assertEqual(readings[0]["eligible_indexes"], [])
-        self.assertEqual(readings[1]["eligible_indexes"], [0])
+        matches.assert_called_once()
 
     def test_camera_order_and_right_button_release(self):
         client = RobloxClient.__new__(RobloxClient)
