@@ -8,12 +8,12 @@
     {
       "id": "anime-expeditions",
       "name": "Anime Expeditions",
-      "version": "0.1.36",
+      "version": "0.1.37",
       "setup_only": false,
       "entrypoint": "AnimeExpeditions.exe",
-      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.36/AnimeExpeditions-0.1.36-windows.zip",
-      "sha256": "a6348b832b9ef8d78d4f308d1e8574731c707e4bec3d329f26390923fd5af7f2",
-      "description": "Auto upgrade uses K once per configured level, with 0 disabled. Retains priority R, manual upgrade T, ordered indexing, one-second camera holds and session wave stats."
+      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.37/AnimeExpeditions-0.1.37-windows.zip",
+      "sha256": "0c3ed1cad7990488ad6820171cb5bdd1f19a29ee91a1a4d3eb231ec85e628564",
+      "description": "Supports units displaying None priority, skipping priority cycling after confirmation while preserving auto upgrade, manual upgrades and panel closing."
     }
   ]
 }
