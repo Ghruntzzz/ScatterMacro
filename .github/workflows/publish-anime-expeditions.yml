@@ -13,6 +13,10 @@ on:
       - assets/story-button-template.png
       - assets/chat-open.png
       - assets/chat-closed.png
+      - assets/start-game-template.png
+      - assets/yen-template.png
+      - assets/unit-close.png
+      - assets/unit-auto-upgrade.png
       - tests/test_story.py
       - tests/test_act_labels.py
       - tests/test_python_vision.py
@@ -55,8 +59,8 @@ jobs:
       - name: Upload tested Windows build
         uses: actions/upload-artifact@v4
         with:
-          name: AnimeExpeditions-0.1.31-windows
-          path: dist/AnimeExpeditions-0.1.31-windows.zip
+          name: AnimeExpeditions-0.1.32-windows
+          path: dist/AnimeExpeditions-0.1.32-windows.zip
           if-no-files-found: error
           retention-days: 7
       - name: Publish and verify macro archive
@@ -65,12 +69,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '0.1.31'
+          $version = '0.1.32'
           $tag = "anime-expeditions-v$version"
           $name = "AnimeExpeditions-$version-windows.zip"
           $archive = "dist/$name"
           if (!(Test-Path $archive)) { throw "Missing macro ZIP: $archive" }
-          gh release create $tag $archive --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Anime Expeditions $version - Story Detection and Simpler Output" --notes "Story button now uses OpenCV image recognition. Chat closes silently when its open icon is detected and verifies the closed icon. Lobby Start uses a longer settling time, while other clicks remain fast. Simplified action output removes click coordinates, attempt counts, and routine verification messages; safe retries remain active. Unit placement/upgrades are not yet automated."
+          gh release create $tag $archive --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Anime Expeditions $version - Story In-Game Operations" --notes "Adds a separate Story in-game flow: verify selected match details, hold I for 3 seconds, aim down, hold O for 3 seconds, then detect Start Game. Indexes run in numerical order with wave gates: slot key and saved position, OCR-confirmed priority via R, configured auto-upgrade icon clicks, OCR-tracked upgrades via T, then image-detected red X. Includes wave/yen monitoring, compact position fields and interruptible input cleanup. Unit prices and end-of-match handling are not automated. Automated tests passed; live camera and placement behavior still require in-game validation."
           if ($LASTEXITCODE -ne 0) { throw 'Macro release upload failed' }
           New-Item -ItemType Directory -Force 'dist/verified' | Out-Null
           gh release download $tag --repo $env:GITHUB_REPOSITORY --pattern $name --dir 'dist/verified'
@@ -82,7 +86,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '0.1.31'
+          $version = '0.1.32'
           $archive = "dist/AnimeExpeditions-$version-windows.zip"
           $sha256 = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
           $url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/anime-expeditions-v$version/AnimeExpeditions-$version-windows.zip"
@@ -95,7 +99,7 @@ jobs:
           $macro[0].version = $version
           $macro[0].url = $url
           $macro[0].sha256 = $sha256
-          $macro[0].description = "Story image detection, silent chat closing, a longer lobby Start hover, and simpler action output. Verified clicks and F2 stop retained. Unit placement/upgrades not yet automated."
+          $macro[0].description = "Story navigation and in-game setup with wave-gated numerical indexing, priority, auto upgrade, manual upgrades and panel closing. Wave/yen monitoring and F2 stop. Live-game validation still needed."
           $catalog | ConvertTo-Json -Depth 20 | Set-Content catalog.json -Encoding utf8
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

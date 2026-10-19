@@ -183,6 +183,7 @@ class UnitManager(QWidget):
                 field.setSpecialValueText("Not set")
                 field.setButtonSymbols(QAbstractSpinBox.NoButtons)
                 field.setKeyboardTracking(False)
+                field.setFixedWidth(100)
                 field.valueChanged.connect(self.changed)
             self.fields[key] = field
             grid.addWidget(field, row + 1, col)

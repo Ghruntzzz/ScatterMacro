@@ -895,6 +895,8 @@ class RuntimeWindow(DashboardWindow):
         self.session_value = self._label(
             stats_panel, "Session  --:--:--", 16, 329, 178, 18,
             f"color: {MUTED}; font: 9px 'Segoe UI';")
+        self.hud_value = self._label(stats_panel, "Wave: -- | Yen: --", 16, 278, 178, 18,
+                                     f"color: {MUTED}; font: 9px 'Segoe UI';")
         self._label(stats_panel, "Roblox: auto-detected",
                     16, 278, 178, 16, f"color: {MUTED}; font: 9px 'Segoe UI';")
 
@@ -1146,12 +1148,21 @@ class RuntimeWindow(DashboardWindow):
         self.worker = StoryWorker(self.values["map"], self, act_name=self.values["act"],
                                   difficulty=self.values["difficulty"],
                                   selected_hwnd=self.values.get("roblox_hwnd", ""),
-                                  selected_pid=self.values.get("roblox_pid", ""), reader=self.story_reader)
+                                  selected_pid=self.values.get("roblox_pid", ""), reader=self.story_reader,
+                                  entries=self.unit_indexes)
         self.worker.message.connect(self.log.appendPlainText)
         self.worker.click_target.connect(self._show_click_target)
+        self.worker.hud_status.connect(self._update_hud)
         self.worker.finished.connect(self._story_finished)
         self.runtime_status.setText("RUNNING")
         self.worker.start()
+
+    def _update_hud(self, value):
+        self.observed_hud = value
+        wave = value["wave"]
+        wave_text = f"{wave[0]}/{wave[1]}" if wave is not None else "--"
+        yen_text = str(value["yen"]) if value["yen"] is not None else "--"
+        self.hud_value.setText(f"Wave: {wave_text} | Yen: {yen_text}")
 
     def _show_click_target(self, x: int, y: int) -> None:
         """Highlight the next Roblox client-relative target without taking focus."""

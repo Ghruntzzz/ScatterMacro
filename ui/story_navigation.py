@@ -17,9 +17,10 @@ from python_macro.act_labels import ActLabelLocator
 class StoryWorker(QThread):
     message = Signal(str)
     click_target = Signal(int, int)
+    hud_status = Signal(object)
 
     def __init__(self, map_name, parent, act_name="Act 1", difficulty="Normal",
-                 selected_hwnd="", selected_pid="", reader=None):
+                 selected_hwnd="", selected_pid="", reader=None, entries=()):
         super().__init__(parent)
         self.map_name = map_name
         self.act_name = act_name
@@ -28,6 +29,7 @@ class StoryWorker(QThread):
         self.selected_pid = selected_pid
         self.stop = Event()
         self.reader = reader if reader is not None else TextReader()
+        self.entries = [dict(entry) for entry in entries]
 
     def run(self):
         try:
@@ -57,6 +59,14 @@ class StoryWorker(QThread):
                            start_click=client.start_click,
                            find_story=StoryButtonLocator(root / "assets" / "story-button-template.png"),
                            highlight=lambda x, y, shape: self.click_target.emit(x, y))
+            if not self.stop.is_set():
+                from python_macro.story_ingame import run_story_ingame
+                run_story_ingame(self.map_name, self.act_name, self.difficulty,
+                                 capture, client, self.reader, self.stop,
+                                 self.message.emit, root / "assets", self.entries,
+                                 self.hud_status.emit)
+        except InterruptedError:
+            self.stop.set()
         except Exception as exc:
             self.message.emit(f"Navigation stopped: {exc}")
         finally:

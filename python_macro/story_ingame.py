@@ -1,0 +1,186 @@
+"""Story in-game flow, separate from lobby navigation. No blind placement."""
+import re
+
+import cv2
+
+from python_macro.unit_actions import UnitIndexer, UnitPanel
+from python_macro.story import normalize
+from python_macro.vision import Region, StartButtonLocator
+
+
+def matches_story(texts, map_name, act, difficulty):
+    text = normalize(" ".join(texts))
+    if "story" not in text or normalize(map_name) not in text:
+        return False
+    difficulty_label = normalize(difficulty) + "mod"
+    if not any(normalize(line) in (difficulty_label, difficulty_label + "e") for line in texts):
+        return False
+    if act.startswith("Act "):
+        return re.search(r"act" + re.escape(act[-1]) + r"(?![0-9])", text) is not None
+    return normalize(act) in text
+
+
+def parse_wave(texts):
+    values = set()
+    for text in texts:
+        match = re.search(r"(?<!\d)(\d{1,3})\s*/\s*(\d{1,3})(?!\d)", text)
+        if match:
+            current, total = map(int, match.groups())
+            if 1 <= total <= 999 and 0 <= current <= total:
+                values.add((current, total))
+    return next(iter(values)) if len(values) == 1 else None
+
+
+def parse_yen(texts):
+    values = set()
+    for text in texts:
+        text = text.strip().replace(",", "").replace("¥", "").strip()
+        if re.fullmatch(r"\d{1,9}", text):
+            values.add(int(text))
+    return next(iter(values)) if len(values) == 1 else None
+
+
+class HudReader:
+    def __init__(self, reader, stop, assets):
+        self.reader, self.stop = reader, stop
+        reference = cv2.imread(str(assets / "yen-template.png"), cv2.IMREAD_GRAYSCALE)
+        if reference is None:
+            raise RuntimeError("Yen reference image is missing.")
+        # Use only the currency icon, never the sample balance of 600.
+        icon = reference[:, :30]
+        self.yen_tiles = [cv2.resize(icon, None, fx=s, fy=s)
+                          for s in (0.8, 1, 1.25, 1.5, 2)]
+        self.wave_region = None
+        self.scans = 0
+
+    def read(self, frame, region, scale=2):
+        return self.reader.read(frame, region, scale=scale, max_variants=1,
+                                min_confidence=0.75, cancelled=self.stop.is_set)
+
+    def wave(self, frame):
+        self.scans += 1
+        if self.wave_region is not None:
+            try:
+                value = parse_wave([m.text for m in self.read(frame, self.wave_region)])
+                if value is not None:
+                    return value
+            except ValueError:
+                pass
+            self.wave_region = None
+        height, width = frame.shape[:2]
+        region = Region(0, 0, width, height if self.scans % 3 == 0 else max(1, height // 2))
+        matches = self.read(frame, region, scale=1)
+        # Anchor to the word "wave" to avoid confusing other progress fractions.
+        anchors = [m for m in matches if normalize(m.text).endswith("wave")]
+        if len(anchors) != 1:
+            return None
+        anchor = anchors[0]
+        xs, ys = zip(*anchor.corners)
+        h = max(12, round(max(ys) - min(ys)))
+        left, top = max(0, round(min(xs)) - h * 8), max(0, round(min(ys)) - h)
+        self.wave_region = Region(left, top, min(width - left, round(max(xs)) - left + h),
+                                  min(height - top, h * 3))
+        return parse_wave([m.text for m in self.read(frame, self.wave_region)])
+
+    def yen(self, frame):
+        gray = cv2.cvtColor(frame[:, :, :3], cv2.COLOR_BGR2GRAY)
+        # Currency is in the lower HUD. Never interpret unit prices as balance.
+        top = frame.shape[0] // 2
+        roi = gray[top:]
+        best = None
+        for tile in self.yen_tiles:
+            h, w = tile.shape
+            if h > roi.shape[0] or w > roi.shape[1]:
+                continue
+            _, score, _, p = cv2.minMaxLoc(cv2.matchTemplate(roi, tile, cv2.TM_CCOEFF_NORMED))
+            if best is None or score > best[0]:
+                best = score, p, w, h
+        if best is None or best[0] < 0.9:
+            return None
+        _, (x, y), w, h = best
+        x += w
+        if x >= frame.shape[1]:
+            return None
+        region = Region(x, top + y, min(w * 5, frame.shape[1] - x), h)
+        return parse_yen([m.text for m in self.read(frame, region)])
+
+
+def run_story_ingame(map_name, act, difficulty, capture, client, reader, stop,
+                     log, assets, entries=(), status=lambda value: None):
+    log("Waiting for match details.")
+    confirmed = 0
+    scans = 0
+    while not stop.is_set():
+        frame = capture()
+        h, w = frame.shape[:2]
+        scans += 1
+        matches = reader.read(frame, Region(w // 2, 0, w - w // 2, h),
+                              scale=2 if scans % 3 == 0 else 1, max_variants=1,
+                              min_confidence=0.75, cancelled=stop.is_set)
+        if not matches_story([m.text for m in matches], map_name, act, difficulty):
+            anchors = [m for m in matches if normalize(m.text).startswith("story")]
+            if len(anchors) == 1:
+                xs, ys = zip(*anchors[0].corners)
+                left = max(w // 2, round(min(xs)) - 25)
+                top = max(0, round(min(ys)) - 15)
+                label_height = max(12, round(max(ys) - min(ys)))
+                matches = reader.read(frame, Region(left, top, w - left,
+                                      min(h - top, label_height * 6)),
+                                      scale=3, max_variants=3, min_confidence=0.75,
+                                      cancelled=stop.is_set,
+                                      accept=lambda found: matches_story(
+                                          [m.text for m in found], map_name, act, difficulty))
+        confirmed = confirmed + 1 if matches_story([m.text for m in matches], map_name, act, difficulty) else 0
+        if confirmed >= 2:
+            break
+        if stop.wait(0.25):
+            return
+    if stop.is_set():
+        return
+    log("Match found. Setting up camera.")
+    if not client.setup_camera() or stop.is_set():
+        return
+    log("Camera ready. Starting game.")
+    find_start = StartButtonLocator(assets / "start-game-template.png")
+    # Wait through loading indefinitely; retries are fresh detections, and
+    # disappearing for two captures confirms that the button was dismissed.
+    clicked, absent = False, 0
+    while not stop.is_set():
+        frame = capture()
+        target = find_start(frame)
+        if stop.is_set():
+            return
+        if target is not None:
+            absent = 0
+            if client.start_click(int(target[0]), int(target[1]), frame.shape) is False:
+                return
+            clicked = True
+            if stop.wait(0.6):
+                return
+        elif clicked:
+            absent += 1
+            if absent >= 2:
+                break
+        if stop.wait(0.15):
+            return
+    if stop.is_set():
+        return
+    log("Game started.")
+    hud = HudReader(reader, stop, assets)
+    indexer = UnitIndexer(entries, client, capture, UnitPanel(reader, stop, assets), stop, log)
+    previous_wave = None
+    while not stop.is_set():
+        frame = capture()
+        wave = hud.wave(frame)
+        yen = None if stop.is_set() else hud.yen(frame)
+        # Two agreeing observations prevent one noisy read releasing wave gates.
+        trusted = wave if wave is not None and wave == previous_wave else None
+        previous_wave = wave
+        next_index = indexer.next_ready(trusted[0] if trusted else None)
+        ready = [next_index] if next_index is not None else []
+        if not stop.is_set():
+            status({"wave": trusted, "yen": yen, "eligible_indexes": ready})
+        if next_index is not None and not stop.is_set():
+            indexer.run(next_index)
+        if stop.wait(0.35):
+            return

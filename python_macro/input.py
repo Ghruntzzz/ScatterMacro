@@ -38,8 +38,14 @@ class MOUSEINPUT(ctypes.Structure):
     ]
 
 
+class KEYBDINPUT(ctypes.Structure):
+    _fields_ = [("wVk", wintypes.WORD), ("wScan", wintypes.WORD),
+                ("dwFlags", wintypes.DWORD), ("time", wintypes.DWORD),
+                ("dwExtraInfo", ctypes.c_size_t)]
+
+
 class INPUT_UNION(ctypes.Union):
-    _fields_ = [("mi", MOUSEINPUT)]
+    _fields_ = [("mi", MOUSEINPUT), ("ki", KEYBDINPUT)]
 
 
 class INPUT(ctypes.Structure):
@@ -169,6 +175,50 @@ class RobloxClient:
 
     def click(self, x, y, shape):
         return self._click(x, y, shape, method="input")
+
+    def _key(self, key, release=False):
+        packet = INPUT(type=1, data=INPUT_UNION(ki=KEYBDINPUT(
+            wVk=ord(key), dwFlags=2 if release else 0)))
+        if self.user.SendInput(1, ctypes.byref(packet), ctypes.sizeof(INPUT)) != 1:
+            raise RuntimeError("Windows rejected a camera key. Check Roblox focus.")
+
+    def hold_key(self, key, seconds):
+        if self.stop.is_set():
+            return False
+        self.check_focus()
+        self._key(key)
+        try:
+            remaining = seconds
+            while remaining > 0:
+                if self.stop.wait(min(0.05, remaining)):
+                    return False
+                self.check_focus()
+                remaining -= 0.05
+            return True
+        finally:
+            self._key(key, release=True)
+
+    def setup_camera(self):
+        if not self.hold_key("I", 3):
+            return False
+        frame = self.capture()
+        x, y = frame.shape[1] // 2, frame.shape[0] // 2
+        point, _ = self._validated_point(x, y, frame.shape)
+        self._move(point.x, point.y)
+        if self.stop.is_set():
+            return False
+        self._send_mouse(0x0008)  # Right button down for camera rotation.
+        try:
+            for _ in range(24):
+                if self.stop.wait(0.015):
+                    return False
+                self.check_focus()
+                current, _ = self._validated_point(x, y, frame.shape)
+                self._move(current.x, current.y)
+                self._send_mouse(MOUSE_MOVE, dy=60)
+        finally:
+            self._send_mouse(0x0010)
+        return self.hold_key("O", 3)
 
     def click_event(self, x, y, shape):
         """AHK SendMode Event-like attempt when SendInput did not change the menu."""
