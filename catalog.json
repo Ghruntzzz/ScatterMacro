@@ -8,12 +8,12 @@
     {
       "id": "anime-expeditions",
       "name": "Anime Expeditions",
-      "version": "0.1.37",
+      "version": "0.1.38",
       "setup_only": false,
       "entrypoint": "AnimeExpeditions.exe",
-      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.37/AnimeExpeditions-0.1.37-windows.zip",
-      "sha256": "0c3ed1cad7990488ad6820171cb5bdd1f19a29ee91a1a4d3eb231ec85e628564",
-      "description": "Supports units displaying None priority, skipping priority cycling after confirmation while preserving auto upgrade, manual upgrades and panel closing."
+      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.38/AnimeExpeditions-0.1.38-windows.zip",
+      "sha256": "68535b1ea28e5b2df93e53bcb9f428ba20032e1eb2e0b7f9d4b9bca7b6330469",
+      "description": "Image-based upgrade levels and maxed detection using bright upgrade bars. Faster priority reading, K auto upgrade without repeated OCR, and image-only panel closing."
     }
   ]
 }
