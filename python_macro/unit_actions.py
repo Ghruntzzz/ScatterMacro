@@ -8,6 +8,7 @@ import numpy as np
 from python_macro.deployment import requested_wave
 from python_macro.story import normalize
 from python_macro.vision import Region
+from python_macro.upgrade_bars import read_upgrade_bars
 
 TARGETS = ("First", "Last", "Closest", "Strongest", "Boss", "Weakest",
            "Shielded", "Fastest", "Flying")
@@ -69,20 +70,29 @@ class UnitPanel:
         self.close_icon = Icon(assets / "unit-close.png")
         self.auto_icon = Icon(assets / "unit-auto-upgrade.png")
 
-    def read(self, frame):
+    def read(self, frame, need_upgrade=False):
         close = self.close_icon(frame)
         if close is None:
             return None
         x, y, w, h = close
-        left, top = max(0, x-w*22), max(0, y-h)
+        left, top = max(0, x-w*14), max(0, y-h)
         region = Region(left, top, min(frame.shape[1]-left, x+w-left),
-                        min(frame.shape[0]-top, h*26))
-        matches = self.reader.read(frame, region, scale=3, max_variants=2,
+                        min(frame.shape[0]-top, h*11))
+        if need_upgrade:
+            upgrade = read_upgrade_bars(frame, close)
+            if upgrade is None:
+                return None
+            return {"close": close[:2], "region": region, "priority": None, "upgrade": upgrade}
+        priority_region = Region(max(0, x-13*w), max(0, y+6*h), 4*w, 3*h)
+        matches = self.reader.read(frame, priority_region, scale=3, max_variants=1,
+                                   min_confidence=0.75, cancelled=self.stop.is_set)
+        priority = priority_value([m.text for m in matches])
+        upgrade = None
+        if priority is None:
+            matches = self.reader.read(frame, region, scale=3, max_variants=2,
                                    min_confidence=0.75, cancelled=self.stop.is_set,
-                                   accept=lambda found: priority_value([m.text for m in found]) is not None
-                                   and upgrade_value([m.text for m in found]) is not None)
-        texts = [m.text for m in matches]
-        priority, upgrade = priority_value(texts), upgrade_value(texts)
+                                   accept=lambda found: priority_value([m.text for m in found]) is not None)
+            priority = priority_value([m.text for m in matches])
         if priority is None and upgrade is None:
             return None
         return {"close": close[:2], "region": region, "priority": priority, "upgrade": upgrade}
@@ -104,19 +114,19 @@ class UnitIndexer:
         if self.stop.wait(seconds):
             raise InterruptedError()
 
-    def snapshot(self):
+    def snapshot(self, need_upgrade=False):
         if self.stop.is_set():
             raise InterruptedError()
         frame = self.capture()
-        panel = self.panel.read(frame)
+        panel = self.panel.read(frame, need_upgrade=True) if need_upgrade else self.panel.read(frame)
         if self.stop.is_set():
             raise InterruptedError()
         return frame, panel
 
-    def read_until(self, predicate, timeout=12):
+    def read_until(self, predicate, timeout=12, need_upgrade=False):
         deadline = self.clock()+timeout
         while not self.stop.is_set() and self.clock() < deadline:
-            frame, panel = self.snapshot()
+            frame, panel = self.snapshot(need_upgrade=True) if need_upgrade else self.snapshot()
             if panel is not None and predicate(panel):
                 return frame, panel
             self.wait(0.15)
@@ -163,9 +173,12 @@ class UnitIndexer:
             # Some placements do not open the panel automatically. Select the
             # saved position once; never re-send the slot key or repeat placement.
             self.click((int(entry["x"]), int(entry["y"])), frame)
-        self.read_until(lambda panel: panel["priority"] is not None)
+        panel = selected
         for _ in range(18):
-            _, panel = self.read_until(lambda panel: panel["priority"] is not None)
+            if self.stop.is_set():
+                raise InterruptedError()
+            if panel is None or panel["priority"] is None:
+                _, panel = self.read_until(lambda panel: panel["priority"] is not None)
             if panel["priority"] == "None":
                 # Non-targeting units have no priority to cycle. Confirm this
                 # is a real label, not a transient OCR miss (Python None).
@@ -173,28 +186,28 @@ class UnitIndexer:
                 _, confirmed = self.read_until(lambda panel: panel["priority"] is not None)
                 if confirmed["priority"] == "None":
                     break
+                panel = confirmed
                 continue
             if panel["priority"] == desired:
                 break
             old = panel["priority"]
             self.key("R")
             self.wait(0.25)
-            self.read_until(lambda panel: panel["priority"] not in (None, old))
+            _, panel = self.read_until(lambda panel: panel["priority"] not in (None, old))
         else:
             raise RuntimeError(f"Could not set target priority for Index {index+1}.")
         for _ in range(auto):
-            self.read_until(lambda panel: panel["priority"] in (desired, "None"))
             self.key("K")
             self.wait(0.2)
         if goal:
             last, stalled = None, self.clock()+120
             while not self.stop.is_set():
-                _, panel = self.read_until(lambda panel: panel["upgrade"] is not None)
+                _, panel = self.read_until(lambda panel: panel["upgrade"] is not None, need_upgrade=True)
                 value = panel["upgrade"]
                 # Confirm a second read before declaring the upgrade complete.
                 if value == "max" or value[0] >= goal or value[0] == value[1]:
                     self.wait(0.15)
-                    _, confirm = self.read_until(lambda panel: panel["upgrade"] is not None)
+                    _, confirm = self.read_until(lambda panel: panel["upgrade"] is not None, need_upgrade=True)
                     final = confirm["upgrade"]
                     if final == "max" or (final[0] >= goal or final[0] == final[1]):
                         break
@@ -213,13 +226,16 @@ class UnitIndexer:
 
     def close(self):
         for _ in range(3):
-            frame, panel = self.snapshot()
-            if panel is None:
+            if self.stop.is_set():
+                raise InterruptedError()
+            frame = self.capture()
+            point = self.panel.close_icon(frame)
+            if point is None:
                 self.wait(0.15)
                 if self.panel.close_icon(self.capture()) is None:
                     return
                 continue
-            self.click(panel["close"], frame)
+            self.click(point[:2], frame)
             self.wait(0.2)
         if self.panel.close_icon(self.capture()) is not None:
             raise RuntimeError("Could not close the unit panel.")

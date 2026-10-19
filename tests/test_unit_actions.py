@@ -57,7 +57,7 @@ class UnitActionTests(unittest.TestCase):
                 stop = FastStop()
                 events, state = [], {"panel":False, "priority":"First", "level":0}
                 image = np.zeros((100,100,3),np.uint8)
-                def read(frame):
+                def read(frame, **kwargs):
                     if not state["panel"]:
                         return None
                     return {"priority":state["priority"], "upgrade":(state["level"],3), "close":(80,10)}
@@ -94,6 +94,17 @@ class UnitActionTests(unittest.TestCase):
         client.hold_key.assert_not_called()
         client.direct_click.assert_not_called()
         self.assertEqual(worker.completed,set())
+
+    def test_closing_uses_only_images_not_ocr(self):
+        image=np.zeros((100,100,3),np.uint8)
+        panel=Mock()
+        panel.close_icon.side_effect=[(80,10),None,None]
+        client=Mock()
+        client.direct_click.return_value=True
+        worker=UnitIndexer([],client,lambda:image,panel,FastStop(),Mock())
+        worker.close()
+        panel.read.assert_not_called()
+        client.direct_click.assert_called_once_with(80,10,image.shape)
 
     def test_none_priority_skips_r_but_keeps_auto_and_upgrade(self):
         worker=UnitIndexer([entry()],Mock(),Mock(),Mock(),FastStop(),Mock())
