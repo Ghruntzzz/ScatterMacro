@@ -96,6 +96,7 @@ class FastText:
                 max_variants=3 if thorough else 1,
                 min_confidence=0.65,
                 cancelled=self.stop.is_set,
+                accept=lambda matches: sum(predicate(m.text) for m in matches) == 1,
             )
         options = [m for m in self.matches if predicate(m.text)]
         if len(options) != 1:

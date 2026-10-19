@@ -52,8 +52,8 @@ jobs:
       - name: Upload tested Windows build
         uses: actions/upload-artifact@v4
         with:
-          name: AnimeExpeditions-0.1.29-windows
-          path: dist/AnimeExpeditions-0.1.29-windows.zip
+          name: AnimeExpeditions-0.1.30-windows
+          path: dist/AnimeExpeditions-0.1.30-windows.zip
           if-no-files-found: error
           retention-days: 7
       - name: Publish and verify macro archive
@@ -62,12 +62,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '0.1.29'
+          $version = '0.1.30'
           $tag = "anime-expeditions-v$version"
           $name = "AnimeExpeditions-$version-windows.zip"
           $archive = "dist/$name"
           if (!(Test-Path $archive)) { throw "Missing macro ZIP: $archive" }
-          gh release create $tag $archive --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Anime Expeditions $version - Verified Story Navigation" --notes "Automatically detects the sole open Roblox window; removes the PID/window selector. Uses faster scale-1 OCR with periodic recovery, cached Act templates, and coarse-to-fine Play image matching. Verifies Play, Story, map, act, difficulty, stage and Start transitions, re-detects targets before retries, and briefly highlights intended clicks. Preserves SendInput, F2 emergency stop and session-bound HWND/PID safety. Unit placement/upgrades are not yet automated."
+          gh release create $tag $archive --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Anime Expeditions $version - Faster Detection and Clicks" --notes "Automatically detects the sole open Roblox window; removes the PID/window selector. Bounds OCR detector work, skips orientation classification for upright game text, stops recovery passes when the target is found, and caches coarse Play templates. Pre-click preparation reduced from 485ms to 130ms; click hold and verification retained. Verifies Play, Story, map, act, difficulty, stage and Start transitions, re-detects targets before retries, and briefly highlights intended clicks. Preserves SendInput, F2 emergency stop and session-bound HWND/PID safety. Unit placement/upgrades are not yet automated."
           if ($LASTEXITCODE -ne 0) { throw 'Macro release upload failed' }
           New-Item -ItemType Directory -Force 'dist/verified' | Out-Null
           gh release download $tag --repo $env:GITHUB_REPOSITORY --pattern $name --dir 'dist/verified'
@@ -79,7 +79,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '0.1.29'
+          $version = '0.1.30'
           $archive = "dist/AnimeExpeditions-$version-windows.zip"
           $sha256 = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
           $url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/anime-expeditions-v$version/AnimeExpeditions-$version-windows.zip"

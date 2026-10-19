@@ -17,6 +17,19 @@ def frame(value=0):
 
 
 class VerifiedStoryTests(unittest.TestCase):
+    def test_recovery_pass_can_stop_at_unique_expected_text(self):
+        reader = Mock()
+        reader.read.return_value = []
+        ocr = FastText(reader, Event())
+        ocr.scans = 4
+        ocr.unique(frame(), lambda text: text == "Story")
+        options = reader.read.call_args.kwargs
+        self.assertEqual(options["max_variants"], 3)
+        match = Mock(text="Story")
+        self.assertTrue(options["accept"]([match]))
+        self.assertFalse(options["accept"]([match, match]))
+        self.assertFalse(options["accept"]([]))
+
     def test_click_retries_only_after_screen_fails_to_advance(self):
         state = {"clicks": 0, "new": False}
         targets = []

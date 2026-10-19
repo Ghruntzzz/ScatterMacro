@@ -1,6 +1,6 @@
 import unittest
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import numpy as np
 
@@ -14,6 +14,18 @@ def result(text="Continue", score=0.95):
 
 
 class OCRTests(unittest.TestCase):
+    def test_engine_uses_bounded_upright_ui_settings(self):
+        constructor = Mock(return_value=Mock(return_value=result()))
+        with patch.dict("sys.modules", {"rapidocr": SimpleNamespace(RapidOCR=constructor)}):
+            reader = TextReader()
+            reader.read(self.frame, self.region, max_variants=1)
+            reader.read(self.frame, self.region, max_variants=1)
+        constructor.assert_called_once()
+        params = constructor.call_args.kwargs["params"]
+        self.assertFalse(params["Global.use_cls"])
+        self.assertEqual(params["Det.limit_type"], "max")
+        self.assertEqual(params["Det.limit_side_len"], 1280)
+
     def setUp(self):
         self.frame = np.zeros((60, 120, 4), dtype=np.uint8)
         self.region = Region(10, 20, 50, 20)

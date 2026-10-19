@@ -15,6 +15,15 @@ from python_macro.input import (
 
 
 class ClickTests(unittest.TestCase):
+    def test_preclick_delay_keeps_brief_hover_within_fast_budget(self):
+        preparation = (PRECLICK_HOVER_SECONDS + PRECLICK_SETTLE_SECONDS
+                       + len(PRECLICK_WIGGLE_OFFSETS) * PRECLICK_WIGGLE_SECONDS)
+        self.assertGreater(PRECLICK_HOVER_SECONDS, 0)
+        self.assertGreater(PRECLICK_SETTLE_SECONDS, 0)
+        self.assertGreaterEqual(preparation, 0.1)
+        self.assertLessEqual(preparation, 0.15)
+        self.assertEqual(CLICK_HOLD_SECONDS, 0.12)
+
     def client(self):
         client = RobloxClient.__new__(RobloxClient)
         client.hwnd = 123

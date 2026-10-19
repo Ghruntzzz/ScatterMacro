@@ -41,7 +41,15 @@ class TextReader:
                     from rapidocr import RapidOCR
                 except ImportError as exc:
                     raise RuntimeError("Install the macro OCR requirements first") from exc
-                self._engine = RapidOCR()
+                # Game UI is upright. Bound detector cost without shrinking
+                # small crops; recognition still receives the source pixels.
+                self._engine = RapidOCR(params={
+                    "Global.use_cls": False,
+                    "Det.limit_type": "max",
+                    "Det.limit_side_len": 1280,
+                    "EngineConfig.onnxruntime.intra_op_num_threads": 4,
+                    "EngineConfig.onnxruntime.inter_op_num_threads": 1,
+                })
             from itertools import islice
             for image in islice(text_variants(crop, scale), max_variants):
                 if cancelled is not None and cancelled():

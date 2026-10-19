@@ -56,11 +56,15 @@ class PlayIconLocator:
         self.tiles = []
         self.misses = 0
         self.shrink = 0.65
+        self.fast_tiles = []
         for scale in (0.65, 0.70, 0.775, 0.85, 0.925, 1.0, 1.075, 1.15,
                       1.225, 1.30, 1.375, 1.45, 1.525, 1.60, 1.75, 1.90):
             size = (round(self.template.shape[1] * scale), round(self.template.shape[0] * scale))
             self.tiles.append(cv2.resize(self.template, size,
                               interpolation=cv2.INTER_AREA if scale < 1 else cv2.INTER_LINEAR))
+            self.fast_tiles.append(cv2.resize(self.tiles[-1], None,
+                                   fx=self.shrink, fy=self.shrink,
+                                   interpolation=cv2.INTER_AREA))
 
     def __call__(self, frame):
         if frame.ndim != 3 or frame.shape[2] not in (3, 4):
@@ -71,9 +75,7 @@ class PlayIconLocator:
         small = cv2.resize(image, None, fx=self.shrink, fy=self.shrink,
                            interpolation=cv2.INTER_AREA)
         candidates = []
-        for idx, tile in enumerate(self.tiles):
-            fast = cv2.resize(tile, None, fx=self.shrink, fy=self.shrink,
-                              interpolation=cv2.INTER_AREA)
+        for idx, fast in enumerate(self.fast_tiles):
             if fast.shape[0] >= small.shape[0] or fast.shape[1] >= small.shape[1]:
                 continue
             _, score, _, origin = cv2.minMaxLoc(cv2.matchTemplate(small, fast, cv2.TM_CCOEFF_NORMED))
