@@ -111,6 +111,7 @@ class UnitActionTests(unittest.TestCase):
         image=np.zeros((100,100,3),np.uint8)
         panel={"priority":"None", "upgrade":(2,7), "close":(80,10)}
         worker.snapshot=Mock(side_effect=[(image,None),(image,panel)])
+        worker.capture.return_value=image
         worker.read_until=Mock(return_value=(image,panel))
         worker.close=Mock()
         worker.client.hold_key.return_value=True
@@ -131,3 +132,35 @@ class UnitActionTests(unittest.TestCase):
             self.assertIsNotNone(icon(frame))
             frame[140:140+h,240:240+w]=tile
             self.assertIsNone(icon(frame))
+
+    def test_placement_retries_three_times_then_six_pixel_offsets(self):
+        image=np.zeros((100,100,3),np.uint8)
+        client=Mock()
+        client.hold_key.return_value=True
+        client.direct_click.return_value=True
+        panel=Mock()
+        panel.read.return_value=None
+        panel.close_icon.return_value=None
+        saved=entry()
+        worker=UnitIndexer([saved],client,lambda:image,panel,FastStop(),Mock())
+        with self.assertRaisesRegex(RuntimeError,"Could not confirm placement"):
+            worker.place(0,saved)
+        self.assertEqual(client.hold_key.call_count,7)
+        clicks=[call.args[:2] for call in client.direct_click.call_args_list]
+        self.assertEqual(clicks[::2],[(20,30)]*3+[(26,30),(14,30),(20,36),(20,24)])
+        self.assertEqual(saved["x"],"20")
+        self.assertEqual(saved["y"],"30")
+        self.assertFalse(worker.completed)
+
+    def test_visible_panel_with_unreadable_priority_prevents_replacement(self):
+        image=np.zeros((100,100,3),np.uint8)
+        client=Mock()
+        client.hold_key.return_value=True
+        client.direct_click.return_value=True
+        panel=Mock()
+        panel.read.return_value=None
+        panel.close_icon.return_value=(80,10,20,20)
+        worker=UnitIndexer([entry()],client,lambda:image,panel,FastStop(),Mock())
+        self.assertIsNone(worker.place(0,entry())["priority"])
+        client.hold_key.assert_called_once()
+        client.direct_click.assert_called_once()

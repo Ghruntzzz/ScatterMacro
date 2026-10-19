@@ -153,6 +153,47 @@ class UnitIndexer:
             return index if required is None or (wave is not None and wave >= required) else None
         return None
 
+    def placement_panel(self, frame, panel):
+        if panel is not None:
+            return panel
+        # A visible close button means the panel opened even if its priority
+        # is unreadable. Never repeat placement just because OCR failed.
+        close = self.panel.close_icon(frame)
+        if close is not None:
+            return {"close": close[:2], "priority": None, "upgrade": None}
+        return None
+
+    def place(self, index, entry):
+        x, y = int(entry["x"]), int(entry["y"])
+        points = [(x,y)]*3 + [(x+6,y),(x-6,y),(x,y+6),(x,y-6)]
+        for attempt, point in enumerate(points):
+            if self.stop.is_set():
+                raise InterruptedError()
+            frame = self.capture()
+            if attempt:
+                frame, panel = self.snapshot()
+                panel = self.placement_panel(frame, panel)
+                if panel is not None:
+                    return panel
+            if not (0 <= point[0] < frame.shape[1] and 0 <= point[1] < frame.shape[0]):
+                if attempt == 0:
+                    raise RuntimeError(f"Index {index+1} position is outside Roblox.")
+                continue
+            self.key(str(entry["unit"]))
+            self.wait(0.25)
+            self.click(point, frame)
+            for scan in range(4):
+                self.wait(0.2)
+                frame, panel = self.snapshot()
+                panel = self.placement_panel(frame, panel)
+                if panel is not None:
+                    return panel
+                if scan == 1:
+                    # Select a successfully placed unit whose panel didn't
+                    # open automatically, before attempting another placement.
+                    self.click(point, frame)
+        raise RuntimeError(f"Could not confirm placement for Index {index+1}. Check the position and available yen.")
+
     def run(self, index):
         entry = self.entries[index]
         desired = entry.get("priority", "First")
@@ -164,16 +205,7 @@ class UnitIndexer:
         if existing is not None:
             self.close()
             frame = self.capture()
-        self.key(str(entry["unit"]))
-        self.wait(0.25)
-        self.click((int(entry["x"]), int(entry["y"])), frame)
-        self.wait(0.35)
-        frame, selected = self.snapshot()
-        if selected is None:
-            # Some placements do not open the panel automatically. Select the
-            # saved position once; never re-send the slot key or repeat placement.
-            self.click((int(entry["x"]), int(entry["y"])), frame)
-        panel = selected
+        panel = self.place(index, entry)
         for _ in range(18):
             if self.stop.is_set():
                 raise InterruptedError()
