@@ -8,11 +8,11 @@
     {
       "id": "anime-expeditions",
       "name": "Anime Expeditions",
-      "version": "0.1.29",
+      "version": "0.1.30",
       "setup_only": false,
       "entrypoint": "AnimeExpeditions.exe",
-      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.29/AnimeExpeditions-0.1.29-windows.zip",
-      "sha256": "4004c5cff68df80a8f6be69bd81e0a862971f470ab0d99aae4fe936222f8a2f9",
+      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.30/AnimeExpeditions-0.1.30-windows.zip",
+      "sha256": "a2221956f9b54a82ce68ddba0ed92009c7f2188a15f8465a97200b197a627c1b",
       "description": "Verified Story navigation with automatic Roblox detection, faster OCR/OpenCV, click retries and target highlights. F2 emergency stop and SendInput retained. Unit placement/upgrades not yet automated."
     }
   ]
