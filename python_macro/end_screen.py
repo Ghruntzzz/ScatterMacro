@@ -1,5 +1,6 @@
 """OCR end-screen recognition and local reward evidence for future webhooks."""
 import json
+import re
 from pathlib import Path
 
 import cv2
@@ -20,8 +21,18 @@ def interpret_end(top, bottom):
     repeat = [m for m in bottom if normalize(m.text) == "repeatstage"]
     outcome = next(iter(outcomes)) if len(outcomes) == 1 and (
         "gainedrewards" in all_text or "gamestats" in all_text or len(repeat) == 1) else None
-    reward = "clickanywheretocontinue" in normalize(" ".join(m.text for m in bottom))
+    prompt = " ".join(m.text for m in bottom)
+    compact = normalize(prompt)
+    closing = "clickanywheretoclose" in compact
+    reward = closing or "clickanywheretocontinue" in compact
+    pages = {(int(a),int(b)) for a,b in re.findall(r'\[\s*(\d{1,2})\s*/\s*(\d{1,2})\s*\]',prompt)
+             if 1 <= int(a) <= int(b) <= 50}
+    clicks = 1
+    if reward and not closing and len(pages) == 1:
+        current, total = pages.pop()
+        clicks = total-current+1
     return {"outcome": outcome, "reward": reward and outcome is None,
+            "reward_clicks": clicks,
             "repeat": center(repeat[0]) if len(repeat) == 1 else None,
             "matches": [*top, *bottom]}
 
@@ -60,7 +71,7 @@ class EndScreenReader:
 
 
 def save_rewards(frame, reading, directory):
-    """Capture the current reward area, never the entire game/results screen."""
+    """Save the Roblox client screenshot and dynamically grouped reward text."""
     directory = Path(directory) / "latest"
     directory.mkdir(parents=True, exist_ok=True)
     for old in directory.glob("reward-*.png"):
@@ -71,11 +82,13 @@ def save_rewards(frame, reading, directory):
             raise OSError("Could not encode reward image")
         (directory / name).write_bytes(data.tobytes())
     matches = reading["matches"]
+    save("roblox.png", frame[:, :, :3])
     headers = [m for m in matches if normalize(m.text) == "gainedrewards"]
     buttons = [m for m in matches if normalize(m.text) == "repeatstage"]
     files = []
     reward_text = []
     strip_name = None
+    rewards = []
     if headers and buttons:
         header, button = headers[0], buttons[0]
         label_height = max(y for x, y in header.corners)-min(y for x, y in header.corners)
@@ -120,8 +133,42 @@ def save_rewards(frame, reading, directory):
                 name = f"reward-{len(files)+1:02d}.png"
                 save(name, strip[max(0,y-4):y+h+4, max(0,x-4):x+w+4])
                 files.append(name)
+                tile_matches = [m for m in matches if left+x-5 <= center(m)[0] < left+x+w+5
+                                and top+y-8 <= center(m)[1] < top+y+h+5]
+                rewards.append(reward_label(tile_matches, top+y, h))
     (directory / "rewards.json").write_text(json.dumps({
         "outcome": reading["outcome"], "text": reward_text,
         "images": files, "strip_image": strip_name,
+        "rewards": rewards, "stats": result_stats(matches), "screenshot": "roblox.png",
     }, indent=2), encoding="utf-8")
     return directory
+
+
+def reward_label(matches, top, height):
+    """Use quantity and bottom captions, not decorative lettering inside icons."""
+    quantities = {m.text.strip() for m in matches if re.fullmatch(r'[\d,.]+\s*[xX]',m.text.strip())}
+    quantity = next(iter(quantities)) if len(quantities) == 1 else '?x'
+    names = []
+    for m in sorted(matches, key=lambda m:(center(m)[1],center(m)[0])):
+        text = m.text.strip()
+        if center(m)[1] < top + height*.65 or re.fullmatch(r'[\d,.]+\s*[xX]',text):
+            continue
+        if normalize(text) not in {normalize(n) for n in names}:
+            names.append(text)
+    return quantity + ' ' + (' '.join(names) or 'Unread reward')
+
+
+def result_stats(matches):
+    stats = {}
+    for title in ('Clear Time','Total Yen','Total Kills','Total Damage'):
+        anchors = [m for m in matches if normalize(m.text) == normalize(title)]
+        for anchor in anchors:
+            ax, ay = center(anchor)
+            height = max(y for x,y in anchor.corners)-min(y for x,y in anchor.corners)
+            choices = [m for m in matches if center(m)[0] > ax
+                       and abs(center(m)[1]-ay) <= max(8,height*.65)
+                       and re.fullmatch(r'[\d,.]+(?:\s*[hms]\s*[\d,.]*\s*[hms]?)*',m.text.strip(),re.I)]
+            if choices:
+                stats[title] = min(choices,key=lambda m:center(m)[0]).text
+                break
+    return stats

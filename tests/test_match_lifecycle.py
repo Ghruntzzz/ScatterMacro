@@ -35,6 +35,14 @@ class LifecycleTests(unittest.TestCase):
             self.assertTrue(interpret_end([], [label("(Click anywhere to continue) " + page)])['reward'])
         self.assertFalse(interpret_end([], [label("75x Gem")])['reward'])
 
+    def test_remaining_reward_count_and_final_close(self):
+        found=interpret_end([], [label('(Click anywhere to continue) [3/6]')])
+        self.assertEqual(found['reward_clicks'],4)
+        found=interpret_end([], [label('(Click anywhere to close) [6/6]')])
+        self.assertTrue(found['reward'])
+        self.assertEqual(found['reward_clicks'],1)
+        self.assertEqual(interpret_end([], [label('Click anywhere to continue [6/3]')])['reward_clicks'],1)
+
     def test_repeat_search_tracks_translated_modal_not_screen_bottom(self):
         reader=Mock()
         reader.read.side_effect=[[label('Victory',197,214,70,32)],
@@ -70,9 +78,35 @@ class LifecycleTests(unittest.TestCase):
                                          status, None, 0, start))
         self.assertEqual(client.direct_click.call_count, 4)
         self.assertEqual([c.args[:2] for c in client.direct_click.call_args_list],
-                         [(350,390),(350,390),(240,410),(240,410)])
+                         [(350,60),(350,60),(240,410),(240,410)])
         status.assert_called_once()
         self.assertEqual(status.call_args.args[0]['result'], 'victory')
+
+    def test_reward_batch_clicks_remaining_pages_without_rescanning(self):
+        frame=np.zeros((500,700,3),np.uint8)
+        stop=FastStop()
+        client=Mock()
+        scans=[]
+        def read(frame):
+            scans.append(client.direct_click.call_count)
+            if len(scans)==1:
+                return dict(reward=True,reward_clicks=4,outcome=None,repeat=None)
+            stop.set()
+            return dict(reward=False,outcome=None,repeat=None)
+        with patch('python_macro.story_ingame.EndScreenReader') as factory:
+            factory.return_value.read.side_effect=read
+            finish_match(lambda:frame,client,Mock(),stop,Mock(),Mock(),None,0,Mock())
+        self.assertEqual(scans,[0,4])
+
+    def test_reward_batch_stops_immediately_on_stop(self):
+        frame=np.zeros((500,700,3),np.uint8)
+        stop=FastStop()
+        client=Mock()
+        client.direct_click.side_effect=lambda *args: stop.set()
+        with patch('python_macro.story_ingame.EndScreenReader') as factory:
+            factory.return_value.read.return_value=dict(reward=True,reward_clicks=6,outcome=None,repeat=None)
+            finish_match(lambda:frame,client,Mock(),stop,Mock(),Mock(),None,0,Mock())
+        self.assertEqual(client.direct_click.call_count,1)
 
     def test_repeat_creates_fresh_indexes_without_camera_or_navigation(self):
         stop = FastStop()
@@ -151,6 +185,30 @@ class LifecycleTests(unittest.TestCase):
         hsv[:,:,0]=60
         frame[160:160+ability.shape[0],200:200+ability.shape[1]]=cv2.cvtColor(hsv,cv2.COLOR_HSV2BGR)
         self.assertIsNone(panel.ability_position(frame))
+
+    def test_ability_click_targets_red_knob_at_intermediate_scales(self):
+        assets=Path(__file__).resolve().parents[1]/'assets'
+        panel=UnitPanel(None,Event(),assets)
+        close=cv2.imread(str(assets/'unit-close.png'))
+        original=cv2.imread(str(assets/'unit-ability-off.png'))
+        for scale in (.7, .95, 1.1, 1.35):
+            frame=np.zeros((400,500,3),np.uint8)
+            frame[10:10+close.shape[0],330:330+close.shape[1]]=close
+            tile=cv2.resize(original,None,fx=scale,fy=scale)
+            frame[160:160+tile.shape[0],200:200+tile.shape[1]]=tile
+            point=panel.ability_position(frame)
+            self.assertIsNotNone(point,scale)
+            x,y=point
+            b,g,r=map(int,frame[y,x])
+            self.assertGreater(r,g+50)
+            self.assertGreater(r,b+50)
+
+    def test_missing_panel_does_not_complete_ability_check(self):
+        panel=Mock()
+        panel.close_icon.return_value=None
+        worker=UnitIndexer([],Mock(),Mock(),panel,FastStop(),Mock())
+        self.assertFalse(worker.enable_ability())
+        worker.client.direct_click.assert_not_called()
 
     def test_monitor_reset_clears_old_result_and_wave(self):
         monitor=MatchMonitor(Mock(),Path('assets'),Mock())

@@ -34,12 +34,12 @@ def upgrade_value(texts):
 
 
 class Icon:
-    def __init__(self, path, threshold=0.92):
+    def __init__(self, path, threshold=0.92, scales=None):
         source = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
         if source is None:
             raise RuntimeError("Unit button reference image is missing.")
         self.tiles = [cv2.resize(source, None, fx=s, fy=s)
-                      for s in (0.8, 1, 1.25, 1.5, 1.75, 2)]
+                      for s in (scales if scales is not None else (0.8, 1, 1.25, 1.5, 1.75, 2))]
         self.threshold = threshold
 
     def __call__(self, frame):
@@ -69,7 +69,8 @@ class UnitPanel:
         self.reader, self.stop = reader, stop
         self.close_icon = Icon(assets / "unit-close.png")
         self.auto_icon = Icon(assets / "unit-auto-upgrade.png")
-        self.ability_icon = Icon(assets / "unit-ability-off.png", threshold=.90)
+        self.ability_icon = Icon(assets / "unit-ability-off.png", threshold=.85,
+                                 scales=np.arange(.6, 2.05, .05))
 
     def read(self, frame, need_upgrade=False):
         close = self.close_icon(frame)
@@ -121,7 +122,9 @@ class UnitPanel:
         red = ((hsv[:,:,0] < 12) | (hsv[:,:,0] > 170)) & (hsv[:,:,1] > 120) & (hsv[:,:,2] > 120)
         if np.mean(red) < .08:
             return None
-        return cx+left, cy+top
+        ry, rx = np.nonzero(red)
+        return (left+max(0,cx-tw//2)+round(float(rx.mean())),
+                top+max(0,cy-th//2)+round(float(ry.mean())))
 
 
 class UnitIndexer:
@@ -207,17 +210,8 @@ class UnitIndexer:
                         self.wait(.15)
                     else:
                         continue
-                    for _ in range(3):
-                        frame = self.capture()
-                        ability = self.panel.ability_position(frame)
-                        if ability is None:
-                            self.wait(.1)
-                            if self.panel.ability_position(self.capture()) is None:
-                                self.ability_checked.add(index)
-                                break
-                        else:
-                            self.click(ability, frame)
-                            self.wait(.2)
+                    if self.enable_ability():
+                        self.ability_checked.add(index)
                 finally:
                     if not self.stop.is_set():
                         self.heartbeat()
@@ -238,6 +232,28 @@ class UnitIndexer:
             required = requested_wave(entry.get("place_at_wave", ""))
             return index if required is None or (wave is not None and wave >= required) else None
         return None
+
+    def enable_ability(self):
+        """Only click the red/off switch, confirming panel presence each time."""
+        absent = 0
+        for _ in range(5):
+            self.heartbeat()
+            if self.stop.is_set():
+                raise InterruptedError()
+            frame = self.capture()
+            if self.panel.close_icon(frame) is None:
+                return False
+            point = self.panel.ability_position(frame)
+            if point is None:
+                absent += 1
+                if absent >= 2:
+                    return True
+                self.wait(.1)
+            else:
+                absent = 0
+                self.click(point, frame)
+                self.wait(.2)
+        return False
 
     def placement_panel(self, frame, panel):
         if panel is not None:
@@ -341,7 +357,11 @@ class UnitIndexer:
                 self.wait(0.2)
         if self.stop.is_set():
             raise InterruptedError()
-        self.close()
+        try:
+            self.enable_ability()
+        finally:
+            if not self.stop.is_set():
+                self.close()
         self.completed.add(index)
         self.active_index = None
         self.log(f"Index {index+1} complete.")

@@ -183,7 +183,7 @@ class UnitManager(QWidget):
                 field = QLineEdit()
                 field.setObjectName(key.replace("_", "-"))
                 field.setPlaceholderText("Any" if key == "place_at_wave" else "Wave (blank = off)")
-                field.setToolTip("Wave 1-9999. Ability check opens this index's placed unit and enables a red/off auto ability switch. Blank disables the check." if key == "auto_ability_wave" else "Blank places when ready.")
+                field.setToolTip("Wave 1-9999 for an additional ability check. Abilities are also checked when the index completes. Blank disables only the scheduled check." if key == "auto_ability_wave" else "Blank places when ready.")
                 field.setValidator(QRegularExpressionValidator(
                     QRegularExpression(r"(?:[1-9][0-9]{0,3})?"), field
                 ))
@@ -235,7 +235,7 @@ class UnitManager(QWidget):
         for offset in range(PAGE_SIZE):
             button = QPushButton()
             button.setObjectName("index-card")
-            button.setFixedHeight(74)
+            button.setFixedHeight(86)
             button.setCursor(Qt.PointingHandCursor)
             button.clicked.connect(lambda checked=False, offset=offset: self.select(self.page * PAGE_SIZE + offset))
             cards.addWidget(button, offset // 2, offset % 2)
@@ -307,10 +307,12 @@ class UnitManager(QWidget):
                       if entry.get("x", "") != "" and entry.get("y", "") != "" else "Not set")
             wave = entry.get("place_at_wave", "")
             wave_label = f"Wave {wave}" if wave else "Any wave"
+            ability = entry.get('auto_ability_wave','')
+            ability_label = f"Ability: wave {ability}" if ability else "Ability: on completion"
             button.setText(
                 f"{index + 1:02d}   Unit {entry['unit']}  ·  {entry['priority']}\n"
                 f"Upgrade {entry['upgrade']}  /  Auto {entry['auto_upgrade']}\n"
-                f"POS  {coords}  ·  {wave_label}"
+                f"POS  {coords}  ·  {wave_label}\n{ability_label}"
             )
             button.setProperty("selected", index == self.selected)
             button.style().unpolish(button)

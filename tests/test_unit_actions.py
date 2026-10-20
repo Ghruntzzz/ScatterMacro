@@ -77,12 +77,16 @@ class UnitActionTests(unittest.TestCase):
                     if value=="T": state["level"]+=1
                     return True
                 client=SimpleNamespace(direct_click=click, hold_key=key)
+                def ability(frame):
+                    events.append('ability check')
+                    return None
                 panel=SimpleNamespace(read=read, auto_position=lambda frame,panel:(50,50),
+                                      ability_position=ability,
                                       close_icon=lambda frame:(80,10) if state["panel"] else None)
                 worker=UnitIndexer([entry(auto_upgrade=str(auto),upgrade=str(goal))],client,
                                    lambda:image,panel,stop,Mock())
                 worker.run(0)
-                self.assertEqual(events,["1","place","R"]+["K"]*auto+["T"]*min(goal,3)+["close"])
+                self.assertEqual(events,["1","place","R"]+["K"]*auto+["T"]*min(goal,3)+["ability check"]*2+["close"])
                 self.assertEqual(worker.completed,{0})
 
     def test_stop_sends_no_input(self):
@@ -114,6 +118,7 @@ class UnitActionTests(unittest.TestCase):
         worker.capture.return_value=image
         worker.read_until=Mock(return_value=(image,panel))
         worker.close=Mock()
+        worker.panel.ability_position.return_value=None
         worker.client.hold_key.return_value=True
         worker.client.direct_click.return_value=True
         worker.run(0)

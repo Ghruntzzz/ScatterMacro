@@ -255,10 +255,15 @@ def finish_match(capture, client, reader, stop, log, status, reward_dir, started
             if not reward_logged:
                 log("Collecting rewards.")
                 reward_logged = True
-            if client.direct_click(frame.shape[1]//2, int(frame.shape[0]*.78), frame.shape) is False:
-                return False
-            if stop.wait(.5):
-                return False
+            # The counter is current/total, so include the final close click.
+            # Batch only the validated remaining pages, then rescan for misses.
+            for _ in range(reading.get('reward_clicks',1)):
+                if stop.is_set():
+                    return False
+                if client.direct_click(frame.shape[1]//2, int(frame.shape[0]*.12), frame.shape) is False:
+                    return False
+                if stop.wait(.12):
+                    return False
         previous = outcome
         if stop.wait(.1):
             return False

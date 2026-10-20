@@ -120,17 +120,20 @@ class NotificationTests(unittest.TestCase):
         self.assertFalse(notify.send('victory'))
         opener.open.assert_not_called()
 
-    def test_reward_attachment_is_only_reward_area(self):
+    def test_reward_text_and_full_client_attachment(self):
         opener=self.opener()
         notify=Notifier(self.settings(discord_id='123456789012345678'),Event(),Mock(),opener)
         with tempfile.TemporaryDirectory() as directory:
             Path(directory,'reward-strip.png').write_bytes(b'reward-pixels')
-            Path(directory,'result.png').write_bytes(b'full-screen-should-never-send')
+            Path(directory,'roblox.png').write_bytes(b'full-client-pixels')
+            Path(directory,'rewards.json').write_text(json.dumps({'rewards':['75x Gem'], 'stats':{'Total Kills':'300'}}))
             self.assertTrue(notify.send('victory',90,directory))
         request=opener.open.call_args.args[0]
-        self.assertIn(b'reward-pixels',request.data)
-        self.assertNotIn(b'full-screen-should-never-send',request.data)
-        self.assertIn(b'attachment://rewards.png',request.data)
+        self.assertNotIn(b'reward-pixels',request.data)
+        self.assertIn(b'full-client-pixels',request.data)
+        self.assertIn(b'75x Gem',request.data)
+        self.assertIn(b'Total Kills',request.data)
+        self.assertIn(b'attachment://roblox.png',request.data)
         self.assertIn('wait=true',request.full_url)
 
     def test_reward_option_off_sends_only_summary(self):

@@ -1,4 +1,4 @@
-"""Discord result notifications with optional reward-area attachments."""
+"""Discord result notifications with reward text and Roblox client captures."""
 import json
 import re
 import uuid
@@ -29,8 +29,13 @@ class Notifier:
     def __init__(self, settings, stop, log, opener=None):
         self.settings, self.stop, self.log = dict(settings), stop, log
         self.opener = opener or build_opener(NoRedirect())
+        self.results = {'victory':0, 'defeat':0}
+        self.total_duration = 0
 
     def send(self, outcome, duration=0, reward_dir=None, error=None):
+        if outcome in self.results:
+            self.results[outcome] += 1
+            self.total_duration += max(0, duration)
         key = 'ping_error' if outcome == 'error' else 'ping_' + outcome
         if not self.settings.get('webhook','').strip() or self.settings.get(key,'0') != '1':
             return False
@@ -51,26 +56,48 @@ class Notifier:
             description = 'The macro needs attention. Check Action Output.'
         embed = {'title': 'Anime Expeditions - ' + outcome.title(),
                  'description':description[:4000], 'color':0x7E1726}
+        fields = []
+        if outcome != 'error':
+            runs = sum(self.results.values())
+            fields = [{'name':name, 'value':str(value), 'inline':True} for name,value in (
+                ('Runs',runs), ('Victories',self.results['victory']),
+                ('Defeats',self.results['defeat']),
+                ('Average Run',f'{int(self.total_duration/max(1,runs))}s'))]
+        metadata = {}
+        if reward_dir is not None:
+            try:
+                metadata = json.loads((Path(reward_dir)/'rewards.json').read_text(encoding='utf-8'))
+                if not isinstance(metadata,dict):
+                    metadata = {}
+            except (OSError, ValueError):
+                pass
+        for name,value in metadata.get('stats',{}).items():
+            fields.append({'name':str(name)[:256], 'value':str(value)[:1024], 'inline':True})
+        if self.settings.get('show_rewards','0') == '1' and reward_dir is not None:
+            rewards = '\n'.join(str(item) for item in metadata.get('rewards',[]))
+            fields.append({'name':'Rewards Earned', 'value':rewards[:1024] or 'Could not read rewards.', 'inline':False})
+        if fields:
+            embed['fields'] = fields[:25]
         payload = {'embeds':[embed], 'allowed_mentions':{'parse':[], 'users':[mention] if mention else []}}
         if mention:
             payload['content'] = f'<@{mention}>'
         image = None
         if self.settings.get('show_rewards','0') == '1' and reward_dir is not None:
-            path = Path(reward_dir) / 'reward-strip.png'
+            path = Path(reward_dir) / 'roblox.png'
             try:
                 if path.is_file() and path.stat().st_size <= 8*1024*1024:
                     image = path.read_bytes()
             except OSError:
                 self.log('Reward image unavailable. Sending the result summary.')
             if image is not None:
-                embed['image'] = {'url':'attachment://rewards.png'}
-                payload['attachments'] = [{'id':0,'filename':'rewards.png'}]
+                embed['image'] = {'url':'attachment://roblox.png'}
+                payload['attachments'] = [{'id':0,'filename':'roblox.png'}]
         boundary = 'ScatterMacro' + uuid.uuid4().hex
         if image is not None:
             body = (f'--{boundary}\r\nContent-Disposition: form-data; name="payload_json"\r\n'
                     'Content-Type: application/json\r\n\r\n').encode() + json.dumps(payload).encode()
             body += (f'\r\n--{boundary}\r\nContent-Disposition: form-data; name="files[0]"; '
-                     'filename="rewards.png"\r\nContent-Type: image/png\r\n\r\n').encode() + image
+                     'filename="roblox.png"\r\nContent-Type: image/png\r\n\r\n').encode() + image
             body += f'\r\n--{boundary}--\r\n'.encode()
             content_type = 'multipart/form-data; boundary=' + boundary
         else:
