@@ -174,7 +174,9 @@ class UnitPanel:
             return None
         x, y, w, h = close
         left, top = max(0, x-14*w), max(0, y-h)
-        crop = frame[top:min(frame.shape[0], y+16*h), left:min(frame.shape[1], x+3*w)]
+        # Ability cards and their switches sit outside the panel's right edge.
+        # Include that sidecar, scaled with the panel, without scanning all Roblox.
+        crop = frame[top:min(frame.shape[0], y+16*h), left:min(frame.shape[1], x+6*w)]
         found = self.ability_switch(crop)
         if found is None:
             return None

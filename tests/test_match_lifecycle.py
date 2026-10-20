@@ -203,6 +203,20 @@ class LifecycleTests(unittest.TestCase):
             self.assertGreater(r,g+50)
             self.assertGreater(r,b+50)
 
+    def test_real_panel_switch_outside_panel_is_found_at_multiple_scales(self):
+        assets=Path(__file__).resolve().parents[1]/'assets'
+        panel=UnitPanel(None,Event(),assets)
+        source=cv2.imread(str(Path(__file__).parent/'fixtures/unit-ability-panel.png'))
+        for scale in (.8,1,1.5):
+            tile=cv2.resize(source,None,fx=scale,fy=scale)
+            frame=np.zeros((tile.shape[0]+100,tile.shape[1]+200,3),np.uint8)
+            frame[40:40+tile.shape[0],70:70+tile.shape[1]]=tile
+            found=panel.ability_state(frame)
+            self.assertIsNotNone(found,scale)
+            self.assertEqual(found[0],'off')
+            self.assertLess(abs(found[1][0]-(70+461*scale)),4)
+            self.assertLess(abs(found[1][1]-(40+35*scale)),4)
+
     def test_missing_panel_does_not_complete_ability_check(self):
         panel=Mock()
         panel.close_icon.return_value=None
