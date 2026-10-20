@@ -227,6 +227,9 @@ def active_unit_config(values: dict[str, str]) -> Path:
         return config_root / "Challenges" / "Auto.ini"
     if mode == "Expeditions":
         return config_root / "Expeditions" / f"{config_segment(values['map'])}.ini"
+    if values.get('act') in {'Mastery', 'Infinite'}:
+        return config_root / "Story" / values['act'] / f"{config_segment(values['map'])}.ini"
+    # Preserve the existing map profile for all five standard Story acts.
     return config_root / "Story" / f"{config_segment(values['map'])}.ini"
 
 

@@ -27,6 +27,33 @@ class SettingsTests(unittest.TestCase):
         self.patch.stop()
         self.temp.cleanup()
 
+    def test_story_profiles_share_standard_acts_but_isolate_special_acts(self):
+        values=dict(mode='Story',map='East Town',act='Act 1')
+        regular=dashboard.active_unit_config(values)
+        self.assertEqual(regular,Path(self.temp.name)/'configs/Story/East_Town.ini')
+        dashboard.write_ini(self.profile('1','123'),regular)
+        for act in ('Act 1','Act 2','Act 3','Act 4','Act 5'):
+            selected={**values,'act':act}
+            self.assertEqual(dashboard.active_unit_config(selected),regular)
+            self.assertEqual(dashboard.load_unit_indexes(selected)[0]['x'],'123')
+        paths={regular}
+        for act,slot in (('Mastery','2'),('Infinite','3')):
+            selected={**values,'act':act}
+            path=dashboard.active_unit_config(selected)
+            self.assertNotIn(path,paths)
+            paths.add(path)
+            self.assertEqual(dashboard.load_unit_indexes(selected)[0]['unit'],'0')
+            dashboard.write_ini(self.profile(slot,'456'),path)
+            self.assertEqual(dashboard.load_unit_indexes(selected)[0]['unit'],slot)
+        self.assertEqual(dashboard.load_unit_indexes(values)[0]['unit'],'1')
+        self.assertNotIn(dashboard.active_unit_config({**values,'map':'School Grounds'}),paths)
+
+    @staticmethod
+    def profile(slot,x):
+        parser=dashboard.configparser.ConfigParser()
+        parser['UnitIndexes']={'Index1Unit':slot,'Index1X':x}
+        return parser
+
     def test_defaults_and_custom_keybinds_persist_with_notifications(self):
         values=dashboard.read_dashboard_values()
         self.assertEqual((values['start_key'],values['stop_key']),('F1','F2'))
