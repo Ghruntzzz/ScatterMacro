@@ -8,12 +8,12 @@
     {
       "id": "anime-expeditions",
       "name": "Anime Expeditions",
-      "version": "0.1.40",
+      "version": "0.1.41",
       "setup_only": false,
       "entrypoint": "AnimeExpeditions.exe",
-      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.40/AnimeExpeditions-0.1.40-windows.zip",
-      "sha256": "5ac8f53862d853982e9c189773f2b528dc110bb60968e28d659144f5d1fbde56",
-      "description": "Story repeat runs, background wave monitoring, faster indexes, auto ability checks, and reward-only Discord notifications. Saved custom hotkeys and live theme settings."
+      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.41/AnimeExpeditions-0.1.41-windows.zip",
+      "sha256": "90c4ffd6ed8612b8e2f41bfe753fc915902a2f44c10724ffc849921326326895",
+      "description": "Faster reward collection, improved Auto Ability checks before panel closure, and visible ability waves. Discord reward text, full Roblox screenshots, and expanded stats."
     }
   ]
 }
