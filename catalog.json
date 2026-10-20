@@ -8,12 +8,12 @@
     {
       "id": "anime-expeditions",
       "name": "Anime Expeditions",
-      "version": "0.1.42",
+      "version": "0.1.43",
       "setup_only": false,
       "entrypoint": "AnimeExpeditions.exe",
-      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.42/AnimeExpeditions-0.1.42-windows.zip",
-      "sha256": "8eee5833103203d4ae0e5154a76c8207361190750540945631d18032ad277e3d",
-      "description": "Background-masked Auto Ability detection with green/on confirmation. Discord session reward totals, total waves, kills and damage; Total Yen removed."
+      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.43/AnimeExpeditions-0.1.43-windows.zip",
+      "sha256": "e93689479f5954c60ba7ead84af2b9701a0dcf910ed16a822794d12b7bab06d3",
+      "description": "Shared Acts 1-5 unit configs with separate Mastery and Infinite profiles per map. Masked Auto Ability detection and accumulated Discord rewards and waves."
     }
   ]
 }
