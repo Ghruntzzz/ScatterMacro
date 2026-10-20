@@ -8,12 +8,12 @@
     {
       "id": "anime-expeditions",
       "name": "Anime Expeditions",
-      "version": "0.1.41",
+      "version": "0.1.42",
       "setup_only": false,
       "entrypoint": "AnimeExpeditions.exe",
-      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.41/AnimeExpeditions-0.1.41-windows.zip",
-      "sha256": "90c4ffd6ed8612b8e2f41bfe753fc915902a2f44c10724ffc849921326326895",
-      "description": "Faster reward collection, improved Auto Ability checks before panel closure, and visible ability waves. Discord reward text, full Roblox screenshots, and expanded stats."
+      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.42/AnimeExpeditions-0.1.42-windows.zip",
+      "sha256": "8eee5833103203d4ae0e5154a76c8207361190750540945631d18032ad277e3d",
+      "description": "Background-masked Auto Ability detection with green/on confirmation. Discord session reward totals, total waves, kills and damage; Total Yen removed."
     }
   ]
 }
