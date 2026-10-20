@@ -8,12 +8,12 @@
     {
       "id": "anime-expeditions",
       "name": "Anime Expeditions",
-      "version": "0.1.44",
+      "version": "0.1.45",
       "setup_only": false,
       "entrypoint": "AnimeExpeditions.exe",
-      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.44/AnimeExpeditions-0.1.44-windows.zip",
-      "sha256": "22cb2b0e037bcedbc6c62cbdafb201846d1579a0350774bd4d2d35bbc7f969aa",
-      "description": "Fixes Auto Ability switches being outside the search boundary. Includes masked switch detection, green confirmation, Story profiles, and accumulated Discord rewards and waves."
+      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.45/AnimeExpeditions-0.1.45-windows.zip",
+      "sha256": "71ec8068a0b54ba015fc6a7c6896a25080693cfc8ddf092132a8edc592ea982b",
+      "description": "Spirit City and Snowy Castle Raids with separate act configs and shared in-game operations. New Story maps, three-second match check, and silent single-click Auto Ability."
     }
   ]
 }
