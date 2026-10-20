@@ -21,11 +21,12 @@ class StoryWorker(QThread):
 
     def __init__(self, map_name, parent, act_name="Act 1", difficulty="Normal",
                  selected_hwnd="", selected_pid="", reader=None, entries=(), reward_dir=None,
-                 notification_settings=None):
+                 notification_settings=None, mode="Story"):
         super().__init__(parent)
         self.map_name = map_name
         self.act_name = act_name
         self.difficulty = difficulty
+        self.mode = mode
         self.selected_hwnd = selected_hwnd
         self.selected_pid = selected_pid
         self.stop = Event()
@@ -56,7 +57,7 @@ class StoryWorker(QThread):
             else:
                 from python_macro.capture import single_roblox_window
                 target = single_roblox_window()
-            self.message.emit("Opening Story mode.")
+            self.message.emit(f"Opening {self.mode} mode.")
             if self.stop.wait(0.5):
                 return
             client = RobloxClient(target[0], self.stop, selected_pid=target[2])
@@ -69,7 +70,8 @@ class StoryWorker(QThread):
                                       ChatLocator(root / "assets"), self.stop)
             from python_macro.story_ingame import already_in_match
             in_match = already_in_match(capture, self.reader, self.stop,
-                                        self.map_name, self.act_name, self.difficulty, find_play=play_icon)
+                                        self.map_name, self.act_name, self.difficulty,
+                                        find_play=play_icon, mode=self.mode)
             if not in_match:
                 navigate_story(self.map_name, capture, self.reader, client.direct_click,
                            self.stop, self.message.emit, scroll=client.scroll,
@@ -78,7 +80,8 @@ class StoryWorker(QThread):
                            find_start=StartButtonLocator(root / "assets" / "start-button-template.png"),
                            verify_clicks=True,
                            start_click=client.start_click,
-                           find_story=StoryButtonLocator(root / "assets" / "story-button-template.png"),
+                           find_story=StoryButtonLocator(root / "assets" / "story-button-template.png") if self.mode == 'Story' else None,
+                           mode=self.mode,
                            highlight=lambda x, y, shape: self.click_target.emit(x, y))
             if not self.stop.is_set():
                 from python_macro.story_ingame import run_story_ingame
@@ -97,7 +100,7 @@ class StoryWorker(QThread):
                                  self.message.emit, root / "assets", self.entries,
                                  update_status, monitor_capture=monitor_capture,
                                  reward_dir=self.reward_dir, entries_provider=self.current_entries,
-                                 match_confirmed=in_match, on_result=notifier.send)
+                                 match_confirmed=in_match, on_result=notifier.send, mode=self.mode)
         except InterruptedError:
             self.stop.set()
         except Exception as exc:

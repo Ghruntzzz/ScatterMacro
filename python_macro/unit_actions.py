@@ -291,10 +291,8 @@ class UnitIndexer:
         return None
 
     def enable_ability(self):
-        """Only click the red/off switch, confirming panel presence each time."""
-        absent = 0
-        clicked = False
-        for _ in range(6):
+        """Click a detected off switch once; units without switches are skipped."""
+        for _ in range(2):
             self.heartbeat()
             if self.stop.is_set():
                 raise InterruptedError()
@@ -303,19 +301,13 @@ class UnitIndexer:
                 return False
             found = self.panel.ability_state(frame)
             if found is None:
-                absent += 1
-                if absent >= 2 and not clicked:
-                    return True
                 self.wait(.1)
             elif found[0] == 'on':
                 return True
             else:
-                absent = 0
                 self.click(found[1], frame)
-                clicked = True
-                self.wait(.3)
-        self.log('Auto Ability could not be confirmed on.')
-        return False
+                return True
+        return True
 
     def placement_panel(self, frame, panel):
         if panel is not None:

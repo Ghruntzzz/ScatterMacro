@@ -87,20 +87,22 @@ def navigate_story(map_name, capture, reader, click, stop, log, timeout=30,
                    scroll=None, max_map_scrolls=MAX_MAP_SCROLLS, find_play=None,
                    skip_play=False, act_name=None, difficulty="Normal", find_act=None,
                    find_start=None, verify_clicks=False, highlight=None, start_click=None,
-                   find_story=None):
+                   find_story=None, mode="Story"):
     """Navigate using captured Roblox client coordinates and cancellable input.
 
     act_name=None retains the legacy map-only contract for existing callers;
     the live Story worker always supplies the selected dashboard act.
     """
-    if verify_clicks:
+    if mode not in ('Story','Raid'):
+        raise ValueError('Unsupported navigation mode.')
+    if verify_clicks or mode == 'Raid':
         from python_macro.story_verified import navigate_story_checked
         return navigate_story_checked(
             map_name, capture, reader, click, stop, log, timeout=timeout,
             scroll=scroll, max_map_scrolls=max_map_scrolls,
             find_play=find_play, skip_play=skip_play, act_name=act_name,
             difficulty=difficulty, find_act=find_act, find_start=find_start,
-            highlight=highlight, start_click=start_click, find_story=find_story,
+            highlight=highlight, start_click=start_click, find_story=find_story, mode=mode,
         )
     if not normalize(map_name):
         raise ValueError("Choose a Story map first.")

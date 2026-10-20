@@ -15,9 +15,11 @@ class RoundEnded(Exception):
     pass
 
 
-def already_in_match(capture, reader, stop, map_name, act, difficulty, find_play=None):
+def already_in_match(capture, reader, stop, map_name, act, difficulty, find_play=None,
+                     mode='Story', wait_seconds=3):
     confirmed = 0
-    for _ in range(3):
+    deadline = time.monotonic()+wait_seconds
+    while not stop.is_set():
         if stop.is_set():
             return False
         frame = capture()
@@ -26,26 +28,28 @@ def already_in_match(capture, reader, stop, map_name, act, difficulty, find_play
                               scale=2, max_variants=2, min_confidence=.7,
                               cancelled=stop.is_set)
         texts = [m.text for m in matches]
-        if not matches_story(texts, map_name, act, difficulty):
+        if not matches_story(texts, map_name, act, difficulty, mode=mode):
             text = normalize(" ".join(texts))
-            if "story" in text and re.search(r"act[1-9]", text) and ("normalmod" in text or "hardmod" in text):
-                raise RuntimeError("Already in a different Story match. Select its map, act and difficulty in the dashboard.")
-            if find_play is not None and find_play(frame) is not None:
-                return False
+            if re.search(r"act[1-9]", text) and (
+                    ('story' in text and ('normalmod' in text or 'hardmod' in text)) or 'raid' in text):
+                raise RuntimeError(f"Already in a different {mode} match. Select its mode, map and act in the dashboard.")
             confirmed = 0
         else:
             confirmed += 1
             if confirmed >= 2:
                 return True
+        remaining = deadline-time.monotonic()
+        if remaining <= 0 or stop.wait(min(.1,remaining)):
+            break
     return False
 
 
-def matches_story(texts, map_name, act, difficulty):
+def matches_story(texts, map_name, act, difficulty, mode='Story'):
     text = normalize(" ".join(texts))
-    if "story" not in text or normalize(map_name) not in text:
+    if normalize(mode) not in text or normalize(map_name) not in text:
         return False
     difficulty_label = normalize(difficulty) + "mod"
-    if not any(normalize(line) in (difficulty_label, difficulty_label + "e") for line in texts):
+    if mode == 'Story' and not any(normalize(line) in (difficulty_label, difficulty_label + "e") for line in texts):
         return False
     if act.startswith("Act "):
         return re.search(r"act" + re.escape(act[-1]) + r"(?![0-9])", text) is not None
@@ -140,7 +144,7 @@ class HudReader:
 def run_story_ingame(map_name, act, difficulty, capture, client, reader, stop,
                      log, assets, entries=(), status=lambda value: None,
                      monitor_capture=None, reward_dir=None, entries_provider=None,
-                     match_confirmed=False, on_result=lambda *args: None):
+                     match_confirmed=False, on_result=lambda *args: None, mode='Story'):
     log("Waiting for match details.")
     confirmed = 0
     scans = 0
@@ -151,8 +155,8 @@ def run_story_ingame(map_name, act, difficulty, capture, client, reader, stop,
         matches = reader.read(frame, Region(w // 2, 0, w - w // 2, h),
                               scale=2 if scans % 3 == 0 else 1, max_variants=1,
                               min_confidence=0.75, cancelled=stop.is_set)
-        if not matches_story([m.text for m in matches], map_name, act, difficulty):
-            anchors = [m for m in matches if normalize(m.text).startswith("story")]
+        if not matches_story([m.text for m in matches], map_name, act, difficulty, mode=mode):
+            anchors = [m for m in matches if normalize(m.text).startswith(normalize(mode))]
             if len(anchors) == 1:
                 xs, ys = zip(*anchors[0].corners)
                 left = max(w // 2, round(min(xs)) - 25)
@@ -163,8 +167,8 @@ def run_story_ingame(map_name, act, difficulty, capture, client, reader, stop,
                                       scale=3, max_variants=3, min_confidence=0.75,
                                       cancelled=stop.is_set,
                                       accept=lambda found: matches_story(
-                                          [m.text for m in found], map_name, act, difficulty))
-        confirmed = confirmed + 1 if matches_story([m.text for m in matches], map_name, act, difficulty) else 0
+                                          [m.text for m in found], map_name, act, difficulty, mode=mode))
+        confirmed = confirmed + 1 if matches_story([m.text for m in matches], map_name, act, difficulty, mode=mode) else 0
         if confirmed >= 2:
             break
         if stop.wait(0.25):

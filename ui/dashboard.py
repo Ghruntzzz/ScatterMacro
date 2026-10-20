@@ -34,9 +34,9 @@ TEXT = "#f3eff0"
 MUTED = "#a8a1a5"
 
 MODE_MAPS = {
-    "Story": ["School Grounds", "Flower Forest", "Rose Kingdom", "Fairy King Forest", "King's Tomb", "East Town"],
+    "Story": ["School Grounds", "Flower Forest", "Rose Kingdom", "Fairy King Forest", "King's Tomb", "East Town", "Crimson Shore", "Flaming Monastery"],
     "Challenges": ["Auto"],
-    "Raid": ["Spirit City"],
+    "Raid": ["Spirit City", "Snowy Castle"],
     "Tower": ["Trait Tower", "Traitless Tower"],
     "Expeditions": ["School Grounds", "Flower Forest", "Rose Kingdom", "East Town"],
 }
@@ -429,7 +429,7 @@ class DashboardWindow(QWidget):
 
     def _deployment(self) -> None:
         deploy = self
-        start = self._button(deploy, "START" if self.mode_box.currentText() == "Story" else "SAVE SETUP", 596, 577, 214, True)
+        start = self._button(deploy, "START" if self.mode_box.currentText() in {"Story", "Raid"} else "SAVE SETUP", 596, 577, 214, True)
         self.start_button = start
         settings = self._button(deploy, "SETTINGS", 830, 577, 164)
         exit_button = self._button(deploy, "EXIT", 1014, 577, 154)
@@ -541,7 +541,7 @@ class DashboardWindow(QWidget):
         self._refresh_route_controls()
         self._save_dashboard()
         if hasattr(self, "start_button"):
-            self.start_button.setText("START" if _mode == "Story" else "SAVE SETUP")
+            self.start_button.setText("START" if _mode in {"Story", "Raid"} else "SAVE SETUP")
 
     def _act_changed(self, _act: str) -> None:
         if self.mode_box.currentText() == "Story":
@@ -598,7 +598,7 @@ class DashboardWindow(QWidget):
 
     def _start_macro(self) -> None:
         self._save_dashboard()
-        if self.mode_box.currentText() != "Story":
+        if self.mode_box.currentText() not in {"Story", "Raid"}:
             self._set_status("Setup saved. This mode's automation is not connected yet.")
             return
         from python_macro.capture import single_roblox_window
@@ -1203,8 +1203,8 @@ class RuntimeWindow(DashboardWindow):
         self.close()
 
     def _start_story(self) -> None:
-        if self.values["mode"] != "Story":
-            self.log.appendPlainText("Only Story navigation is available.")
+        if self.values["mode"] not in {"Story", "Raid"}:
+            self.log.appendPlainText("Only Story and Raid automation are available.")
             return
         if self.return_pending or (self.worker is not None and self.worker.isRunning()):
             return
@@ -1218,7 +1218,7 @@ class RuntimeWindow(DashboardWindow):
                                   selected_hwnd=self.values.get("roblox_hwnd", ""),
                                   selected_pid=self.values.get("roblox_pid", ""), reader=self.story_reader,
                                   entries=self.unit_indexes, reward_dir=CONFIG_PATH.parent / "rewards",
-                                  notification_settings=read_dashboard_values())
+                                  notification_settings=read_dashboard_values(), mode=self.values['mode'])
         self.worker.message.connect(self.log.appendPlainText)
         self.worker.click_target.connect(self._show_click_target)
         self.worker.hud_status.connect(self._update_hud)

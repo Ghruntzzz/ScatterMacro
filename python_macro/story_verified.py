@@ -128,11 +128,15 @@ def navigate_story_checked(map_name, capture, reader, click, stop, log, timeout=
                            scroll=None, max_map_scrolls=MAX_MAP_SCROLLS, find_play=None,
                            skip_play=False, act_name=None, difficulty="Normal",
                            find_act=None, find_start=None, highlight=None, start_click=None,
-                           find_story=None):
+                           find_story=None, mode="Story"):
+    if mode not in ('Story','Raid'):
+        raise ValueError('Unsupported navigation mode.')
     if not normalize(map_name):
         raise ValueError("Choose a Story map first.")
     act = validate_act(act_name) if act_name is not None else None
-    if act not in (None, "Mastery", "Infinite"):
+    if mode == 'Raid' and act not in ('Act 1','Act 2','Act 3'):
+        raise ValueError('Raid act must be Act 1-3.')
+    if mode == 'Story' and act not in (None, "Mastery", "Infinite"):
         validate_difficulty(difficulty)
     ocr = FastText(reader, stop)
 
@@ -141,7 +145,7 @@ def navigate_story_checked(map_name, capture, reader, click, stop, log, timeout=
             return find_story
         predicate = lambda t: normalize(t) == normalize(label)
         def locate(frame):
-            if label == "Story" and frame is not ocr.last_frame:
+            if label in ("Story", "Raid") and frame is not ocr.last_frame:
                 # The lobby navigation is normally in the upper part of the
                 # client. Fall back to full-screen OCR if this fast scan misses.
                 matches = reader.read(
@@ -173,12 +177,12 @@ def navigate_story_checked(map_name, capture, reader, click, stop, log, timeout=
     if not skip_play:
         log("Opening Play menu.")
         if not press("Play", find_play if find_play is not None else text_target("Play"),
-                     lambda after, before: text_target("Story")(after) is not None):
+                     lambda after, before: text_target(mode)(after) is not None):
             return
-    log("Selecting Story.")
-    if not press("Story", text_target("Story"),
+    log(f"Selecting {mode}.")
+    if not press(mode, text_target(mode),
                  lambda after, before: text_target(map_name)(after) is not None
-                 or (text_target("Story")(after) is None and changed_screen(before, after))):
+                 or (text_target(mode)(after) is None and changed_screen(before, after))):
         return
 
     log(f"Finding map: {map_name}.")
@@ -227,7 +231,7 @@ def navigate_story_checked(map_name, capture, reader, click, stop, log, timeout=
     if not click_once(act, act_target, capture, click, stop,
                       highlight=highlight, timeout=timeout):
         return
-    if act not in ("Mastery", "Infinite"):
+    if mode == 'Story' and act not in ("Mastery", "Infinite"):
         if difficulty == "Hard":
             log("Selecting Hard difficulty.")
             if not press("Hard", text_target("Hard"),
@@ -242,7 +246,7 @@ def navigate_story_checked(map_name, capture, reader, click, stop, log, timeout=
                  (find_start(after) is not None if find_start is not None
                   else text_target("Start")(after) is not None)):
         return
-    log("Starting Story.")
+    log(f"Starting {mode}.")
     start_locator = find_start if find_start is not None else text_target("Start")
     if not press("Start", start_locator,
                  lambda after, before:

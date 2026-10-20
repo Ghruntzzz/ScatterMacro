@@ -54,6 +54,25 @@ class SettingsTests(unittest.TestCase):
         parser['UnitIndexes']={'Index1Unit':slot,'Index1X':x}
         return parser
 
+    def test_raid_profiles_are_separate_for_every_map_and_act(self):
+        paths=set()
+        for map_name in ('Spirit City','Snowy Castle'):
+            for act in ('Act 1','Act 2','Act 3'):
+                values=dict(mode='Raid',map=map_name,act=act)
+                path=dashboard.active_unit_config(values)
+                self.assertNotIn(path,paths)
+                paths.add(path)
+                dashboard.write_ini(self.profile(act[-1],str(len(paths))),path)
+                self.assertEqual(dashboard.load_unit_indexes(values)[0]['x'],str(len(paths)))
+        self.assertEqual(len(paths),6)
+        self.assertIn('Crimson Shore',dashboard.MODE_MAPS['Story'])
+        self.assertIn('Flaming Monastery',dashboard.MODE_MAPS['Story'])
+        window=dashboard.DashboardWindow()
+        window.mode_box.setCurrentText('Raid')
+        self.assertTrue(window.difficulty_box.isHidden())
+        self.assertEqual(window.start_button.text(),'START')
+        window.close()
+
     def test_defaults_and_custom_keybinds_persist_with_notifications(self):
         values=dashboard.read_dashboard_values()
         self.assertEqual((values['start_key'],values['stop_key']),('F1','F2'))

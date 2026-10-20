@@ -238,14 +238,32 @@ class LifecycleTests(unittest.TestCase):
                 self.assertLess(abs(found[1][0]-(70+kx)),4)
                 self.assertLess(abs(found[1][1]-(50+ky)),4)
 
-    def test_ability_disappearance_is_not_success_after_click(self):
+    def test_ability_click_does_not_rescan_or_log_confirmation(self):
         panel=Mock()
         panel.close_icon.return_value=(350,15,25,25)
         panel.ability_state.side_effect=[('off',(200,150))]+[None]*5
         frame=np.zeros((400,500,3),np.uint8)
         worker=UnitIndexer([],Mock(),lambda:frame,panel,FastStop(),Mock())
-        self.assertFalse(worker.enable_ability())
+        self.assertTrue(worker.enable_ability())
         self.assertEqual(worker.client.direct_click.call_count,1)
+        self.assertEqual(panel.ability_state.call_count,1)
+        worker.log.assert_not_called()
+
+    def test_preflight_waits_three_seconds_even_when_play_is_visible(self):
+        clock=[0.0]
+        stop=Mock()
+        stop.is_set.return_value=False
+        def wait(seconds):
+            clock[0]+=seconds
+            return False
+        stop.wait.side_effect=wait
+        reader=Mock()
+        reader.read.return_value=[]
+        frame=np.zeros((500,700,3),np.uint8)
+        with patch('python_macro.story_ingame.time.monotonic',side_effect=lambda:clock[0]):
+            self.assertFalse(already_in_match(lambda:frame,reader,stop,'East Town','Act 1','Normal',find_play=lambda frame:(10,10)))
+        self.assertAlmostEqual(clock[0],3)
+        self.assertGreater(reader.read.call_count,3)
 
     def test_green_ability_is_not_clicked(self):
         panel=Mock()

@@ -1,6 +1,8 @@
 import unittest
 from threading import Event
 from unittest.mock import Mock
+from types import SimpleNamespace
+from python_macro.story import navigate_story
 
 import numpy as np
 
@@ -17,6 +19,37 @@ def frame(value=0):
 
 
 class VerifiedStoryTests(unittest.TestCase):
+    def test_raid_navigation_all_maps_and_acts_without_difficulty(self):
+        for map_name in ('Spirit City','Snowy Castle'):
+            for act in ('Act 1','Act 2','Act 3'):
+                labels=['Play','Raid',map_name,act,'Select Stage','Start']
+                state=[0]
+                clicked=[]
+                def capture():
+                    return frame(state[0]*42)
+                def read(image,*args,**kwargs):
+                    i=int(image[0,0,0])//42
+                    return [SimpleNamespace(text=labels[i],corners=((10,10),(30,10),(30,30),(10,30)))] if i<len(labels) else []
+                def click(*args):
+                    clicked.append(labels[state[0]])
+                    state[0]+=1
+                    return True
+                reader=Mock()
+                reader.read.side_effect=read
+                log=Mock()
+                navigate_story(map_name,capture,reader,click,FastStop(),log,
+                               act_name=act,difficulty='-',mode='Raid',verify_clicks=True)
+                self.assertEqual(clicked,labels)
+                self.assertNotIn('difficulty',str(log.call_args_list).lower())
+
+    def test_raid_rejects_nonraid_acts_before_input(self):
+        for act in ('Act 4','Act 5','Infinite','Mastery'):
+            click=Mock()
+            with self.assertRaises(ValueError):
+                navigate_story('Snowy Castle',Mock(),Mock(),click,FastStop(),Mock(),
+                               act_name=act,mode='Raid')
+            click.assert_not_called()
+
     def test_act_is_clicked_once_even_when_screen_does_not_change(self):
         capture = Mock(return_value=frame())
         click = Mock(return_value=True)

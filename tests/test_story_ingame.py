@@ -16,6 +16,20 @@ class FastStop(Event):
 
 
 class StoryIngameTests(unittest.TestCase):
+    def test_raid_match_details_and_shared_ingame_without_difficulty(self):
+        texts=['Raid Snowy Castle Act 3']
+        self.assertTrue(matches_story(texts,'Snowy Castle','Act 3','-',mode='Raid'))
+        self.assertFalse(matches_story(texts,'Snowy Castle','Act 2','-',mode='Raid'))
+        self.assertFalse(matches_story(texts,'Snowy Castle','Act 3','Normal'))
+        reader=Mock()
+        reader.read.return_value=[SimpleNamespace(text=t) for t in texts]
+        client=Mock()
+        with patch('python_macro.story_ingame.run_matches') as matches:
+            run_story_ingame('Snowy Castle','Act 3','-',lambda:np.zeros((600,800,3),np.uint8),
+                             client,reader,FastStop(),Mock(),Path('assets'),mode='Raid')
+        client.setup_camera.assert_called_once()
+        matches.assert_called_once()
+
     def test_camera_and_unit_keys_use_matching_scan_code_down_and_up(self):
         client = RobloxClient.__new__(RobloxClient)
         client.user = Mock()

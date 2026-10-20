@@ -89,6 +89,9 @@ class Notifier:
         seconds = max(0,int(duration))
         description = (f"{self.settings.get('map','Story')} | {self.settings.get('act','')} | "
                        f"{self.settings.get('difficulty','')}\nRun time: {seconds//60}m {seconds%60}s")
+        if self.settings.get('mode') == 'Raid':
+            description = (f"Raid | {self.settings.get('map','')} | {self.settings.get('act','')}"
+                           f"\nRun time: {seconds//60}m {seconds%60}s")
         if outcome == 'error':
             # Never include exception text that might expose URLs or tokens.
             description = 'The macro needs attention. Check Action Output.'
