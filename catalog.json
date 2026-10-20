@@ -8,12 +8,12 @@
     {
       "id": "anime-expeditions",
       "name": "Anime Expeditions",
-      "version": "0.1.43",
+      "version": "0.1.44",
       "setup_only": false,
       "entrypoint": "AnimeExpeditions.exe",
-      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.43/AnimeExpeditions-0.1.43-windows.zip",
-      "sha256": "e93689479f5954c60ba7ead84af2b9701a0dcf910ed16a822794d12b7bab06d3",
-      "description": "Shared Acts 1-5 unit configs with separate Mastery and Infinite profiles per map. Masked Auto Ability detection and accumulated Discord rewards and waves."
+      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.44/AnimeExpeditions-0.1.44-windows.zip",
+      "sha256": "22cb2b0e037bcedbc6c62cbdafb201846d1579a0350774bd4d2d35bbc7f969aa",
+      "description": "Fixes Auto Ability switches being outside the search boundary. Includes masked switch detection, green confirmation, Story profiles, and accumulated Discord rewards and waves."
     }
   ]
 }
