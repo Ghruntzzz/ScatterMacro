@@ -81,7 +81,7 @@ class UnitActionTests(unittest.TestCase):
                     events.append('ability check')
                     return None
                 panel=SimpleNamespace(read=read, auto_position=lambda frame,panel:(50,50),
-                                      ability_position=ability,
+                                      ability_state=ability,
                                       close_icon=lambda frame:(80,10) if state["panel"] else None)
                 worker=UnitIndexer([entry(auto_upgrade=str(auto),upgrade=str(goal))],client,
                                    lambda:image,panel,stop,Mock())
@@ -118,7 +118,7 @@ class UnitActionTests(unittest.TestCase):
         worker.capture.return_value=image
         worker.read_until=Mock(return_value=(image,panel))
         worker.close=Mock()
-        worker.panel.ability_position.return_value=None
+        worker.panel.ability_state.return_value=None
         worker.client.hold_key.return_value=True
         worker.client.direct_click.return_value=True
         worker.run(0)

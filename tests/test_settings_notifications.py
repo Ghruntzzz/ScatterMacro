@@ -146,6 +146,41 @@ class NotificationTests(unittest.TestCase):
         self.assertNotIn('image',payload['embeds'][0])
         self.assertEqual(payload['allowed_mentions']['parse'],[])
 
+    def test_session_rewards_stats_and_waves_accumulate_without_yen(self):
+        opener=self.opener()
+        notify=Notifier(self.settings(),Event(),Mock(),opener)
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory,'rewards.json')
+            for amount in (75,25):
+                notify.observe({'new_run':True})
+                notify.observe({'wave':(15,15)})
+                notify.observe({'result':'victory'})
+                notify.observe({'wave':(0,15)})
+                path.write_text(json.dumps({'rewards':[f'{amount}x Gem','?x Unknown'],
+                                           'stats':{'Total Yen':'1000','Total Kills':'300','Total Damage':'1,000'}}))
+                notify.send('victory',60,directory)
+        payload=json.loads(opener.open.call_args.args[0].data)
+        fields={f['name']:f['value'] for f in payload['embeds'][0]['fields']}
+        self.assertEqual(fields['Rewards Earned'],'25x Gem\n?x Unknown')
+        self.assertEqual(fields['Total Rewards (Session)'],'100x Gem')
+        self.assertEqual(fields['Total Waves Completed'],'30')
+        self.assertEqual(fields['Total Kills'],'600')
+        self.assertEqual(fields['Total Damage'],'2,000')
+        self.assertEqual(fields['Runs'],'2')
+        self.assertNotIn('Total Yen',fields)
+
+    def test_muted_results_still_contribute_to_totals(self):
+        opener=self.opener()
+        notify=Notifier(self.settings(),Event(),Mock(),opener)
+        with tempfile.TemporaryDirectory() as directory:
+            Path(directory,'rewards.json').write_text(json.dumps({'rewards':['25x Gem']}))
+            self.assertFalse(notify.send('defeat',30,directory))
+            notify.send('victory',60,directory)
+        payload=json.loads(opener.open.call_args.args[0].data)
+        fields={f['name']:f['value'] for f in payload['embeds'][0]['fields']}
+        self.assertEqual(fields['Total Rewards (Session)'],'50x Gem')
+        self.assertEqual(fields['Defeats'],'1')
+
     def test_failures_do_not_raise_or_expose_url(self):
         opener=self.opener()
         opener.open.side_effect=OSError('secret webhook URL')

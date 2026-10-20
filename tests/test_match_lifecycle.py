@@ -12,7 +12,7 @@ import numpy as np
 from python_macro.end_screen import interpret_end, save_rewards, EndScreenReader
 from python_macro.match_monitor import MatchMonitor
 from python_macro.story_ingame import already_in_match, finish_match, run_matches, RoundEnded
-from python_macro.unit_actions import UnitIndexer, UnitPanel
+from python_macro.unit_actions import UnitIndexer, UnitPanel, AbilitySwitch
 from test_unit_actions import FastStop, entry
 
 
@@ -210,6 +210,37 @@ class LifecycleTests(unittest.TestCase):
         self.assertFalse(worker.enable_ability())
         worker.client.direct_click.assert_not_called()
 
+    def test_switch_masks_ignore_background_and_recognize_both_states(self):
+        detector=AbilitySwitch(Path(__file__).resolve().parents[1]/'assets')
+        for state in ('off','on'):
+            _,tile,mask,kx,ky=next(t for t in detector.tiles if t[0]==state and abs(t[1].shape[0]-50)<=1)
+            for background in ((180,80,40),(30,170,190),(220,220,220)):
+                frame=np.full((180,200,3),background,np.uint8)
+                crop=frame[50:50+tile.shape[0],70:70+tile.shape[1]]
+                crop[mask>0]=tile[mask>0]
+                found=detector(frame)
+                self.assertIsNotNone(found,(state,background))
+                self.assertEqual(found[0],state)
+                self.assertLess(abs(found[1][0]-(70+kx)),4)
+                self.assertLess(abs(found[1][1]-(50+ky)),4)
+
+    def test_ability_disappearance_is_not_success_after_click(self):
+        panel=Mock()
+        panel.close_icon.return_value=(350,15,25,25)
+        panel.ability_state.side_effect=[('off',(200,150))]+[None]*5
+        frame=np.zeros((400,500,3),np.uint8)
+        worker=UnitIndexer([],Mock(),lambda:frame,panel,FastStop(),Mock())
+        self.assertFalse(worker.enable_ability())
+        self.assertEqual(worker.client.direct_click.call_count,1)
+
+    def test_green_ability_is_not_clicked(self):
+        panel=Mock()
+        panel.close_icon.return_value=(350,15,25,25)
+        panel.ability_state.return_value=('on',(200,170))
+        worker=UnitIndexer([],Mock(),Mock(),panel,FastStop(),Mock())
+        self.assertTrue(worker.enable_ability())
+        worker.client.direct_click.assert_not_called()
+
     def test_monitor_reset_clears_old_result_and_wave(self):
         monitor=MatchMonitor(Mock(),Path('assets'),Mock())
         monitor.state=dict(outcome='victory',reward=True,wave=(15,15))
@@ -220,7 +251,7 @@ class LifecycleTests(unittest.TestCase):
         frame=np.zeros((400,500,3),np.uint8)
         panel, client = Mock(), Mock()
         panel.close_icon.return_value=(350,15,25,25)
-        panel.ability_position.side_effect=[(200,150),None,None]
+        panel.ability_state.side_effect=[('off',(200,150)),('on',(200,170))]
         client.direct_click.return_value=True
         worker=UnitIndexer([entry(auto_ability_wave='5'),entry()],client,lambda:frame,panel,FastStop(),Mock())
         worker.placed={0:(20,30),1:(40,50)}

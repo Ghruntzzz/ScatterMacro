@@ -59,8 +59,8 @@ jobs:
       - name: Upload tested Windows build
         uses: actions/upload-artifact@v4
         with:
-          name: AnimeExpeditions-0.1.41-windows
-          path: dist/AnimeExpeditions-0.1.41-windows.zip
+          name: AnimeExpeditions-0.1.42-windows
+          path: dist/AnimeExpeditions-0.1.42-windows.zip
           if-no-files-found: error
           retention-days: 7
       - name: Publish and verify macro archive
@@ -69,12 +69,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '0.1.41'
+          $version = '0.1.42'
           $tag = "anime-expeditions-v$version"
           $name = "AnimeExpeditions-$version-windows.zip"
           $archive = "dist/$name"
           if (!(Test-Path $archive)) { throw "Missing macro ZIP: $archive" }
-          gh release create $tag $archive --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Anime Expeditions $version - Rewards and Auto Ability" --notes "Faster reward dismissal uses remaining page counts and handles the final close prompt. Auto Ability detection supports intermediate scales and targets the red switch knob. Completed indexes check abilities before closing their panels; cards show the scheduled check wave. Discord notifications list reward text, include a full Roblox client screenshot, and show additional session and result stats. 191 automated tests passed. Live gameplay and real Discord delivery still need user validation."
+          gh release create $tag $archive --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Anime Expeditions $version - Ability States and Session Totals" --notes "Auto Ability uses red/off and green/on references with the surrounding background masked out. Color candidates keep matching fast; a missing red switch after clicking is no longer treated as enabled without green confirmation. Discord removes Total Yen and accumulates readable rewards, kills, damage, run time, and completed waves across the current macro session, including muted or failed notifications. Per-run reward text and full Roblox screenshots remain available. 196 automated tests passed, including changed backgrounds and reward accumulation. Live gameplay and real Discord delivery still need user validation."
           if ($LASTEXITCODE -ne 0) { throw 'Macro release upload failed' }
           New-Item -ItemType Directory -Force 'dist/verified' | Out-Null
           gh release download $tag --repo $env:GITHUB_REPOSITORY --pattern $name --dir 'dist/verified'
@@ -86,7 +86,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '0.1.41'
+          $version = '0.1.42'
           $archive = "dist/AnimeExpeditions-$version-windows.zip"
           $sha256 = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
           $url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/anime-expeditions-v$version/AnimeExpeditions-$version-windows.zip"
@@ -99,7 +99,7 @@ jobs:
           $macro[0].version = $version
           $macro[0].url = $url
           $macro[0].sha256 = $sha256
-          $macro[0].description = "Faster reward collection, improved Auto Ability checks before panel closure, and visible ability waves. Discord reward text, full Roblox screenshots, and expanded stats."
+          $macro[0].description = "Background-masked Auto Ability detection with green/on confirmation. Discord session reward totals, total waves, kills and damage; Total Yen removed."
           $catalog | ConvertTo-Json -Depth 20 | Set-Content catalog.json -Encoding utf8
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

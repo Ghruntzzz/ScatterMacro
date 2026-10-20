@@ -46,6 +46,9 @@ class StoryWorker(QThread):
     def run(self):
         from python_macro.notifications import Notifier
         notifier = Notifier(self.notification_settings, self.stop, self.message.emit)
+        def update_status(value):
+            notifier.observe(value)
+            self.hud_status.emit(value)
         try:
             from python_macro.capture import selected_roblox_window
             if self.selected_hwnd and self.selected_pid:
@@ -92,7 +95,7 @@ class StoryWorker(QThread):
                 run_story_ingame(self.map_name, self.act_name, self.difficulty,
                                  capture, client, self.reader, self.stop,
                                  self.message.emit, root / "assets", self.entries,
-                                 self.hud_status.emit, monitor_capture=monitor_capture,
+                                 update_status, monitor_capture=monitor_capture,
                                  reward_dir=self.reward_dir, entries_provider=self.current_entries,
                                  match_confirmed=in_match, on_result=notifier.send)
         except InterruptedError:

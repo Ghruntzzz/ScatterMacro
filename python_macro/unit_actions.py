@@ -64,13 +64,73 @@ class Icon:
         return best[1:]
 
 
+class AbilitySwitch:
+    """Match only the pill interior, excluding the variable game background."""
+    def __init__(self, assets):
+        self.tiles = []
+        for state in ('off','on'):
+            source = cv2.imread(str(assets / f'unit-ability-{state}.png'))
+            if source is None:
+                raise RuntimeError('Auto Ability reference image is missing.')
+            h,w = source.shape[:2]
+            mask = np.zeros((h,w),np.uint8)
+            radius = max(2,(w-8)//2)
+            cx = w//2
+            cv2.rectangle(mask,(cx-radius,3+radius),(cx+radius,h-4-radius),255,-1)
+            cv2.circle(mask,(cx,3+radius),radius,255,-1)
+            cv2.circle(mask,(cx,h-4-radius),radius,255,-1)
+            for scale in np.arange(.6,2.05,.05):
+                tile = cv2.resize(source,None,fx=scale,fy=scale)
+                scaled_mask = cv2.resize(mask,(tile.shape[1],tile.shape[0]),interpolation=cv2.INTER_NEAREST)
+                hsv = cv2.cvtColor(tile,cv2.COLOR_BGR2HSV)
+                color = self.color_mask(hsv,state) & (scaled_mask > 0)
+                ys,xs = np.nonzero(color)
+                self.tiles.append((state,tile,scaled_mask,float(xs.mean()),float(ys.mean())))
+
+    @staticmethod
+    def color_mask(hsv,state):
+        hue = hsv[:,:,0]
+        color = ((hue < 12) | (hue > 170)) if state == 'off' else ((hue > 30) & (hue < 90))
+        return color & (hsv[:,:,1] > 120) & (hsv[:,:,2] > 120)
+
+    def __call__(self, frame):
+        frame = np.ascontiguousarray(frame[:,:,:3])
+        hits = []
+        hsv_frame = cv2.cvtColor(frame,cv2.COLOR_BGR2HSV)
+        candidates = {}
+        for state in ('off','on'):
+            binary = self.color_mask(hsv_frame,state).astype(np.uint8)*255
+            contours,_ = cv2.findContours(binary,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
+            candidates[state] = [cv2.boundingRect(c) for c in contours
+                                 if cv2.contourArea(c) >= 20]
+        for state,tile,mask,kx,ky in self.tiles:
+            h,w = tile.shape[:2]
+            for bx,by,bw,bh in candidates[state]:
+                if not (.4*w <= bw <= w and .3*w <= bh <= 1.2*w):
+                    continue
+                x0,y0 = round(bx+bw/2-kx),round(by+bh/2-ky)
+                left,top = max(0,x0-4),max(0,y0-4)
+                crop = frame[top:y0+h+5,left:x0+w+5]
+                if crop.shape[0] < h or crop.shape[1] < w:
+                    continue
+                scores = cv2.matchTemplate(crop,tile,cv2.TM_SQDIFF_NORMED,mask=mask)
+                scores = np.nan_to_num(scores,nan=1,posinf=1,neginf=1)
+                score,_,point,_ = cv2.minMaxLoc(scores)
+                if score <= .20:
+                    x,y = point
+                    hits.append((score,state,(left+x+round(kx),top+y+round(ky))))
+        if not hits:
+            return None
+        _,state,point = min(hits,key=lambda hit:hit[0])
+        return state,point
+
+
 class UnitPanel:
     def __init__(self, reader, stop, assets):
         self.reader, self.stop = reader, stop
         self.close_icon = Icon(assets / "unit-close.png")
         self.auto_icon = Icon(assets / "unit-auto-upgrade.png")
-        self.ability_icon = Icon(assets / "unit-ability-off.png", threshold=.85,
-                                 scales=np.arange(.6, 2.05, .05))
+        self.ability_switch = AbilitySwitch(assets)
 
     def read(self, frame, need_upgrade=False):
         close = self.close_icon(frame)
@@ -105,26 +165,21 @@ class UnitPanel:
         return (found[0]+left, found[1]+top) if found is not None else None
 
     def ability_position(self, frame):
+        found = self.ability_state(frame)
+        return found[1] if found is not None and found[0] == 'off' else None
+
+    def ability_state(self, frame):
         close = self.close_icon(frame)
         if close is None:
             return None
         x, y, w, h = close
         left, top = max(0, x-14*w), max(0, y-h)
-        crop = frame[top:min(frame.shape[0], y+11*h), left:min(frame.shape[1], x+w)]
-        found = self.ability_icon(crop)
+        crop = frame[top:min(frame.shape[0], y+16*h), left:min(frame.shape[1], x+3*w)]
+        found = self.ability_switch(crop)
         if found is None:
             return None
-        cx, cy, tw, th = found
-        # Only the red/off state is clickable. Grayscale matching alone could
-        # also match the enabled switch and inadvertently turn it off.
-        tile = crop[max(0,cy-th//2):cy+th//2, max(0,cx-tw//2):cx+tw//2, :3]
-        hsv = cv2.cvtColor(tile, cv2.COLOR_BGR2HSV)
-        red = ((hsv[:,:,0] < 12) | (hsv[:,:,0] > 170)) & (hsv[:,:,1] > 120) & (hsv[:,:,2] > 120)
-        if np.mean(red) < .08:
-            return None
-        ry, rx = np.nonzero(red)
-        return (left+max(0,cx-tw//2)+round(float(rx.mean())),
-                top+max(0,cy-th//2)+round(float(ry.mean())))
+        state,(cx,cy) = found
+        return state,(cx+left,cy+top)
 
 
 class UnitIndexer:
@@ -236,23 +291,28 @@ class UnitIndexer:
     def enable_ability(self):
         """Only click the red/off switch, confirming panel presence each time."""
         absent = 0
-        for _ in range(5):
+        clicked = False
+        for _ in range(6):
             self.heartbeat()
             if self.stop.is_set():
                 raise InterruptedError()
             frame = self.capture()
             if self.panel.close_icon(frame) is None:
                 return False
-            point = self.panel.ability_position(frame)
-            if point is None:
+            found = self.panel.ability_state(frame)
+            if found is None:
                 absent += 1
-                if absent >= 2:
+                if absent >= 2 and not clicked:
                     return True
                 self.wait(.1)
+            elif found[0] == 'on':
+                return True
             else:
                 absent = 0
-                self.click(point, frame)
-                self.wait(.2)
+                self.click(found[1], frame)
+                clicked = True
+                self.wait(.3)
+        self.log('Auto Ability could not be confirmed on.')
         return False
 
     def placement_panel(self, frame, panel):

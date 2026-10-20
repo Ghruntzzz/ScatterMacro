@@ -2,6 +2,8 @@
 import json
 import re
 import uuid
+from threading import Lock
+from python_macro.session_stats import WaveTotals
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
@@ -31,11 +33,47 @@ class Notifier:
         self.opener = opener or build_opener(NoRedirect())
         self.results = {'victory':0, 'defeat':0}
         self.total_duration = 0
+        self.reward_totals = {}
+        self.stat_totals = {}
+        self.wave_totals = WaveTotals()
+        self.wave_lock = Lock()
+        self.run_finished = False
+
+    def observe(self, value):
+        with self.wave_lock:
+            if value.get('new_run'):
+                self.wave_totals.start_run()
+                self.run_finished = False
+            if not self.run_finished:
+                self.wave_totals.observe(value.get('wave'))
+                if value.get('result') in ('victory','defeat'):
+                    if value['result'] == 'victory':
+                        self.wave_totals.finish_run()
+                    self.run_finished = True
 
     def send(self, outcome, duration=0, reward_dir=None, error=None):
+        metadata = {}
+        if reward_dir is not None:
+            try:
+                metadata = json.loads((Path(reward_dir)/'rewards.json').read_text(encoding='utf-8'))
+                if not isinstance(metadata,dict):
+                    metadata = {}
+            except (OSError, ValueError):
+                pass
         if outcome in self.results:
             self.results[outcome] += 1
             self.total_duration += max(0, duration)
+            for item in metadata.get('rewards',[]):
+                match = re.fullmatch(r'(\d[\d,]*)\s*[xX]\s+(.+)', str(item).strip())
+                if match and 'unread reward' not in match[2].casefold():
+                    name = ' '.join(match[2].split())
+                    key = name.casefold()
+                    old = self.reward_totals.get(key, (name,0))
+                    self.reward_totals[key] = (old[0],old[1]+int(match[1].replace(',','')))
+            for name in ('Total Kills','Total Damage'):
+                value = str(metadata.get('stats',{}).get(name,''))
+                if re.fullmatch(r'\d[\d,]*',value):
+                    self.stat_totals[name] = self.stat_totals.get(name,0)+int(value.replace(',',''))
         key = 'ping_error' if outcome == 'error' else 'ping_' + outcome
         if not self.settings.get('webhook','').strip() or self.settings.get(key,'0') != '1':
             return False
@@ -62,20 +100,17 @@ class Notifier:
             fields = [{'name':name, 'value':str(value), 'inline':True} for name,value in (
                 ('Runs',runs), ('Victories',self.results['victory']),
                 ('Defeats',self.results['defeat']),
-                ('Average Run',f'{int(self.total_duration/max(1,runs))}s'))]
-        metadata = {}
-        if reward_dir is not None:
-            try:
-                metadata = json.loads((Path(reward_dir)/'rewards.json').read_text(encoding='utf-8'))
-                if not isinstance(metadata,dict):
-                    metadata = {}
-            except (OSError, ValueError):
-                pass
-        for name,value in metadata.get('stats',{}).items():
-            fields.append({'name':str(name)[:256], 'value':str(value)[:1024], 'inline':True})
+                ('Average Run',f'{int(self.total_duration/max(1,runs))}s'),
+                ('Total Run Time',f'{int(self.total_duration)}s'))]
+            with self.wave_lock:
+                fields.append({'name':'Total Waves Completed','value':str(self.wave_totals.total),'inline':True})
+            for name,value in self.stat_totals.items():
+                fields.append({'name':name,'value':f'{value:,}','inline':True})
         if self.settings.get('show_rewards','0') == '1' and reward_dir is not None:
             rewards = '\n'.join(str(item) for item in metadata.get('rewards',[]))
             fields.append({'name':'Rewards Earned', 'value':rewards[:1024] or 'Could not read rewards.', 'inline':False})
+            totals = '\n'.join(f'{count:,}x {name}' for name,count in self.reward_totals.values())
+            fields.append({'name':'Total Rewards (Session)', 'value':totals[:1024] or 'No readable rewards yet.', 'inline':False})
         if fields:
             embed['fields'] = fields[:25]
         payload = {'embeds':[embed], 'allowed_mentions':{'parse':[], 'users':[mention] if mention else []}}
