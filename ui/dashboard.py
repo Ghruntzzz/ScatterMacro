@@ -1054,7 +1054,7 @@ class RuntimeWindow(DashboardWindow):
         if self.worker is not None and self.worker.isRunning():
             self.worker.update_entry(index, entry)
 
-    def _record_path(self,index,mode):
+    def _record_path(self,index):
         recorder=getattr(self,'path_recorder',None)
         if recorder is not None and recorder.active:
             recorder.finish()
@@ -1072,7 +1072,7 @@ class RuntimeWindow(DashboardWindow):
             hwnd,pid=self.values.get('roblox_hwnd'),self.values.get('roblox_pid')
             target=selected_roblox_window(hwnd,pid) if hwnd and pid else single_roblox_window()
             client=RobloxClient(target[0],Event(),selected_pid=target[2])
-            self.path_recorder=PathRecorder(client,mode,self)
+            self.path_recorder=PathRecorder(client,self)
             self.path_recorder.finished.connect(lambda raw:self.index_editor.save_path(index,raw))
             self.path_recorder.failed.connect(self._record_failed)
             self.path_recorder.start()
@@ -1167,8 +1167,6 @@ class RuntimeWindow(DashboardWindow):
         from python_macro.hotkeys import RuntimeHotkeys
         if event_type in (b"windows_generic_MSG", b"windows_dispatcher_MSG"):
             msg = wintypes.MSG.from_address(int(message))
-            if msg.message == 0x00ff and getattr(self,'path_recorder',None) is not None:
-                self.path_recorder.raw_mouse(msg.lParam)
             if msg.message == 0x0312 and not self.return_pending:
                 if msg.wParam == RuntimeHotkeys.START and self.isVisible():
                     self._start_story()

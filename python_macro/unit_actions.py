@@ -186,7 +186,7 @@ class UnitPanel:
 
 class UnitIndexer:
     def __init__(self, entries, client, capture, panel, stop, log, clock=time.monotonic,
-                 heartbeat=lambda: None):
+                 heartbeat=lambda: None, allow_paths=True):
         self.entries = entries
         self.client, self.capture, self.panel = client, capture, panel
         self.stop, self.log = stop, log
@@ -194,7 +194,8 @@ class UnitIndexer:
             paused = getattr(client, 'focus_pause_time', 0.0)
             return clock() - (paused if isinstance(paused, (float,int)) else 0.0)
         self.clock = active_clock
-        self.completed = set()
+        self.completed = {i for i, entry in enumerate(entries)
+                          if entry.get('path') and not allow_paths}
         self.heartbeat = heartbeat
         self.placed = {}
         self.ability_checked = set()
@@ -357,6 +358,8 @@ class UnitIndexer:
         raise RuntimeError(f"Could not confirm placement for Index {index+1}. Check the position and available yen.")
 
     def run(self, index):
+        if index in self.completed:
+            return
         entry = self.entries[index]
         if entry.get('path'):
             from python_macro.pathing import replay_path,decode_path

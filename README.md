@@ -51,12 +51,14 @@ retry the same stage. Challenges currently share the Challenge unit configuratio
 
 ## Recorded paths
 
-Select an index in Unit Manager, choose Keyboard, Mouse, or Both, and press
+Select an index in Unit Manager and press
 Record. Roblox is focused automatically. F3 or Stop Recording finishes and saves
-the path. Keyboard records WASD; Mouse records relative movement and right-button
-camera dragging, not left-clicks. Recording pauses outside Roblox and is limited
+the path. Only WASD is recorded, never mouse movements or clicks.
+Recording pauses outside Roblox and is limited
 to five minutes. A path index cannot also contain unit placement or upgrade
-settings; Reset removes its path. Paths replay in numerical index order.
+settings; Reset removes its path. Paths run in numerical index order only on the
+first match of each macro session, not on repeats or later challenges. Starting
+a new macro session enables them again. Old Mouse/Both paths must be recorded again.
 
 Replay is timed input, not position-aware navigation. Use the same starting
 position, camera, sensitivity, and game settings as the recording. Movement can

@@ -27,8 +27,8 @@ class PathTests(unittest.TestCase):
 
     def test_wasd_only_recording_and_focus_pause(self):
         now=[0]
-        recorder=PathRecording('Keyboard',lambda:now[0])
-        recorder.sample(True,['W','E'],dx=50)
+        recorder=PathRecording(clock=lambda:now[0])
+        recorder.sample(True,['W','E'])
         now[0]=1
         recorder.sample(True,['W','D'])
         now[0]=1.01
@@ -45,14 +45,22 @@ class PathTests(unittest.TestCase):
         self.assertEqual(data['events'][0],[0,'key','W',1])
         self.assertIn([1,'key','W',0],data['events'])
 
-    def test_mouse_mode_ignores_keyboard_and_records_relative_drag(self):
-        now=[0]
-        recorder=PathRecording('Mouse',lambda:now[0])
-        recorder.sample(True,['W'],True,12,-4)
-        now[0]=.5
-        recorder.sample(True,[],False)
-        data=decode_path(recorder.finish())
-        self.assertEqual(data['events'],[[0,'look',1],[0,'mouse',12,-4],[.5,'look',0]])
+    def test_mouse_recordings_rejected(self):
+        for mode in ('Mouse','Both'):
+            with self.assertRaises(ValueError):
+                decode_path(path(mode))
+
+    def test_paths_skipped_after_first_match(self):
+        entries=[dict(EMPTY_INDEX,path=path()),dict(EMPTY_INDEX,unit='1',x='10',y='20')]
+        worker=UnitIndexer(entries,Mock(),Mock(),Mock(),FastStop(),Mock(),allow_paths=False)
+        self.assertEqual(worker.next_ready(None),1)
+        with patch('python_macro.pathing.replay_path') as replay:
+            worker.run(0)
+        replay.assert_not_called()
+        worker.completed.add(1)
+        self.assertTrue(worker.all_done())
+        fresh=UnitIndexer(entries,Mock(),Mock(),Mock(),FastStop(),Mock())
+        self.assertEqual(fresh.next_ready(None),0)
 
     def test_invalid_keys_times_and_modes_rejected(self):
         for raw in ('{}',path(events=[[0,'key','E',1]]),path(events=[[2,'key','W',1]]),
@@ -66,11 +74,11 @@ class PathTests(unittest.TestCase):
         stop=FastStop()
         stop.wait=lambda seconds:now.__setitem__(0,now[0]+seconds) or False
         client=SimpleNamespace(focus_pause_time=0,check_focus=Mock(),_key=Mock(),_send_mouse=Mock())
-        replay_path(path('Both',[[0,'key','W',1],[.5,'mouse',3,-2],[1,'key','W',0]]),
+        replay_path(path(),
                     client,stop,clock=lambda:now[0])
         self.assertAlmostEqual(now[0],1)
         self.assertEqual([c.args for c in client._key.call_args_list],[('W',),('W',)])
-        client._send_mouse.assert_called_once_with(1,dx=3,dy=-2)
+        client._send_mouse.assert_not_called()
 
     def test_stop_and_game_end_release_all_held_input(self):
         for game_end in (False,True):
@@ -87,10 +95,10 @@ class PathTests(unittest.TestCase):
                 if game_end and now[0]>.0:
                     raise RuntimeError('round ended')
             with self.assertRaises(RuntimeError if game_end else InterruptedError):
-                replay_path(path('Both',[[0,'key','W',1],[0,'look',1],[1,'mouse',1,1]]),
+                replay_path(path(),
                             client,stop,heartbeat,lambda:now[0])
             client._key.assert_called_with('W',release=True)
-            client._send_mouse.assert_called_with(0x10)
+            client._send_mouse.assert_not_called()
 
     def test_path_index_replays_in_numerical_order_without_unit_placement(self):
         entries=[dict(EMPTY_INDEX,path=path()),dict(EMPTY_INDEX,unit='1',x='10',y='20')]
@@ -108,6 +116,9 @@ class PathTests(unittest.TestCase):
     def test_manager_path_disables_fields_and_reset_restores(self):
         entries=[dict(EMPTY_INDEX,unit='6',x='400',y='300')]
         widget=UnitManager(entries,Mock(),lambda:False,Mock(),record=Mock())
+        self.assertFalse(hasattr(widget,'path_mode'))
+        widget.toggle_record()
+        widget.record_callback.assert_called_once_with(0)
         widget.save_path(0,path())
         self.assertEqual(entries[0]['unit'],'0')
         self.assertEqual(entries[0]['x'],'')
@@ -128,7 +139,7 @@ class PathTests(unittest.TestCase):
         user.GetForegroundWindow.return_value=99
         user.GetAsyncKeyState.return_value=0
         client=SimpleNamespace(user=user,hwnd=99,focus_roblox=Mock(return_value=True))
-        recorder=PathRecorder(client,'Keyboard',window)
+        recorder=PathRecorder(client,window)
         finished=Mock()
         recorder.finished.connect(finished)
         recorder.start()
@@ -137,36 +148,6 @@ class PathTests(unittest.TestCase):
         recorder.sample()
         self.assertFalse(recorder.active)
         finished.assert_called_once_with('')
-        user.SendInput.assert_not_called()
-        window.close()
-
-    def test_raw_mouse_registration_and_cleanup_without_global_input(self):
-        import ctypes
-        from ui.path_recorder import PathRecorder,Header,Mouse
-        from PySide6.QtWidgets import QWidget
-        window=QWidget()
-        user=Mock()
-        user.GetForegroundWindow.return_value=99
-        user.GetAsyncKeyState.return_value=0
-        user.RegisterRawInputDevices.return_value=True
-        client=SimpleNamespace(user=user,hwnd=99,focus_roblox=Mock(return_value=True))
-        recorder=PathRecorder(client,'Mouse',window)
-        recorder.start()
-        header=Header(0,ctypes.sizeof(Header)+ctypes.sizeof(Mouse),None,0)
-        mouse=Mouse(0,0,0,7,-3,0)
-        packet=bytes(header)+bytes(mouse)
-        def read(handle,command,buffer,size,header_size):
-            ctypes.cast(size,ctypes.POINTER(ctypes.c_uint)).contents.value=len(packet)
-            if buffer is None:
-                return 0
-            ctypes.memmove(buffer,packet,len(packet))
-            return len(packet)
-        user.GetRawInputData.side_effect=read
-        recorder.raw_mouse(10)
-        self.assertEqual(recorder.recording.events[-1][1:],['mouse',7,-3])
-        recorder.finish()
-        self.assertFalse(recorder.registered)
-        self.assertEqual(user.RegisterRawInputDevices.call_count,2)
         user.SendInput.assert_not_called()
         window.close()
 

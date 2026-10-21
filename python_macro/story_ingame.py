@@ -289,6 +289,7 @@ def run_matches(capture, client, reader, stop, log, assets, entries, status,
                 on_result=lambda *args: None, next_match=None):
     monitor = MatchMonitor(monitor_capture, assets, status)
     monitor.start()
+    first_run = True
     try:
         while not stop.is_set():
             active_hud = HudReader(reader, stop, assets) if allow_active else None
@@ -308,7 +309,8 @@ def run_matches(capture, client, reader, stop, log, assets, entries, status,
                 return state["wave"]
             indexer = UnitIndexer(entries_provider() if entries_provider else entries,
                                   client, capture, UnitPanel(reader, stop, assets),
-                                  stop, log, heartbeat=checkpoint)
+                                  stop, log, heartbeat=checkpoint, allow_paths=first_run)
+            first_run = False
             waiting_logged = False
             try:
                 while not stop.is_set():
