@@ -8,12 +8,12 @@
     {
       "id": "anime-expeditions",
       "name": "Anime Expeditions",
-      "version": "0.1.51",
+      "version": "0.1.52",
       "setup_only": false,
       "entrypoint": "AnimeExpeditions.exe",
-      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.51/AnimeExpeditions-0.1.51-windows.zip",
-      "sha256": "fc256c15e3610f0941f55bfe17d0813d05e79cafd2b4b67abe827eaacb87fbda",
-      "description": "Fixes repeated Tower tab clicks and excludes tab-card Floor labels from playable floor selection."
+      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.52/AnimeExpeditions-0.1.52-windows.zip",
+      "sha256": "b9dd48d06344a3382f7a93e8544470651525c2a31745f579daabcbf8c0b43702",
+      "description": "Tower in-game operations with Next Floor on victory, Repeat Floor on defeat, and quieter Action Output."
     }
   ]
 }
