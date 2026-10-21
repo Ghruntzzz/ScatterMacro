@@ -8,12 +8,12 @@
     {
       "id": "anime-expeditions",
       "name": "Anime Expeditions",
-      "version": "0.1.49",
+      "version": "0.1.50",
       "setup_only": false,
       "entrypoint": "AnimeExpeditions.exe",
-      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.49/AnimeExpeditions-0.1.49-windows.zip",
-      "sha256": "9719b76827667a62bc0dcb733e862dd9f6c81141c3138db0e4b2f7a160f04bf2",
-      "description": "Automatic map profiles in Story, Raid and Challenge; empty-profile creation and faster image-based Challenge navigation."
+      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.50/AnimeExpeditions-0.1.50-windows.zip",
+      "sha256": "4da8c050fe92aad406f3a3c27ab883347d2908c073969634e8b051e518dfd2ad",
+      "description": "Tower navigation with highest visible floor selection and separate per-map Trait and Traitless profiles."
     }
   ]
 }
