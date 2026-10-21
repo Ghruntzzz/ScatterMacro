@@ -1038,6 +1038,14 @@ class RuntimeWindow(DashboardWindow):
                                        self.log.appendPlainText, manager, record=self._record_path)
         self.index_editor.setGeometry(12, 12, 403, 894)
 
+    def _challenge_profile(self,mode,map_name,act,entries):
+        self.unit_config_path=active_unit_config(dict(mode=mode,map=map_name,act=act))
+        self.unit_indexes[:]=[dict(e) for e in entries]
+        self.index_editor.copied_index=None
+        self.index_editor.select(0)
+        self.index_editor.setToolTip(f'{mode} profile: {map_name}, {act}')
+        self.log.appendPlainText(f'Unit profile: {map_name}, {act}.')
+
     def _save_runtime_index(self, index, entry):
         parser = configparser.ConfigParser(interpolation=None)
         read_ini(parser, self.unit_config_path)
@@ -1284,6 +1292,7 @@ class RuntimeWindow(DashboardWindow):
         self.worker.message.connect(self.log.appendPlainText)
         self.worker.click_target.connect(self._show_click_target)
         self.worker.hud_status.connect(self._update_hud)
+        self.worker.profile_changed.connect(self._challenge_profile)
         self.worker.finished.connect(self._story_finished)
         self.runtime_status.setText("RUNNING")
         self.worker.start()

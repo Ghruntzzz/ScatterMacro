@@ -64,8 +64,8 @@ jobs:
       - name: Upload tested Windows build
         uses: actions/upload-artifact@v4
         with:
-          name: AnimeExpeditions-0.1.48-windows
-          path: dist/AnimeExpeditions-0.1.48-windows.zip
+          name: AnimeExpeditions-0.1.49-windows
+          path: dist/AnimeExpeditions-0.1.49-windows.zip
           if-no-files-found: error
           retention-days: 7
       - name: Publish and verify macro archive
@@ -74,12 +74,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '0.1.48'
+          $version = '0.1.49'
           $tag = "anime-expeditions-v$version"
           $name = "AnimeExpeditions-$version-windows.zip"
           $archive = "dist/$name"
           if (!(Test-Path $archive)) { throw "Missing macro ZIP: $archive" }
-          gh release create $tag $archive --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Anime Expeditions $version - Challenge Cooldown Fixes" --notes "Challenge selection now recognizes Available in cooldowns, clicks Back, and skips that challenge until its timer expires. Uses the supplied Challenge button image, avoids redundant category clicks, and reuses OCR results for the same capture. Each Challenge match loads its matching Story map profile; configure indexes in Story, where Acts 1-5 share the map profile. 232 tests passed, including cooldown skipping and profile switching. OCR verified against the supplied cooldown screenshot. Live gameplay validation remains recommended."
+          gh release create $tag $archive --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Anime Expeditions $version - Automatic Map Profiles" --notes "Unit Manager now switches to the detected map profile in Story, Raid, and Challenge. Missing profiles open empty and save on edit. Raid keeps separate profiles for each map and act; standard Story acts share their map profile. Live new indexes wait for coordinates instead of stopping the macro. Challenge navigation uses static tab and Back images, excludes changing timers, skips unavailable Weekly, and reuses confirmed captures and OCR results. 238 tests passed. Live gameplay validation remains recommended."
           if ($LASTEXITCODE -ne 0) { throw 'Macro release upload failed' }
           New-Item -ItemType Directory -Force 'dist/verified' | Out-Null
           gh release download $tag --repo $env:GITHUB_REPOSITORY --pattern $name --dir 'dist/verified'
@@ -91,7 +91,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '0.1.48'
+          $version = '0.1.49'
           $archive = "dist/AnimeExpeditions-$version-windows.zip"
           $sha256 = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
           $url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/anime-expeditions-v$version/AnimeExpeditions-$version-windows.zip"
@@ -104,7 +104,7 @@ jobs:
           $macro[0].version = $version
           $macro[0].url = $url
           $macro[0].sha256 = $sha256
-          $macro[0].description = "Challenge cooldown skipping, faster image-based navigation, and matching Story map profiles."
+          $macro[0].description = "Automatic map profiles in Story, Raid and Challenge; empty-profile creation and faster image-based Challenge navigation."
           $catalog | ConvertTo-Json -Depth 20 | Set-Content catalog.json -Encoding utf8
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

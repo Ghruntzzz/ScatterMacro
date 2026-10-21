@@ -48,7 +48,11 @@ individual challenges in Match Settings to skip them. The macro reads available
 entries and remaining limits, waits when selected challenges are unavailable,
 and returns through View Party -> Change Gamemode after victories. Defeats can
 retry the same stage. Challenges load the matching Story map configuration on
-every match (Acts 1-5 share that map's profile). Configure these indexes in Story.
+every match (Acts 1-5 share that map's profile). Unit Manager automatically
+switches profiles when match details are detected in Story, Raid, or Challenge.
+Missing profiles open empty and are created when edited. Raid profiles are
+separate for each map and act; Story Mastery and Infinite stay separate too.
+New indexes wait for their saved position before placement during live editing.
 An "Available in" stage is backed out of and skipped until its timer expires.
 
 ## Recorded paths

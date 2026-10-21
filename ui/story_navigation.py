@@ -18,6 +18,7 @@ class StoryWorker(QThread):
     message = Signal(str)
     click_target = Signal(int, int)
     hud_status = Signal(object)
+    profile_changed = Signal(str,str,str,object)
 
     def __init__(self, map_name, parent, act_name="Act 1", difficulty="Normal",
                  selected_hwnd="", selected_pid="", reader=None, entries=(), reward_dir=None,
@@ -35,6 +36,22 @@ class StoryWorker(QThread):
         self.entries_lock = Lock()
         self.reward_dir = reward_dir
         self.notification_settings = notification_settings or {}
+        self.challenge_route = None
+
+    def challenge_entries(self,map_name,act):
+        return self.map_entries('Story',map_name,act)
+
+    def map_entries(self,mode,map_name,act):
+        from ui.dashboard import load_unit_indexes,active_unit_config
+        values=dict(mode=mode,map=map_name,act=act)
+        path=active_unit_config(values)
+        if path != self.challenge_route:
+            entries=load_unit_indexes(values,count=len(self.entries))
+            with self.entries_lock:
+                self.entries=entries
+                self.challenge_route=path
+            self.profile_changed.emit(mode,map_name,act,[dict(e) for e in entries])
+        return self.current_entries()
 
     def update_entry(self, index, entry):
         with self.entries_lock:
@@ -70,7 +87,6 @@ class StoryWorker(QThread):
                                       ChatLocator(root / "assets"), self.stop)
             if self.mode == 'Challenges':
                 from python_macro.challenges import run_challenges
-                from ui.dashboard import load_unit_indexes
                 from python_macro.capture import capture_client
                 def challenge_capture():
                     if client.user.GetForegroundWindow() != client.hwnd or client.user.IsIconic(client.hwnd):
@@ -84,13 +100,16 @@ class StoryWorker(QThread):
                 run_challenges(capture,client,self.reader,self.stop,self.message.emit,root/'assets',
                                self.notification_settings,self.entries,update_status,challenge_capture,
                                self.reward_dir,self.current_entries,notifier,play_icon,
-                               route_entries=lambda map_name,act:load_unit_indexes(
-                                   dict(mode='Story',map=map_name,act=act),count=len(self.entries)))
+                               route_entries=self.challenge_entries)
                 return
             from python_macro.story_ingame import already_in_match
+            def detected(mode,map_name,act,difficulty):
+                self.mode,self.map_name,self.act_name,self.difficulty=mode,map_name,act,difficulty
+                notifier.settings.update(mode=mode,map=map_name,act=act,difficulty=difficulty)
+                self.map_entries(mode,map_name,act)
             in_match = already_in_match(capture, self.reader, self.stop,
                                         self.map_name, self.act_name, self.difficulty,
-                                        find_play=play_icon, mode=self.mode)
+                                        find_play=play_icon, mode=self.mode,on_detect=detected)
             if not in_match:
                 navigate_story(self.map_name, capture, self.reader, client.direct_click,
                            self.stop, self.message.emit, scroll=client.scroll,
@@ -119,7 +138,8 @@ class StoryWorker(QThread):
                                  self.message.emit, root / "assets", self.entries,
                                  update_status, monitor_capture=monitor_capture,
                                  reward_dir=self.reward_dir, entries_provider=self.current_entries,
-                                 match_confirmed=in_match, on_result=notifier.send, mode=self.mode)
+                                 match_confirmed=in_match, on_result=notifier.send, mode=self.mode,
+                                 on_detect=detected)
         except InterruptedError:
             self.stop.set()
         except Exception as exc:

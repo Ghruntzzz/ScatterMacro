@@ -15,10 +15,29 @@ class RoundEnded(Exception):
     pass
 
 
+def detected_route(texts):
+    text=' '.join(texts)
+    if any(word in text.lower() for word in ('rewards available','resets in','select stage')):
+        return None
+    match=re.search(r'\b(Story|Raid)\s+(.+?)\s*[-\u2013]?\s*(Act\s*[1-5]|Mastery|Infinite)\b',text,re.I)
+    if not match:
+        return None
+    mode=match[1].title()
+    act=re.sub(r'\s+',' ',match[3].title())
+    act=re.sub(r'Act\s*([1-5])',r'Act \1',act)
+    difficulty='Hard' if 'hardmod' in normalize(text) else 'Normal'
+    if mode=='Story' and not any(n in normalize(text) for n in ('normalmod','hardmod')):
+        return None
+    if mode=='Raid' and act not in ('Act 1','Act 2','Act 3'):
+        return None
+    return mode,match[2].strip(' -\u2013'),act,difficulty
+
+
 def already_in_match(capture, reader, stop, map_name, act, difficulty, find_play=None,
-                     mode='Story', wait_seconds=3):
+                     mode='Story', wait_seconds=3, on_detect=None):
     confirmed = 0
     deadline = time.monotonic()+wait_seconds
+    previous=None
     while not stop.is_set():
         if stop.is_set():
             return False
@@ -28,6 +47,16 @@ def already_in_match(capture, reader, stop, map_name, act, difficulty, find_play
                               scale=2, max_variants=2, min_confidence=.7,
                               cancelled=stop.is_set)
         texts = [m.text for m in matches]
+        if on_detect is not None:
+            route=detected_route(texts)
+            if route is not None and route==previous:
+                on_detect(*route)
+                return True
+            previous=route
+            remaining=deadline-time.monotonic()
+            if remaining<=0 or stop.wait(min(.1,remaining)):
+                break
+            continue
         if not matches_story(texts, map_name, act, difficulty, mode=mode):
             text = normalize(" ".join(texts))
             if re.search(r"act[1-9]", text) and (
@@ -144,9 +173,10 @@ class HudReader:
 def run_story_ingame(map_name, act, difficulty, capture, client, reader, stop,
                      log, assets, entries=(), status=lambda value: None,
                      monitor_capture=None, reward_dir=None, entries_provider=None,
-                     match_confirmed=False, on_result=lambda *args: None, mode='Story', next_match=None):
+                     match_confirmed=False, on_result=lambda *args: None, mode='Story', next_match=None,
+                     on_detect=None):
     if not prepare_match(map_name,act,difficulty,capture,client,reader,stop,log,
-                         match_confirmed=match_confirmed,mode=mode):
+                         match_confirmed=match_confirmed,mode=mode,on_detect=on_detect):
         return
     run_matches(capture, client, reader, stop, log, assets, entries, status,
                 monitor_capture or capture, reward_dir, entries_provider, allow_active=match_confirmed,
@@ -154,10 +184,11 @@ def run_story_ingame(map_name, act, difficulty, capture, client, reader, stop,
 
 
 def prepare_match(map_name,act,difficulty,capture,client,reader,stop,log,
-                  match_confirmed=False,mode='Story'):
+                  match_confirmed=False,mode='Story',on_detect=None):
     log("Waiting for match details.")
     confirmed = 0
     scans = 0
+    previous=None
     while not match_confirmed and not stop.is_set():
         frame = capture()
         h, w = frame.shape[:2]
@@ -178,8 +209,15 @@ def prepare_match(map_name,act,difficulty,capture,client,reader,stop,log,
                                       cancelled=stop.is_set,
                                       accept=lambda found: matches_story(
                                           [m.text for m in found], map_name, act, difficulty, mode=mode))
-        confirmed = confirmed + 1 if matches_story([m.text for m in matches], map_name, act, difficulty, mode=mode) else 0
+        route=detected_route([m.text for m in matches]) if on_detect else None
+        if route is not None:
+            confirmed=confirmed+1 if route==previous else 1
+            previous=route
+        else:
+            confirmed = confirmed + 1 if matches_story([m.text for m in matches], map_name, act, difficulty, mode=mode) else 0
         if confirmed >= 2:
+            if on_detect:
+                on_detect(*(route or (mode,map_name,act,difficulty)))
             break
         if stop.wait(0.25):
             return
@@ -309,12 +347,15 @@ def run_matches(capture, client, reader, stop, log, assets, entries, status,
                 return state["wave"]
             indexer = UnitIndexer(entries_provider() if entries_provider else entries,
                                   client, capture, UnitPanel(reader, stop, assets),
-                                  stop, log, heartbeat=checkpoint, allow_paths=first_run)
+                                  stop, log, heartbeat=checkpoint, allow_paths=first_run,
+                                  allow_incomplete=bool(entries_provider))
             first_run = False
             waiting_logged = False
             try:
                 while not stop.is_set():
                     wave = checkpoint()
+                    if entries_provider:
+                        indexer.entries=entries_provider()
                     indexer.check_abilities(wave[0] if wave else None)
                     next_index = indexer.next_ready(wave[0] if wave else None)
                     if next_index is not None:

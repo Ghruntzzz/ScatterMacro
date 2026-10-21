@@ -96,6 +96,12 @@ class ChallengeFlow:
         self.party = Icon(assets/'view-party.png',threshold=.85)
         self.change = Icon(assets/'change-gamemode.png',threshold=.85)
         self.challenge = Icon(assets/'challenge-button.png',threshold=.85)
+        self.back = Icon(assets/'challenge-back.png',threshold=.85)
+        # Only the static label/status strip participates, never the reset timer.
+        self.tab_icons = {kind:Icon(assets/('challenge-'+kind+'.png'),threshold=.88,
+                                   crop=(6,6,160,34)) for kind in ('regular','daily')}
+        self.weekly_unavailable = Icon(assets/'challenge-weekly-unavailable.png',threshold=.88,
+                                       crop=(6,6,160,34))
         self.menu_frame, self.menu_result = None, None
         self.cooldowns = {}
         self.current = None
@@ -111,6 +117,7 @@ class ChallengeFlow:
         matches = self.reader.read(frame,Region(0,0,w,h),scale=2,max_variants=1,
                                    min_confidence=.6,cancelled=self.stop.is_set)
         self.menu_frame, self.menu_result = frame, menu_data(matches)
+        self.ocr.last_frame,self.ocr.matches=frame,matches
         return self.menu_result
 
     def cooldown(self,frame):
@@ -123,12 +130,32 @@ class ChallengeFlow:
     def challenge_target(self,frame):
         return self.challenge(frame) or self.text('Challenge','Challenges')(frame)
 
+    def back_target(self,frame):
+        return self.back(frame) or self.text('Back')(frame)
+
+    def tab_target(self,kind,frame):
+        icon=self.tab_icons.get(kind)
+        if icon is not None:
+            point=icon(frame)
+            if point is not None:
+                return point
+        if kind=='weekly' and self.weekly_unavailable(frame) is not None:
+            return None
+        tab=self.read_menu(frame)[0].get(kind)
+        return tab['point'] if tab and tab['available'] else None
+
     def text(self,*labels):
         names = {normalize(label) for label in labels}
         return lambda frame:self.ocr.unique(frame,lambda text:normalize(text) in names)
 
     def press(self,label,locate,advanced=None):
-        return click_and_confirm(label,locate,advanced or (lambda after,before:changed_screen(before,after)),
+        check=advanced or (lambda after,before:changed_screen(before,after))
+        def confirmed(after,before):
+            if check(after,before):
+                self.transition_frame=after
+                return True
+            return False
+        return click_and_confirm(label,locate,confirmed,
                                  self.capture,self.client.start_click if label=='Start' else self.client.direct_click,
                                  self.stop,self.log,timeout=30,stable_seconds=.45 if label=='Start' else 0)
 
@@ -178,12 +205,12 @@ class ChallengeFlow:
                     continue
                 # Resolve tab coordinates again rather than reusing a previous menu frame.
                 def tab_target(frame):
-                    tab=self.read_menu(frame)[0].get(kind)
-                    return tab['point'] if tab and tab['available'] else None
-                if not any(category(c.key)==kind for c in cards) and not self.press(kind.title()+' Challenge',tab_target,
-                    lambda after,before:any(category(c.key)==kind for c in self.read_menu(after)[1])):
-                    return None
-                _,cards=self.read_menu()
+                    return self.tab_target(kind,frame)
+                if not any(category(c.key)==kind for c in cards):
+                    if not self.press(kind.title()+' Challenge',tab_target,
+                        lambda after,before:any(category(c.key)==kind for c in self.read_menu(after)[1])):
+                        return None
+                    _,cards=self.read_menu(getattr(self,'transition_frame',None))
                 card=next((c for c in cards if c.key==key and self.permitted(c)),None)
                 if card is None:
                     continue
@@ -196,12 +223,13 @@ class ChallengeFlow:
                 if not self.press('Challenge stage',card_target,
                                   lambda after,before:self.cooldown(after) is not None or self.text('Select Stage')(after) is not None):
                     return None
-                seconds=self.cooldown(self.capture())
+                frame=getattr(self,'transition_frame',None)
+                seconds=self.cooldown(frame if frame is not None else self.capture())
                 if seconds is not None:
                     self.cooldowns[self.identity(card)]=self.clock()+seconds
                     self.log('Challenge is on cooldown. Moving to the next challenge.')
-                    if not self.press('Back',self.text('Back'),
-                                      lambda after,before:self.text('Back')(after) is None and bool(self.read_menu(after)[1])):
+                    if not self.press('Back',self.back_target,
+                                      lambda after,before:self.back_target(after) is None and bool(self.read_menu(after)[1])):
                         return None
                     continue
                 if not self.press('Select Stage',self.text('Select Stage'),

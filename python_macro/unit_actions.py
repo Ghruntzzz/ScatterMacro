@@ -34,10 +34,13 @@ def upgrade_value(texts):
 
 
 class Icon:
-    def __init__(self, path, threshold=0.92, scales=None):
+    def __init__(self, path, threshold=0.92, scales=None, crop=None):
         source = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
         if source is None:
             raise RuntimeError("Unit button reference image is missing.")
+        if crop is not None:
+            x,y,w,h=crop
+            source=source[y:y+h,x:x+w]
         self.tiles = [cv2.resize(source, None, fx=s, fy=s)
                       for s in (scales if scales is not None else (0.8, 1, 1.25, 1.5, 1.75, 2))]
         self.threshold = threshold
@@ -186,8 +189,9 @@ class UnitPanel:
 
 class UnitIndexer:
     def __init__(self, entries, client, capture, panel, stop, log, clock=time.monotonic,
-                 heartbeat=lambda: None, allow_paths=True):
+                 heartbeat=lambda: None, allow_paths=True, allow_incomplete=False):
         self.entries = entries
+        self.allow_incomplete=allow_incomplete
         self.client, self.capture, self.panel = client, capture, panel
         self.stop, self.log = stop, log
         def active_clock():
@@ -291,6 +295,8 @@ class UnitIndexer:
             if str(entry.get("unit", "0")) not in {"1","2","3","4","5","6"}:
                 continue
             if not all(str(entry.get(key, "")).isdecimal() for key in ("x", "y")):
+                if self.allow_incomplete:
+                    return None
                 raise RuntimeError(f"Set the position for Index {index+1} before starting.")
             required = requested_wave(entry.get("place_at_wave", ""))
             return index if required is None or (wave is not None and wave >= required) else None

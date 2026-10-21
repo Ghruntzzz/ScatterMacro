@@ -97,6 +97,78 @@ class ChallengeTests(unittest.TestCase):
         self.assertEqual(flow.challenge_target(object()),(100,100))
         flow.text.assert_not_called()
 
+    def test_tab_images_ignore_reset_timer(self):
+        import cv2
+        flow=self.flow()
+        for kind in ('regular','daily'):
+            frame=cv2.imread('assets/challenge-'+kind+'.png')
+            frame[50:]=255
+            flow.read_menu=Mock(side_effect=AssertionError('Unexpected OCR'))
+            self.assertIsNotNone(flow.tab_target(kind,frame))
+
+    def test_weekly_unavailable_image_never_selects_tab(self):
+        import cv2
+        flow=self.flow()
+        frame=cv2.imread('assets/challenge-weekly-unavailable.png')
+        frame[50:]=255
+        flow.read_menu=Mock(side_effect=AssertionError('Unexpected OCR'))
+        self.assertIsNone(flow.tab_target('weekly',frame))
+
+    def test_new_map_profile_is_empty_then_saves_and_reloads(self):
+        import tempfile
+        from ui import dashboard
+        from ui.story_navigation import StoryWorker
+        from ui.unit_manager import EMPTY_INDEX
+        from PySide6.QtWidgets import QApplication
+        app=QApplication.instance() or QApplication([])
+        with tempfile.TemporaryDirectory() as directory, patch.object(dashboard,'CONFIG_PATH',Path(directory)/'settings.ini'):
+            window=dashboard.RuntimeWindow()
+            worker=StoryWorker('Auto',None,reader=Mock(),entries=[dict(EMPTY_INDEX)]*104,mode='Challenges')
+            worker.profile_changed.connect(window._challenge_profile)
+            entries=worker.challenge_entries('Flower Forest','Act 2')
+            self.assertTrue(all(e['unit']=='0' for e in entries))
+            self.assertEqual(window.unit_config_path,dashboard.active_unit_config(dict(mode='Story',map='Flower Forest',act='Act 2')))
+            window._save_runtime_index(0,dict(EMPTY_INDEX,unit='1',x='10',y='20'))
+            worker.challenge_entries('Rose Kingdom','Act 1')
+            self.assertEqual(window.unit_indexes[0]['unit'],'0')
+            worker.challenge_entries('Flower Forest','Act 5')
+            self.assertEqual(window.unit_indexes[0]['unit'],'1')
+            worker.map_entries('Raid','Spirit City','Act 1')
+            window._save_runtime_index(0,dict(EMPTY_INDEX,unit='2',x='10',y='20'))
+            worker.map_entries('Raid','Spirit City','Act 2')
+            self.assertEqual(window.unit_indexes[0]['unit'],'0')
+            worker.map_entries('Raid','Spirit City','Act 1')
+            self.assertEqual(window.unit_indexes[0]['unit'],'2')
+            window.close()
+
+    def test_detected_story_and_raid_routes(self):
+        from python_macro.story_ingame import detected_route
+        self.assertEqual(detected_route(['Story East Town - Act 3','Normal Mode']),
+                         ('Story','East Town','Act 3','Normal'))
+        self.assertEqual(detected_route(['Raid','Snowy Castle - Act 2']),
+                         ('Raid','Snowy Castle','Act 2','Normal'))
+        self.assertEqual(detected_route(['Story Flower Forest - Infinite','Hard Mode']),
+                         ('Story','Flower Forest','Infinite','Hard'))
+        self.assertIsNone(detected_route(['Story East Town - Act 3','Select Stage']))
+
+    def test_live_new_index_waits_for_coordinates(self):
+        from python_macro.unit_actions import UnitIndexer
+        from ui.unit_manager import EMPTY_INDEX
+        entries=[dict(EMPTY_INDEX,unit='1')]
+        indexer=UnitIndexer(entries,Mock(),Mock(),Mock(),FastStop(),Mock(),allow_incomplete=True)
+        self.assertIsNone(indexer.next_ready(None))
+        entries[0].update(x='10',y='20')
+        self.assertEqual(indexer.next_ready(None),0)
+
+    def test_existing_match_changes_profile_instead_of_rejecting_other_map(self):
+        from python_macro.story_ingame import already_in_match
+        reader=Mock()
+        reader.read.return_value=[label('Raid Snowy Castle - Act 2')]
+        callback=Mock()
+        frame=np.zeros((500,700,3),np.uint8)
+        self.assertTrue(already_in_match(lambda:frame,reader,FastStop(),'East Town','Act 1','Normal',on_detect=callback))
+        callback.assert_called_once_with('Raid','Snowy Castle','Act 2','Normal')
+
     def test_unavailable_selection_waits_and_remains_cancellable(self):
         flow=self.flow()
         tabs={kind:dict(available=False) for kind in ('weekly','daily','regular')}
