@@ -8,12 +8,12 @@
     {
       "id": "anime-expeditions",
       "name": "Anime Expeditions",
-      "version": "0.1.45",
+      "version": "0.1.46",
       "setup_only": false,
       "entrypoint": "AnimeExpeditions.exe",
-      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.45/AnimeExpeditions-0.1.45-windows.zip",
-      "sha256": "71ec8068a0b54ba015fc6a7c6896a25080693cfc8ddf092132a8edc592ea982b",
-      "description": "Spirit City and Snowy Castle Raids with separate act configs and shared in-game operations. New Story maps, three-second match check, and silent single-click Auto Ability."
+      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.46/AnimeExpeditions-0.1.46-windows.zip",
+      "sha256": "f538cf57649a5c0408decd96a18b37315bc5b6332ea6840cbebf5ed43678708b",
+      "description": "Challenges with selection and cooldown checks, recorded keyboard/mouse path indexes, cleaner logs and Total Rewards, stable Start clicks and faster unit setup."
     }
   ]
 }
