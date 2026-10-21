@@ -88,6 +88,38 @@ class StoryWorker(QThread):
             from python_macro.chat import ChatLocator, ChatSafeCapture
             capture = ChatSafeCapture(client.capture, client.direct_click,
                                       ChatLocator(root / "assets"), self.stop)
+            if self.mode == 'Expeditions':
+                self.message.emit('Expedition checkpoint shops still require manual handling.')
+                from python_macro.expeditions import ExpeditionFlow
+                from python_macro.story_ingame import already_in_match,run_story_ingame
+                from python_macro.capture import capture_client
+                flow=ExpeditionFlow(capture,client,self.reader,self.stop,self.message.emit,
+                                    root/'assets',self.map_name,self.difficulty,
+                                    priority=self.notification_settings.get('card_priority',''))
+                in_match=already_in_match(capture,self.reader,self.stop,self.map_name,
+                                          'Expedition',self.difficulty,mode='Expedition')
+                if not in_match and not flow.navigate(play_icon):
+                    return
+                def expedition_capture():
+                    if client.user.GetForegroundWindow()!=client.hwnd or client.user.IsIconic(client.hwnd):
+                        return None
+                    try:
+                        return capture_client(client.hwnd)
+                    except RuntimeError:
+                        if client.user.GetForegroundWindow()!=client.hwnd or client.user.IsIconic(client.hwnd):
+                            return None
+                        raise
+                def expedition_profile(*args):
+                    self.map_entries('Expeditions',self.map_name,'Expedition')
+                if in_match:
+                    expedition_profile()
+                run_story_ingame(self.map_name,'Expedition',self.difficulty,capture,client,self.reader,
+                                 self.stop,self.message.emit,root/'assets',self.entries,update_status,
+                                 monitor_capture=expedition_capture,reward_dir=self.reward_dir,
+                                 entries_provider=self.current_entries,match_confirmed=in_match,
+                                 mode='Expedition',on_detect=expedition_profile,
+                                 on_result=notifier.send,service=flow.service)
+                return
             if self.mode == 'Tower':
                 from python_macro.tower import TowerFlow
                 from ui.dashboard import MODE_MAPS

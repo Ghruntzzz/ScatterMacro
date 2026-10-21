@@ -174,13 +174,13 @@ def run_story_ingame(map_name, act, difficulty, capture, client, reader, stop,
                      log, assets, entries=(), status=lambda value: None,
                      monitor_capture=None, reward_dir=None, entries_provider=None,
                      match_confirmed=False, on_result=lambda *args: None, mode='Story', next_match=None,
-                     on_detect=None):
+                     on_detect=None,service=None):
     if not prepare_match(map_name,act,difficulty,capture,client,reader,stop,log,
                          match_confirmed=match_confirmed,mode=mode,on_detect=on_detect):
         return
     run_matches(capture, client, reader, stop, log, assets, entries, status,
                 monitor_capture or capture, reward_dir, entries_provider, allow_active=match_confirmed,
-                on_result=on_result, next_match=next_match)
+                on_result=on_result, next_match=next_match,service=service)
 
 
 def prepare_match(map_name,act,difficulty,capture,client,reader,stop,log,
@@ -326,7 +326,7 @@ def finish_match(capture, client, reader, stop, log, status, reward_dir, started
 
 def run_matches(capture, client, reader, stop, log, assets, entries, status,
                 monitor_capture, reward_dir, entries_provider=None, allow_active=False,
-                on_result=lambda *args: None, next_match=None, transition_match=None):
+                on_result=lambda *args: None, next_match=None, transition_match=None,service=None):
     monitor = MatchMonitor(monitor_capture, assets, status)
     monitor.start()
     first_run = True
@@ -346,6 +346,8 @@ def run_matches(capture, client, reader, stop, log, assets, entries, status,
                     raise RuntimeError("Screen monitoring failed: " + state["error"])
                 if state["outcome"] or state["reward"]:
                     raise RoundEnded()
+                if service is not None:
+                    service(indexer)
                 return state["wave"]
             indexer = UnitIndexer(entries_provider() if entries_provider else entries,
                                   client, capture, UnitPanel(reader, stop, assets),

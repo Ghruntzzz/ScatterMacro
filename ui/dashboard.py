@@ -120,6 +120,7 @@ def read_dashboard_values() -> dict[str, str]:
         "act": dashboard.get("Act", "Act 1"),
         "difficulty": dashboard.get("ExpeditionDifficulty", dashboard.get("Difficulty", "1")) if mode == "Expeditions" else dashboard.get("Difficulty", "Normal"),
         "expedition_difficulty": dashboard.get("ExpeditionDifficulty", "1"),
+        "card_priority": dashboard.get("CardPriority", ""),
         "tower_type": dashboard.get("TowerType", "Trait Tower"),
         "private_server": roblox.get("PrivateServerLink", ""),
         "roblox_hwnd": "",  # Legacy selector values must never bind a new session.
@@ -418,6 +419,8 @@ class DashboardWindow(QWidget):
         self.difficulty_box = self._combo(config, "DIFFICULTY", ["Normal", "Hard"], self.values["difficulty"], 36, 187, 240)
         self.act_box = self._combo(config, "ACT", MODE_ACTS["Story"], self.values["act"], 314, 187, 320)
         self.challenge_panel = QWidget(config)
+        self.card_priority_button=self._button(config,'CARD PRIORITY',314,215,320,False)
+        self.card_priority_button.clicked.connect(self._card_priority)
         self.challenge_panel.setGeometry(36,175,600,120)
         self.challenge_boxes = {}
         for i,(key,label) in enumerate((('weekly','Weekly'),('daily','Daily'),('regular1','Regular #1'),
@@ -435,6 +438,12 @@ class DashboardWindow(QWidget):
         self.last_expedition_difficulty = self.values["expedition_difficulty"]
         self._refresh_route_controls(initial=True)
 
+    def _card_priority(self):
+        from ui.card_priority import CardPriorityDialog
+        dialog=CardPriorityDialog(read_dashboard_values().get('card_priority',''),self)
+        if dialog.exec()==QDialog.DialogCode.Accepted:
+            update_config('Dashboard',{'CardPriority':'|'.join(dialog.order())})
+
     def _private_server(self) -> None:
         side = self._card(714, 208, 468, 316, 8)
         self._section_title(side, "PRIVATE SERVER", 20)
@@ -451,7 +460,7 @@ class DashboardWindow(QWidget):
 
     def _deployment(self) -> None:
         deploy = self
-        start = self._button(deploy, "START" if self.mode_box.currentText() in {"Story", "Raid", "Challenges", "Tower"} else "SAVE SETUP", 596, 577, 214, True)
+        start = self._button(deploy, "START" if self.mode_box.currentText() in {"Story", "Raid", "Challenges", "Tower", "Expeditions"} else "SAVE SETUP", 596, 577, 214, True)
         self.start_button = start
         settings = self._button(deploy, "SETTINGS", 830, 577, 164)
         exit_button = self._button(deploy, "EXIT", 1014, 577, 154)
@@ -563,7 +572,7 @@ class DashboardWindow(QWidget):
         self._refresh_route_controls()
         self._save_dashboard()
         if hasattr(self, "start_button"):
-            self.start_button.setText("START" if _mode in {"Story", "Raid", "Challenges", "Tower"} else "SAVE SETUP")
+            self.start_button.setText("START" if _mode in {"Story", "Raid", "Challenges", "Tower", "Expeditions"} else "SAVE SETUP")
 
     def _act_changed(self, _act: str) -> None:
         if self.mode_box.currentText() == "Story":
@@ -582,6 +591,7 @@ class DashboardWindow(QWidget):
         self._set_combo_items(self.act_box, acts, previous_act)
         self._set_combo_visible(self.act_box, mode in {"Story", "Raid"})
         self.challenge_panel.setVisible(mode=='Challenges')
+        self.card_priority_button.setVisible(mode=='Expeditions')
 
         if mode == "Story":
             difficulties = ["Hard"] if self.act_box.currentText() in {"Infinite", "Mastery"} else ["Normal", "Hard"]
@@ -624,7 +634,7 @@ class DashboardWindow(QWidget):
 
     def _start_macro(self) -> None:
         self._save_dashboard()
-        if self.mode_box.currentText() not in {"Story", "Raid", "Challenges", "Tower"}:
+        if self.mode_box.currentText() not in {"Story", "Raid", "Challenges", "Tower", "Expeditions"}:
             self._set_status("Setup saved. This mode's automation is not connected yet.")
             return
         from python_macro.capture import single_roblox_window
@@ -1277,7 +1287,7 @@ class RuntimeWindow(DashboardWindow):
             return
         if getattr(self,'path_recorder',None) is not None and ctypes.windll.user32.GetAsyncKeyState(0x72)&0x8000:
             return
-        if self.values["mode"] not in {"Story", "Raid", "Challenges", "Tower"}:
+        if self.values["mode"] not in {"Story", "Raid", "Challenges", "Tower", "Expeditions"}:
             self.log.appendPlainText("Only Story, Raid, Challenge and Tower navigation are available.")
             return
         if self.return_pending or (self.worker is not None and self.worker.isRunning()):
