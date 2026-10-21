@@ -8,12 +8,12 @@
     {
       "id": "anime-expeditions",
       "name": "Anime Expeditions",
-      "version": "0.1.47",
+      "version": "0.1.48",
       "setup_only": false,
       "entrypoint": "AnimeExpeditions.exe",
-      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.47/AnimeExpeditions-0.1.47-windows.zip",
-      "sha256": "3bed7649ccd7d34203d20a864f85108d88b86bf743d37119910cd9e7aff8a78c",
-      "description": "WASD-only path recording, first-match-only path indexes, and simplified recording controls."
+      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.48/AnimeExpeditions-0.1.48-windows.zip",
+      "sha256": "a34fcbd47e79be9f0ecf4d4d833358fb7659d949484760645b0f399753cc7730",
+      "description": "Challenge cooldown skipping, faster image-based navigation, and matching Story map profiles."
     }
   ]
 }
