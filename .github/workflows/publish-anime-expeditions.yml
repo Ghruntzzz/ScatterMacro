@@ -64,8 +64,8 @@ jobs:
       - name: Upload tested Windows build
         uses: actions/upload-artifact@v4
         with:
-          name: AnimeExpeditions-0.1.50-windows
-          path: dist/AnimeExpeditions-0.1.50-windows.zip
+          name: AnimeExpeditions-0.1.51-windows
+          path: dist/AnimeExpeditions-0.1.51-windows.zip
           if-no-files-found: error
           retention-days: 7
       - name: Publish and verify macro archive
@@ -74,12 +74,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '0.1.50'
+          $version = '0.1.51'
           $tag = "anime-expeditions-v$version"
           $name = "AnimeExpeditions-$version-windows.zip"
           $archive = "dist/$name"
           if (!(Test-Path $archive)) { throw "Missing macro ZIP: $archive" }
-          gh release create $tag $archive --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Anime Expeditions $version - Tower Navigation" --notes "Adds Tower navigation: Play, Tower, selected Trait or Traitless tab, highest visible floor, Select Stage, then Start using existing animation settling. Reads changing floor numbers with OCR and matches static tab headings. Tower match details load separate profiles for each Story map within Trait and Traitless; missing profiles open empty and save on edit. Tower in-game operations and end-of-run progression are not implemented yet. 245 tests passed and supplied floor screenshot verified with OCR. Live navigation still needs gameplay validation."
+          gh release create $tag $archive --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Anime Expeditions $version - Tower Floor Selection Fix" --notes "Fixes repeated Tower tab clicks by selecting the tab once and waiting independently for the playable floor. Excludes Floor labels inside Tower tab cards using nearby headings and image-based card bounds. Highest visible playable floor selection is preserved. 248 tests passed. Real OCR verified that the supplied selected-tab screenshot yields no playable floor while the main Tower screenshot still detects Floor 1."
           if ($LASTEXITCODE -ne 0) { throw 'Macro release upload failed' }
           New-Item -ItemType Directory -Force 'dist/verified' | Out-Null
           gh release download $tag --repo $env:GITHUB_REPOSITORY --pattern $name --dir 'dist/verified'
@@ -91,7 +91,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '0.1.50'
+          $version = '0.1.51'
           $archive = "dist/AnimeExpeditions-$version-windows.zip"
           $sha256 = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
           $url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/anime-expeditions-v$version/AnimeExpeditions-$version-windows.zip"
@@ -104,7 +104,7 @@ jobs:
           $macro[0].version = $version
           $macro[0].url = $url
           $macro[0].sha256 = $sha256
-          $macro[0].description = "Tower navigation with highest visible floor selection and separate per-map Trait and Traitless profiles."
+          $macro[0].description = "Fixes repeated Tower tab clicks and excludes tab-card Floor labels from playable floor selection."
           $catalog | ConvertTo-Json -Depth 20 | Set-Content catalog.json -Encoding utf8
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

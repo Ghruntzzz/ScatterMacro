@@ -4,7 +4,7 @@ import re
 from python_macro.challenges import ChallengeFlow
 from python_macro.end_screen import center
 from python_macro.story import normalize
-from python_macro.story_verified import changed_screen
+from python_macro.story_verified import changed_screen, click_once
 from python_macro.unit_actions import Icon
 from python_macro.vision import Region
 
@@ -13,6 +13,14 @@ def visible_floors(matches):
     floors=[]
     for label in matches:
         text=normalize(label.text)
+        x,y=center(label)
+        height=max(p[1] for p in label.corners)-min(p[1] for p in label.corners)
+        # Tab cards also say Floor N. Their nearby Tower heading distinguishes
+        # them from the selectable floors in the main tower view.
+        if any(normalize(m.text) in ('tower','traitlesstower')
+               and abs(center(m)[0]-x)<max(100,height*5)
+               and 0<y-center(m)[1]<max(45,height*3) for m in matches):
+            continue
         combined=re.fullmatch(r'floor([1-9][0-9]{0,3})',text)
         if combined:
             floors.append((int(combined[1]),center(label)))
@@ -57,7 +65,17 @@ class TowerFlow(ChallengeFlow):
             h,w=frame.shape[:2]
             matches=self.reader.read(frame,Region(0,0,w,h),scale=2,max_variants=1,
                                      min_confidence=.65,cancelled=self.stop.is_set)
-            self.floor_frame,self.floor_options=frame,visible_floors(matches)
+            excluded=[]
+            for kind,icon in self.tab_icons.items():
+                hit=icon(frame)
+                if hit is not None:
+                    x,y,width,_=hit
+                    scale=width/(44 if kind=='Trait Tower' else 81)
+                    excluded.append((x-170*scale,y-25*scale,x+65*scale,y+125*scale))
+            options=[(number,point) for number,point in visible_floors(matches)
+                     if not any(left<=point[0]<=right and top<=point[1]<=bottom
+                                for left,top,right,bottom in excluded)]
+            self.floor_frame,self.floor_options=frame,options
             self.ocr.last_frame,self.ocr.matches=frame,matches
         return self.floor_options
 
@@ -94,8 +112,10 @@ class TowerFlow(ChallengeFlow):
         if not self.press('Tower',self.tower_target,
                           lambda after,before:self.text('Traitless Tower')(after) is not None):
             return False
-        if not self.press(self.tower_type,self.tower_tab,
-                          lambda after,before:changed_screen(before,after) and bool(self.floors(after))):
+        # Selecting an already active tab may not change the screen at all.
+        # Click once, then let the floor step wait for its own target.
+        if not click_once(self.tower_type,self.tower_tab,self.capture,
+                          self.client.direct_click,self.stop):
             return False
         self.log('Selecting highest visible floor.')
         if not self.press('Floor',self.highest_floor,
