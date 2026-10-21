@@ -95,6 +95,9 @@ class ChallengeFlow:
         self.start = StartButtonLocator(assets/'start-button-template.png')
         self.party = Icon(assets/'view-party.png',threshold=.85)
         self.change = Icon(assets/'change-gamemode.png',threshold=.85)
+        self.challenge = Icon(assets/'challenge-button.png',threshold=.85)
+        self.menu_frame, self.menu_result = None, None
+        self.cooldowns = {}
         self.current = None
         self.wins = {}
         self.expires = {}
@@ -102,10 +105,23 @@ class ChallengeFlow:
 
     def read_menu(self,frame=None):
         frame = self.capture() if frame is None else frame
+        if frame is self.menu_frame:
+            return self.menu_result
         h,w = frame.shape[:2]
         matches = self.reader.read(frame,Region(0,0,w,h),scale=2,max_variants=1,
                                    min_confidence=.6,cancelled=self.stop.is_set)
-        return menu_data(matches)
+        self.menu_frame, self.menu_result = frame, menu_data(matches)
+        return self.menu_result
+
+    def cooldown(self,frame):
+        point=self.ocr.unique(frame,lambda text:'availablein' in normalize(text))
+        if point is None:
+            return None
+        text=next(m.text for m in self.ocr.matches if 'availablein' in normalize(m.text))
+        return reset_seconds(text) or 30
+
+    def challenge_target(self,frame):
+        return self.challenge(frame) or self.text('Challenge','Challenges')(frame)
 
     def text(self,*labels):
         names = {normalize(label) for label in labels}
@@ -119,9 +135,9 @@ class ChallengeFlow:
     def open_menu(self,find_play):
         if len(self.read_menu()[0]) == 3:
             return True
-        if not self.press('Play',find_play,lambda after,before:self.text('Challenge','Challenges')(after) is not None):
+        if not self.press('Play',find_play,lambda after,before:self.challenge_target(after) is not None):
             return False
-        return self.press('Challenge',self.text('Challenge','Challenges'),
+        return self.press('Challenge',self.challenge_target,
                           lambda after,before:len(self.read_menu(after)[0])==3)
 
     def identity(self,card):
@@ -130,6 +146,8 @@ class ChallengeFlow:
     def permitted(self,card):
         identity = self.identity(card)
         now = self.clock()
+        if now < self.cooldowns.get(identity,0):
+            return False
         if now >= self.expires.get(identity,float('inf')):
             self.wins.pop(identity,None)
             self.budget.pop(identity,None)
@@ -153,7 +171,7 @@ class ChallengeFlow:
         while not self.stop.is_set():
             for key in self.enabled:
                 kind=category(key)
-                tabs,_=self.read_menu()
+                tabs,cards=self.read_menu()
                 if len(tabs)!=3:
                     raise RuntimeError('Could not read the Challenge menu. No challenge was clicked.')
                 if not tabs[kind]['available']:
@@ -162,7 +180,7 @@ class ChallengeFlow:
                 def tab_target(frame):
                     tab=self.read_menu(frame)[0].get(kind)
                     return tab['point'] if tab and tab['available'] else None
-                if not self.press(kind.title()+' Challenge',tab_target,
+                if not any(category(c.key)==kind for c in cards) and not self.press(kind.title()+' Challenge',tab_target,
                     lambda after,before:any(category(c.key)==kind for c in self.read_menu(after)[1])):
                     return None
                 _,cards=self.read_menu()
@@ -176,8 +194,16 @@ class ChallengeFlow:
                                  if c.key==key and self.identity(c)==self.identity(card) and self.permitted(c)),None)
                 self.log('Selecting '+key.replace('regular','Regular Challenge #').title()+'.')
                 if not self.press('Challenge stage',card_target,
-                                  lambda after,before:self.text('Select Stage')(after) is not None):
+                                  lambda after,before:self.cooldown(after) is not None or self.text('Select Stage')(after) is not None):
                     return None
+                seconds=self.cooldown(self.capture())
+                if seconds is not None:
+                    self.cooldowns[self.identity(card)]=self.clock()+seconds
+                    self.log('Challenge is on cooldown. Moving to the next challenge.')
+                    if not self.press('Back',self.text('Back'),
+                                      lambda after,before:self.text('Back')(after) is None and bool(self.read_menu(after)[1])):
+                        return None
+                    continue
                 if not self.press('Select Stage',self.text('Select Stage'),
                                   lambda after,before:self.start(after) is not None):
                     return None
@@ -198,14 +224,14 @@ class ChallengeFlow:
                           lambda after,before:self.change(after) is not None or self.text('Change Gamemode','Change Mode')(after) is not None):
             return False
         if not self.press('Change Gamemode',lambda f:self.change(f) or self.text('Change Gamemode','Change Mode')(f),
-                          lambda after,before:self.text('Challenge','Challenges')(after) is not None):
+                          lambda after,before:self.challenge_target(after) is not None):
             return False
-        return self.press('Challenge',self.text('Challenge','Challenges'),
+        return self.press('Challenge',self.challenge_target,
                           lambda after,before:len(self.read_menu(after)[0])==3)
 
 
 def run_challenges(capture,client,reader,stop,log,assets,settings,entries,status,
-                   monitor_capture,reward_dir,entries_provider,notifier,find_play):
+                   monitor_capture,reward_dir,entries_provider,notifier,find_play,route_entries=None):
     from python_macro.story_ingame import run_story_ingame,prepare_match
     flow=ChallengeFlow(capture,client,reader,stop,log,assets,settings)
     if not flow.enabled:
@@ -244,6 +270,13 @@ def run_challenges(capture,client,reader,stop,log,assets,settings,entries,status
         return
     def set_route(card):
         notifier.settings.update(map=card.map_name,act=card.act,difficulty='Hard',mode='Challenges')
+        route[0]=card
+    route=[card]
+    def challenge_entries():
+        current=route[0]
+        if route_entries is not None:
+            return route_entries(current.map_name,current.act)
+        return entries_provider() if entries_provider else entries
     set_route(card)
     def next_match():
         if not flow.return_to_menu():
@@ -254,7 +287,7 @@ def run_challenges(capture,client,reader,stop,log,assets,settings,entries,status
         set_route(card)
         return prepare_match(card.map_name,card.act,'Hard',capture,client,reader,stop,log,mode='Challenge')
     run_story_ingame(card.map_name,card.act,'Hard',capture,client,reader,stop,log,assets,entries,status,
-                     monitor_capture=monitor_capture,reward_dir=reward_dir,entries_provider=entries_provider,
+                     monitor_capture=monitor_capture,reward_dir=reward_dir,entries_provider=challenge_entries,
                      mode='Challenge',on_result=notifier.send,next_match=next_match,match_confirmed=in_match)
 
 

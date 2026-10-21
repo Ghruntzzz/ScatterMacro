@@ -47,7 +47,9 @@ Challenges run enabled Weekly, Daily, then Regular #1-3 in that order. Uncheck
 individual challenges in Match Settings to skip them. The macro reads available
 entries and remaining limits, waits when selected challenges are unavailable,
 and returns through View Party -> Change Gamemode after victories. Defeats can
-retry the same stage. Challenges currently share the Challenge unit configuration.
+retry the same stage. Challenges load the matching Story map configuration on
+every match (Acts 1-5 share that map's profile). Configure these indexes in Story.
+An "Available in" stage is backed out of and skipped until its timer expires.
 
 ## Recorded paths
 

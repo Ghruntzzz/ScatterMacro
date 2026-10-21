@@ -58,6 +58,7 @@ class ChallengeTests(unittest.TestCase):
 
     def test_selector_advances_weekly_daily_then_regular(self):
         flow=self.flow()
+        flow.cooldown=Mock(return_value=None)
         flow.press=Mock(return_value=True)
         tabs={kind:dict(available=True) for kind in ('weekly','daily','regular')}
         cards=[Card(key,'East Town','Act 1',(20,20),None,600) for key in ORDER]
@@ -67,6 +68,34 @@ class ChallengeTests(unittest.TestCase):
         self.assertEqual(flow.select().key,'daily')
         flow.completed()
         self.assertEqual(flow.select().key,'regular1')
+
+    def test_cooldown_backs_out_and_selects_next_regular(self):
+        now=[0]
+        flow=self.flow({'challenge_weekly':'0','challenge_daily':'0'},clock=lambda:now[0])
+        tabs={kind:dict(available=True) for kind in ('weekly','daily','regular')}
+        cards=[Card('regular'+str(i),'Rose Kingdom','Act 2',(20,20),10,600) for i in (1,2,3)]
+        flow.read_menu=Mock(return_value=(tabs,cards))
+        flow.press=Mock(return_value=True)
+        flow.cooldown=Mock(side_effect=[671,None])
+        self.assertEqual(flow.select().key,'regular2')
+        self.assertEqual([c.args[0] for c in flow.press.call_args_list],
+                         ['Challenge stage','Back','Challenge stage','Select Stage','Start'])
+        self.assertFalse(flow.permitted(cards[0]))
+        now[0]=672
+        self.assertTrue(flow.permitted(cards[0]))
+
+    def test_available_in_is_a_cooldown_not_select_stage(self):
+        flow=self.flow()
+        flow.ocr.unique=Mock(return_value=(400,398))
+        flow.ocr.matches=[label('Available in 11:11')]
+        self.assertEqual(flow.cooldown(object()),671)
+
+    def test_challenge_template_avoids_ocr_when_found(self):
+        flow=self.flow()
+        flow.challenge=Mock(return_value=(100,100))
+        flow.text=Mock()
+        self.assertEqual(flow.challenge_target(object()),(100,100))
+        flow.text.assert_not_called()
 
     def test_unavailable_selection_waits_and_remains_cancellable(self):
         flow=self.flow()
@@ -137,6 +166,28 @@ class ChallengeTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             flow.select()
         flow.client.direct_click.assert_not_called()
+
+    def test_story_profile_is_reloaded_for_each_selected_map(self):
+        from python_macro.challenges import run_challenges
+        frame=np.zeros((200,400,3),np.uint8)
+        first=Card('weekly','Rose Kingdom','Act 2',(0,0),None,600)
+        second=Card('daily','East Town','Act 4',(0,0),None,600)
+        profiles=Mock(side_effect=lambda name,act:[name,act])
+        notifier=SimpleNamespace(settings={},send=Mock())
+        with patch('python_macro.challenges.ChallengeFlow') as factory, \
+             patch('python_macro.story_ingame.run_story_ingame') as run, \
+             patch('python_macro.story_ingame.prepare_match',return_value=True):
+            flow=factory.return_value
+            flow.enabled=['weekly','daily']
+            flow.read_menu.return_value=({'weekly':{},'daily':{},'regular':{}},[])
+            flow.select.side_effect=[first,second]
+            run_challenges(lambda:frame,Mock(),Mock(),FastStop(),Mock(),Path('assets'),{},[],Mock(),
+                           Mock(),None,Mock(),notifier,Mock(),route_entries=profiles)
+            provider=run.call_args.kwargs['entries_provider']
+            self.assertEqual(provider(),['Rose Kingdom','Act 2'])
+            self.assertTrue(run.call_args.kwargs['next_match']())
+            self.assertEqual(provider(),['East Town','Act 4'])
+            self.assertEqual(provider(),['East Town','Act 4'])
 
     def test_active_match_extracts_dynamic_map_and_act(self):
         card=active_challenge([label('Weekly Challenge'),label('Crimson Shore - Act 4')])
