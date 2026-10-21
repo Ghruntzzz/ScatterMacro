@@ -61,9 +61,10 @@ Tower navigation supports the saved Trait Tower or Traitless Tower selection:
 Play, Tower, selected type, highest visible floor, Select Stage, then Start.
 Floor numbers use OCR rather than fixed coordinates. Tower match details load
 `configs/Tower/<type>/<map>.ini`, independently for each type and Story map.
-Missing profiles open empty and save on edit. Tower in-game operation and
-end-of-run progression are not implemented yet; this release stops after
-navigation and profile loading.
+Missing profiles open empty and save on edit. Tower uses the shared in-game
+unit, wave, reward, statistics and webhook flow. Victory advances with Next
+Floor; defeat uses Repeat Floor. New floors refresh the map profile and camera;
+repeats reuse the camera. Starting inside a Tower match skips navigation.
 
 Select an index in Unit Manager and press
 Record. Roblox is focused automatically. F3 or Stop Recording finishes and saves

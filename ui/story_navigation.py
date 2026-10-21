@@ -93,11 +93,21 @@ class StoryWorker(QThread):
                 from ui.dashboard import MODE_MAPS
                 flow=TowerFlow(capture,client,self.reader,self.stop,self.message.emit,
                                root/'assets',self.tower_type)
-                if flow.navigate(play_icon):
-                    map_name=flow.wait_map(MODE_MAPS['Story'])
-                    if map_name:
-                        self.map_entries('Tower',map_name,'Floors')
-                        self.message.emit('Tower profile ready. In-game Tower operations are not configured yet.')
+                from python_macro.capture import capture_client
+                def tower_capture():
+                    if client.user.GetForegroundWindow()!=client.hwnd or client.user.IsIconic(client.hwnd):
+                        return None
+                    try:
+                        return capture_client(client.hwnd)
+                    except RuntimeError:
+                        if client.user.GetForegroundWindow()!=client.hwnd or client.user.IsIconic(client.hwnd):
+                            return None
+                        raise
+                def tower_map(map_name):
+                    self.map_entries('Tower',map_name,'Floors')
+                    notifier.settings.update(mode=self.tower_type,map=map_name,act='Floors',difficulty='')
+                flow.run(play_icon,MODE_MAPS['Story'],tower_map,self.current_entries,update_status,
+                         tower_capture,self.reward_dir,notifier,root/'assets')
                 return
             if self.mode == 'Challenges':
                 from python_macro.challenges import run_challenges

@@ -263,7 +263,7 @@ def start_game(capture, client, stop, assets, active_hud=None):
 
 
 def finish_match(capture, client, reader, stop, log, status, reward_dir, started, find_start,
-                 on_result=lambda *args: None, next_match=None):
+                 on_result=lambda *args: None, next_match=None, transition_match=None):
     end = EndScreenReader(reader, stop)
     previous, counted = None, False
     reward_logged = False
@@ -293,6 +293,8 @@ def finish_match(capture, client, reader, stop, log, status, reward_dir, started
                 # a fresh capture rather than clicking stale coordinates.
                 previous = outcome
                 continue
+            if transition_match is not None:
+                return transition_match(outcome)
             if outcome == 'victory' and next_match is not None:
                 return next_match()
             if reading["repeat"] is not None:
@@ -324,7 +326,7 @@ def finish_match(capture, client, reader, stop, log, status, reward_dir, started
 
 def run_matches(capture, client, reader, stop, log, assets, entries, status,
                 monitor_capture, reward_dir, entries_provider=None, allow_active=False,
-                on_result=lambda *args: None, next_match=None):
+                on_result=lambda *args: None, next_match=None, transition_match=None):
     monitor = MatchMonitor(monitor_capture, assets, status)
     monitor.start()
     first_run = True
@@ -370,7 +372,8 @@ def run_matches(capture, client, reader, stop, log, assets, entries, status,
             if stop.is_set() or not finish_match(capture, client, reader, stop, log,
                                                 status, reward_dir, started,
                                                 StartButtonLocator(assets / "start-game-template.png"),
-                                                on_result=on_result, next_match=next_match):
+                                                on_result=on_result, next_match=next_match,
+                                                transition_match=transition_match):
                 return
     finally:
         monitor.close()

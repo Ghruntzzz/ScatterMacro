@@ -1,5 +1,6 @@
 """Tower lobby navigation; floor numbers are read, never hard-coded."""
 import re
+import time
 
 from python_macro.challenges import ChallengeFlow
 from python_macro.end_screen import center
@@ -52,6 +53,8 @@ class TowerFlow(ChallengeFlow):
             'Traitless Tower':Icon(assets/'tower-traitless-tab.png',threshold=.88,crop=(103,6,81,16)),
         }
         self.floor_frame,self.floor_options=None,[]
+        self.next_floor=Icon(assets/'tower-next-floor.png',threshold=.85)
+        self.repeat_floor=Icon(assets/'tower-repeat-floor.png',threshold=.85)
 
     def tower_target(self,frame):
         return self.tower_button(frame) or self.text('Tower')(frame)
@@ -87,9 +90,10 @@ class TowerFlow(ChallengeFlow):
         points={point for number,point in floors if number==highest}
         return next(iter(points)) if len(points)==1 else None
 
-    def wait_map(self,map_names):
+    def wait_map(self,map_names,timeout=None):
         self.log('Waiting for Tower match details.')
         previous=None
+        deadline=time.monotonic()+timeout if timeout is not None else float('inf')
         while not self.stop.is_set():
             frame=self.capture()
             h,w=frame.shape[:2]
@@ -97,13 +101,52 @@ class TowerFlow(ChallengeFlow):
                                      min_confidence=.65,cancelled=self.stop.is_set)
             text=normalize(' '.join(m.text for m in matches))
             found=[name for name in map_names if normalize(name) in text]
-            current=found[0] if len(found)==1 and 'tower' in text else None
+            result=any(word in text for word in ('gainedrewards','gamestats','nextfloor','repeatfloor','selectstage'))
+            current=found[0] if len(found)==1 and 'tower' in text and not result else None
             if current and current==previous:
                 return current
             previous=current
+            if time.monotonic()>=deadline:
+                return None
             if self.stop.wait(.15):
                 return None
         return None
+
+    def transition(self,outcome,map_names,on_map):
+        if outcome not in ('victory','defeat'):
+            return False
+        label='Next Floor' if outcome=='victory' else 'Repeat Floor'
+        icon=self.next_floor if outcome=='victory' else self.repeat_floor
+        self.log('Advancing floor.' if outcome=='victory' else 'Repeating floor.')
+        start_game=self.game_start
+        if not self.press(label,lambda frame:icon(frame) or self.text(label)(frame),
+                          lambda after,before:start_game(after) is not None):
+            return False
+        map_name=self.wait_map(map_names)
+        if map_name is None:
+            return False
+        on_map(map_name)
+        return (outcome=='defeat' or self.client.setup_camera()) and not self.stop.is_set()
+
+    def run(self,find_play,map_names,on_map,entries_provider,status,monitor_capture,reward_dir,notifier,assets):
+        from python_macro.story_ingame import run_matches
+        from python_macro.vision import StartButtonLocator
+        self.game_start=StartButtonLocator(assets/'start-game-template.png')
+        map_name=self.wait_map(map_names,timeout=3)
+        in_match=map_name is not None
+        if not in_match:
+            if not self.navigate(find_play):
+                return
+            map_name=self.wait_map(map_names)
+        if map_name is None or self.stop.is_set():
+            return
+        on_map(map_name)
+        if not self.client.setup_camera() or self.stop.is_set():
+            return
+        run_matches(self.capture,self.client,self.reader,self.stop,self.log,assets,[],status,
+                    monitor_capture,reward_dir,entries_provider,allow_active=in_match,
+                    on_result=notifier.send,
+                    transition_match=lambda outcome:self.transition(outcome,map_names,on_map))
 
     def navigate(self,find_play):
         if not self.press('Play',find_play,

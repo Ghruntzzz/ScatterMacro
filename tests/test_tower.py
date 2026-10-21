@@ -10,6 +10,46 @@ from test_unit_actions import FastStop
 
 
 class TowerTests(unittest.TestCase):
+    def test_outcome_selects_next_only_on_victory(self):
+        for outcome,expected in [('victory','Next Floor'),('defeat','Repeat Floor')]:
+            flow=self.flow()
+            flow.game_start=Mock()
+            flow.press=Mock(return_value=True)
+            flow.wait_map=Mock(return_value='East Town')
+            on_map=Mock()
+            self.assertTrue(flow.transition(outcome,['East Town'],on_map))
+            self.assertEqual(flow.press.call_args.args[0],expected)
+            on_map.assert_called_once_with('East Town')
+            self.assertEqual(flow.client.setup_camera.call_count,int(outcome=='victory'))
+
+    def test_tower_uses_shared_match_loop_and_existing_match_skips_navigation(self):
+        flow=self.flow()
+        flow.wait_map=Mock(return_value='East Town')
+        flow.navigate=Mock()
+        notifier=Mock()
+        with patch('python_macro.story_ingame.run_matches') as run:
+            flow.run(Mock(),['East Town'],Mock(),Mock(),Mock(),Mock(),None,notifier,Path('assets'))
+        flow.navigate.assert_not_called()
+        flow.client.setup_camera.assert_called_once()
+        self.assertTrue(run.call_args.kwargs['allow_active'])
+        self.assertIs(run.call_args.kwargs['on_result'],notifier.send)
+
+    def test_tower_result_uses_shared_stats_once_before_transition(self):
+        from python_macro.story_ingame import finish_match
+        from python_macro.end_screen import interpret_end
+        for outcome in ('victory','defeat'):
+            reading=interpret_end([label(outcome)], [label('Repeat Floor')])
+            self.assertEqual(reading['outcome'],outcome)
+            frame=np.zeros((600,800,3),np.uint8)
+            status,notify,transition=Mock(),Mock(),Mock(return_value=True)
+            with patch('python_macro.story_ingame.EndScreenReader') as end:
+                end.return_value.read.return_value=reading
+                self.assertTrue(finish_match(lambda:frame,Mock(),Mock(),FastStop(),Mock(),status,
+                                            None,0,Mock(),on_result=notify,transition_match=transition))
+            status.assert_called_once()
+            notify.assert_called_once()
+            transition.assert_called_once_with(outcome)
+
     def flow(self,kind='Trait Tower'):
         return TowerFlow(Mock(),Mock(),Mock(),FastStop(),Mock(),Path('assets'),kind)
 

@@ -18,7 +18,7 @@ def interpret_end(top, bottom):
     labels = {normalize(m.text) for m in top}
     all_text = normalize(" ".join(m.text for m in (*top, *bottom)))
     outcomes = labels.intersection({"victory", "defeat"})
-    repeat = [m for m in bottom if normalize(m.text) == "repeatstage"]
+    repeat = [m for m in bottom if normalize(m.text) in ("repeatstage","repeatfloor")]
     outcome = next(iter(outcomes)) if len(outcomes) == 1 and (
         "gainedrewards" in all_text or "gamestats" in all_text or len(repeat) == 1) else None
     prompt = " ".join(m.text for m in bottom)
@@ -87,7 +87,7 @@ def save_rewards(frame, reading, directory):
     matches = reading["matches"]
     save("roblox.png", frame[:, :, :3])
     headers = [m for m in matches if normalize(m.text) == "gainedrewards"]
-    buttons = [m for m in matches if normalize(m.text) == "repeatstage"]
+    buttons = [m for m in matches if normalize(m.text) in ("repeatstage","repeatfloor")]
     if not buttons:
         buttons = [m for m in matches if normalize(m.text) == 'viewparty']
     files = []

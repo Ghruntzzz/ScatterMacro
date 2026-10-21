@@ -1049,7 +1049,6 @@ class RuntimeWindow(DashboardWindow):
         self.index_editor.copied_index=None
         self.index_editor.select(0)
         self.index_editor.setToolTip(f'{mode} profile: {map_name}, {act}')
-        self.log.appendPlainText(f'Unit profile: {map_name}, {act}.')
 
     def _save_runtime_index(self, index, entry):
         parser = configparser.ConfigParser(interpolation=None)
