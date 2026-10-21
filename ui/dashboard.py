@@ -230,7 +230,9 @@ def active_unit_config(values: dict[str, str]) -> Path:
     if mode == "Raid":
         return config_root / "Raid" / f"{config_segment(values['map'])}_{config_segment(values.get('act', 'Act 1'))}.ini"
     if mode == "Tower":
-        return config_root / "Tower" / config_segment(values["tower_type"]) / "Auto.ini"
+        name=values.get('map','')
+        profile=config_segment(name) if name and name not in MODE_MAPS['Tower'] else 'Auto'
+        return config_root / "Tower" / config_segment(values["tower_type"]) / (profile+'.ini')
     if mode == "Challenges":
         return config_root / "Challenges" / "Auto.ini"
     if mode == "Expeditions":
@@ -449,7 +451,7 @@ class DashboardWindow(QWidget):
 
     def _deployment(self) -> None:
         deploy = self
-        start = self._button(deploy, "START" if self.mode_box.currentText() in {"Story", "Raid", "Challenges"} else "SAVE SETUP", 596, 577, 214, True)
+        start = self._button(deploy, "START" if self.mode_box.currentText() in {"Story", "Raid", "Challenges", "Tower"} else "SAVE SETUP", 596, 577, 214, True)
         self.start_button = start
         settings = self._button(deploy, "SETTINGS", 830, 577, 164)
         exit_button = self._button(deploy, "EXIT", 1014, 577, 154)
@@ -561,7 +563,7 @@ class DashboardWindow(QWidget):
         self._refresh_route_controls()
         self._save_dashboard()
         if hasattr(self, "start_button"):
-            self.start_button.setText("START" if _mode in {"Story", "Raid", "Challenges"} else "SAVE SETUP")
+            self.start_button.setText("START" if _mode in {"Story", "Raid", "Challenges", "Tower"} else "SAVE SETUP")
 
     def _act_changed(self, _act: str) -> None:
         if self.mode_box.currentText() == "Story":
@@ -622,7 +624,7 @@ class DashboardWindow(QWidget):
 
     def _start_macro(self) -> None:
         self._save_dashboard()
-        if self.mode_box.currentText() not in {"Story", "Raid", "Challenges"}:
+        if self.mode_box.currentText() not in {"Story", "Raid", "Challenges", "Tower"}:
             self._set_status("Setup saved. This mode's automation is not connected yet.")
             return
         from python_macro.capture import single_roblox_window
@@ -1039,7 +1041,10 @@ class RuntimeWindow(DashboardWindow):
         self.index_editor.setGeometry(12, 12, 403, 894)
 
     def _challenge_profile(self,mode,map_name,act,entries):
-        self.unit_config_path=active_unit_config(dict(mode=mode,map=map_name,act=act))
+        values=dict(mode=mode,map=map_name,act=act)
+        if mode in ('Trait Tower','Traitless Tower'):
+            values.update(mode='Tower',tower_type=mode)
+        self.unit_config_path=active_unit_config(values)
         self.unit_indexes[:]=[dict(e) for e in entries]
         self.index_editor.copied_index=None
         self.index_editor.select(0)
@@ -1273,8 +1278,8 @@ class RuntimeWindow(DashboardWindow):
             return
         if getattr(self,'path_recorder',None) is not None and ctypes.windll.user32.GetAsyncKeyState(0x72)&0x8000:
             return
-        if self.values["mode"] not in {"Story", "Raid", "Challenges"}:
-            self.log.appendPlainText("Only Story, Raid and Challenge automation are available.")
+        if self.values["mode"] not in {"Story", "Raid", "Challenges", "Tower"}:
+            self.log.appendPlainText("Only Story, Raid, Challenge and Tower navigation are available.")
             return
         if self.return_pending or (self.worker is not None and self.worker.isRunning()):
             return

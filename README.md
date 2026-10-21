@@ -57,6 +57,14 @@ An "Available in" stage is backed out of and skipped until its timer expires.
 
 ## Recorded paths
 
+Tower navigation supports the saved Trait Tower or Traitless Tower selection:
+Play, Tower, selected type, highest visible floor, Select Stage, then Start.
+Floor numbers use OCR rather than fixed coordinates. Tower match details load
+`configs/Tower/<type>/<map>.ini`, independently for each type and Story map.
+Missing profiles open empty and save on edit. Tower in-game operation and
+end-of-run progression are not implemented yet; this release stops after
+navigation and profile loading.
+
 Select an index in Unit Manager and press
 Record. Roblox is focused automatically. F3 or Stop Recording finishes and saves
 the path. Only WASD is recorded, never mouse movements or clicks.

@@ -28,6 +28,7 @@ class StoryWorker(QThread):
         self.act_name = act_name
         self.difficulty = difficulty
         self.mode = mode
+        self.tower_type = map_name if mode=='Tower' else None
         self.selected_hwnd = selected_hwnd
         self.selected_pid = selected_pid
         self.stop = Event()
@@ -44,13 +45,15 @@ class StoryWorker(QThread):
     def map_entries(self,mode,map_name,act):
         from ui.dashboard import load_unit_indexes,active_unit_config
         values=dict(mode=mode,map=map_name,act=act)
+        if mode=='Tower':
+            values['tower_type']=self.tower_type
         path=active_unit_config(values)
         if path != self.challenge_route:
             entries=load_unit_indexes(values,count=len(self.entries))
             with self.entries_lock:
                 self.entries=entries
                 self.challenge_route=path
-            self.profile_changed.emit(mode,map_name,act,[dict(e) for e in entries])
+            self.profile_changed.emit(self.tower_type if mode=='Tower' else mode,map_name,act,[dict(e) for e in entries])
         return self.current_entries()
 
     def update_entry(self, index, entry):
@@ -85,6 +88,17 @@ class StoryWorker(QThread):
             from python_macro.chat import ChatLocator, ChatSafeCapture
             capture = ChatSafeCapture(client.capture, client.direct_click,
                                       ChatLocator(root / "assets"), self.stop)
+            if self.mode == 'Tower':
+                from python_macro.tower import TowerFlow
+                from ui.dashboard import MODE_MAPS
+                flow=TowerFlow(capture,client,self.reader,self.stop,self.message.emit,
+                               root/'assets',self.tower_type)
+                if flow.navigate(play_icon):
+                    map_name=flow.wait_map(MODE_MAPS['Story'])
+                    if map_name:
+                        self.map_entries('Tower',map_name,'Floors')
+                        self.message.emit('Tower profile ready. In-game Tower operations are not configured yet.')
+                return
             if self.mode == 'Challenges':
                 from python_macro.challenges import run_challenges
                 from python_macro.capture import capture_client
