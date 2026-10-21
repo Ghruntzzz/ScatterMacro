@@ -8,12 +8,12 @@
     {
       "id": "anime-expeditions",
       "name": "Anime Expeditions",
-      "version": "0.1.48",
+      "version": "0.1.49",
       "setup_only": false,
       "entrypoint": "AnimeExpeditions.exe",
-      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.48/AnimeExpeditions-0.1.48-windows.zip",
-      "sha256": "a34fcbd47e79be9f0ecf4d4d833358fb7659d949484760645b0f399753cc7730",
-      "description": "Challenge cooldown skipping, faster image-based navigation, and matching Story map profiles."
+      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.49/AnimeExpeditions-0.1.49-windows.zip",
+      "sha256": "9719b76827667a62bc0dcb733e862dd9f6c81141c3138db0e4b2f7a160f04bf2",
+      "description": "Automatic map profiles in Story, Raid and Challenge; empty-profile creation and faster image-based Challenge navigation."
     }
   ]
 }
