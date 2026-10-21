@@ -13,6 +13,7 @@ EMPTY_INDEX = {
     "unit": "0", "priority": "First", "upgrade": "0",
     "auto_upgrade": "0", "x": "", "y": "", "place_at_wave": "",
     "auto_ability_wave": "",
+    "path": "",
 }
 PAGE_SIZE = 6
 TARGETS = ["First", "Last", "Closest", "Strongest", "Boss",
@@ -84,11 +85,13 @@ class UnitManager(QWidget):
     save(index_zero_based, entry_dict), busy() and log(message).
     """
 
-    def __init__(self, entries, save, busy, log, parent=None):
+    def __init__(self, entries, save, busy, log, parent=None, record=None):
         super().__init__(parent)
         self.entries, self.save, self.busy, self.log = entries, save, busy, log
         self.selected, self.page, self.loading = 0, 0, False
         self.copied_index = None
+        self.record_callback=record
+        self.recording=False
 
         self.setObjectName("unit-editor")
         self.setStyleSheet("""
@@ -146,6 +149,16 @@ class UnitManager(QWidget):
         editor.addWidget(self._text("SELECTED INDEX", "section"))
         self.heading = self._text("", "title")
         editor.addWidget(self.heading)
+        path_row=QHBoxLayout()
+        self.path_mode=QComboBox()
+        self.path_mode.addItems(['Keyboard','Mouse','Both'])
+        self.path_mode.setToolTip('Keyboard records WASD only. Mouse records relative motion and right-button camera dragging, not left clicks. Use the same starting position, camera and sensitivity for playback. Maximum five minutes.')
+        self.record_button=self._button('Record',self.toggle_record,'primary')
+        path_row.addWidget(self.path_mode)
+        path_row.addWidget(self.record_button)
+        editor.addLayout(path_row)
+        self.path_note=self._text('Path recording: F3 stops. Reset removes a saved path.','subtitle')
+        editor.addWidget(self.path_note)
 
         self.fields = {}
         labels = [
@@ -269,7 +282,7 @@ class UnitManager(QWidget):
         return button
 
     def select(self, index):
-        if not 0 <= index < len(self.entries):
+        if self.recording or not 0 <= index < len(self.entries):
             return
         self.selected, self.page, self.loading = index, index // PAGE_SIZE, True
         entry = self.entries[index]
@@ -291,7 +304,50 @@ class UnitManager(QWidget):
             else:
                 field.setValue(int(value) if value else -1 if key in ("x", "y") else 0)
         self.loading = False
+        if entry.get('path'):
+            try:
+                from python_macro.pathing import decode_path
+                self.path_mode.setCurrentText(decode_path(entry['path'])['mode'])
+            except ValueError:
+                pass
+        self.update_path_controls()
         self.refresh_cards()
+
+    def update_path_controls(self):
+        path=bool(self.entries[self.selected].get('path'))
+        for field in self.fields.values():
+            field.setEnabled(not path and not self.recording)
+        for button in (self.capture_button,self.clear_position_button):
+            button.setEnabled(not path and not self.recording)
+        for button in (self.copy_button,self.clear_button,self.previous,self.next,*self.cards):
+            button.setEnabled(not self.recording)
+        self.paste_button.setEnabled(self.copied_index is not None and not self.recording)
+        self.path_mode.setEnabled(not self.recording)
+        self.record_button.setText('Stop Recording' if self.recording else 'Record')
+        self.path_note.setText('Recording Roblox movement. F3 stops.' if self.recording else
+                              'Path-only index. Reset removes the path.' if path else
+                              'Path recording: F3 stops. No unit settings on path indexes.')
+
+    def toggle_record(self):
+        if self.record_callback is None:
+            self.log('Path recording is available in the runtime dashboard.')
+            return
+        if not self.recording and self.busy():
+            self.log('Stop the macro before recording a path.')
+            return
+        self.record_callback(self.selected,self.path_mode.currentText())
+
+    def recording_changed(self,active):
+        self.recording=active
+        self.update_path_controls()
+
+    def save_path(self,index,raw):
+        self.recording_changed(False)
+        if raw:
+            self.selected=index
+            if self._commit({**EMPTY_INDEX,'path':raw}):
+                self.select(index)
+                self.log(f'Path saved to Index {index+1}.')
 
     def refresh_cards(self):
         count = len(self.entries)
@@ -314,6 +370,13 @@ class UnitManager(QWidget):
                 f"Upgrade {entry['upgrade']}  /  Auto {entry['auto_upgrade']}\n"
                 f"POS  {coords}  ·  {wave_label}\n{ability_label}"
             )
+            if entry.get('path'):
+                try:
+                    from python_macro.pathing import decode_path
+                    path=decode_path(entry['path'])
+                    button.setText(f"{index+1:02d}   PATH\n{path['mode']}  /  {path['duration']:.1f}s\nMovement only")
+                except ValueError:
+                    button.setText(f'{index+1:02d}   PATH\nInvalid recording - please record again')
             button.setProperty("selected", index == self.selected)
             button.style().unpolish(button)
             button.style().polish(button)
@@ -326,6 +389,10 @@ class UnitManager(QWidget):
             from python_macro.deployment import requested_wave
             requested_wave(entry["place_at_wave"])
             requested_wave(entry["auto_ability_wave"])
+            if entry.get('path'):
+                from python_macro.pathing import decode_path
+                decode_path(entry['path'])
+                entry={**EMPTY_INDEX,'path':entry['path']}
             self.save(self.selected, entry)
         except (OSError, ValueError) as error:
             self.log(f"Could not save index: {error}")
@@ -337,7 +404,7 @@ class UnitManager(QWidget):
         return True
 
     def changed(self, *_):
-        if self.loading:
+        if self.loading or self.recording or self.entries[self.selected].get('path'):
             return
         entry = {
             key: (field.currentText() if isinstance(field, QComboBox)

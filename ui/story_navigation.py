@@ -68,6 +68,22 @@ class StoryWorker(QThread):
             from python_macro.chat import ChatLocator, ChatSafeCapture
             capture = ChatSafeCapture(client.capture, client.direct_click,
                                       ChatLocator(root / "assets"), self.stop)
+            if self.mode == 'Challenges':
+                from python_macro.challenges import run_challenges
+                from python_macro.capture import capture_client
+                def challenge_capture():
+                    if client.user.GetForegroundWindow() != client.hwnd or client.user.IsIconic(client.hwnd):
+                        return None
+                    try:
+                        return capture_client(client.hwnd)
+                    except RuntimeError:
+                        if client.user.GetForegroundWindow() != client.hwnd or client.user.IsIconic(client.hwnd):
+                            return None
+                        raise
+                run_challenges(capture,client,self.reader,self.stop,self.message.emit,root/'assets',
+                               self.notification_settings,self.entries,update_status,challenge_capture,
+                               self.reward_dir,self.current_entries,notifier,play_icon)
+                return
             from python_macro.story_ingame import already_in_match
             in_match = already_in_match(capture, self.reader, self.stop,
                                         self.map_name, self.act_name, self.difficulty,

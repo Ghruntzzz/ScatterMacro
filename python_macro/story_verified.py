@@ -29,7 +29,8 @@ def changed_screen(before, after, fraction=0.075):
 
 
 def click_and_confirm(label, locate, advanced, capture, click, stop, log,
-                      highlight=None, timeout=30, attempts=3, settle_seconds=1.5):
+                      highlight=None, timeout=30, attempts=3, settle_seconds=1.5,
+                      stable_seconds=0):
     """Click a freshly detected target, then check a real screen transition.
 
     locate(frame) -> (x,y[,confidence]) or None.
@@ -47,6 +48,14 @@ def click_and_confirm(label, locate, advanced, capture, click, stop, log,
             if stop.wait(0.10):
                 return False
             continue
+        if stable_seconds:
+            if stop.wait(stable_seconds):
+                return False
+            fresh = capture()
+            settled = locate(fresh)
+            if settled is None or max(abs(settled[i]-target[i]) for i in (0,1)) > 3:
+                continue
+            before, target = fresh, settled
         if attempt >= attempts:
             raise RuntimeError(f"{label} did not respond. Check the game and try again.")
         x, y = int(target[0]), int(target[1])
@@ -172,7 +181,8 @@ def navigate_story_checked(map_name, capture, reader, click, stop, log, timeout=
     def press(label, locate, advanced):
         send_click = start_click if label == "Start" and start_click is not None else click
         return click_and_confirm(label, locate, advanced, capture, send_click, stop, log,
-                                 highlight=highlight, timeout=timeout)
+                                 highlight=highlight, timeout=timeout,
+                                 stable_seconds=.45 if label == 'Start' else 0)
 
     if not skip_play:
         log("Opening Play menu.")

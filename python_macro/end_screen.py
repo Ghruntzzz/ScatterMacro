@@ -67,7 +67,10 @@ class EndScreenReader:
         matches = self.reader.read(frame, Region(0, int(h*.4), int(w*.8), h-int(h*.4)),
                                    scale=2, max_variants=1, min_confidence=.65,
                                    cancelled=self.stop.is_set)
-        return {**reading, "matches": [*reading["matches"], *matches]}
+        # Prefer the dedicated enlarged reward pass over overlapping earlier OCR.
+        retained = [m for m in reading['matches'] if not
+                    (center(m)[1] >= int(h*.4) and center(m)[0] < int(w*.8))]
+        return {**reading, "matches": [*retained, *matches]}
 
 
 def save_rewards(frame, reading, directory):
@@ -85,6 +88,8 @@ def save_rewards(frame, reading, directory):
     save("roblox.png", frame[:, :, :3])
     headers = [m for m in matches if normalize(m.text) == "gainedrewards"]
     buttons = [m for m in matches if normalize(m.text) == "repeatstage"]
+    if not buttons:
+        buttons = [m for m in matches if normalize(m.text) == 'viewparty']
     files = []
     reward_text = []
     strip_name = None
@@ -99,7 +104,7 @@ def save_rewards(frame, reading, directory):
         # Derive the reward column from the navigation row, not item names or
         # a fixed number of rewards. This includes every visible row of tiles.
         party = [m for m in matches if normalize(m.text) == "viewparty"]
-        if party:
+        if party and center(party[0]) != center(button):
             px, _ = center(party[0])
             bx, _ = center(button)
             right = min(frame.shape[1], round(px + .9*(px-bx)))
@@ -150,12 +155,28 @@ def reward_label(matches, top, height):
     quantity = next(iter(quantities)) if len(quantities) == 1 else '?x'
     names = []
     for m in sorted(matches, key=lambda m:(center(m)[1],center(m)[0])):
-        text = m.text.strip()
+        text = clean_reward_name(m.text)
         if center(m)[1] < top + height*.65 or re.fullmatch(r'[\d,.]+\s*[xX]',text):
             continue
         if normalize(text) not in {normalize(n) for n in names}:
             names.append(text)
-    return quantity + ' ' + (' '.join(names) or 'Unread reward')
+    joined = []
+    for name in names:
+        words = name.split()
+        overlap = 0
+        for size in range(1,min(len(joined),len(words))+1):
+            if normalize(' '.join(joined[-size:])) == normalize(' '.join(words[:size])):
+                overlap = size
+        joined.extend(words[overlap:])
+    return quantity + ' ' + (clean_reward_name(' '.join(joined)) or 'Unread reward')
+
+
+def clean_reward_name(text):
+    text = re.sub(r'\bSplrit\b','Spirit',text,flags=re.I)
+    text = re.sub(r'\bUnlt\b','Unit',text,flags=re.I)
+    text = re.sub(r'\bRald Token\b','Raid Token',text,flags=re.I)
+    text = re.sub(r'\bMoonbla\s+de\b','Moonblade',text,flags=re.I)
+    return ' '.join(text.split())
 
 
 def result_stats(matches):

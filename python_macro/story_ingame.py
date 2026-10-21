@@ -144,7 +144,17 @@ class HudReader:
 def run_story_ingame(map_name, act, difficulty, capture, client, reader, stop,
                      log, assets, entries=(), status=lambda value: None,
                      monitor_capture=None, reward_dir=None, entries_provider=None,
-                     match_confirmed=False, on_result=lambda *args: None, mode='Story'):
+                     match_confirmed=False, on_result=lambda *args: None, mode='Story', next_match=None):
+    if not prepare_match(map_name,act,difficulty,capture,client,reader,stop,log,
+                         match_confirmed=match_confirmed,mode=mode):
+        return
+    run_matches(capture, client, reader, stop, log, assets, entries, status,
+                monitor_capture or capture, reward_dir, entries_provider, allow_active=match_confirmed,
+                on_result=on_result, next_match=next_match)
+
+
+def prepare_match(map_name,act,difficulty,capture,client,reader,stop,log,
+                  match_confirmed=False,mode='Story'):
     log("Waiting for match details.")
     confirmed = 0
     scans = 0
@@ -179,9 +189,7 @@ def run_story_ingame(map_name, act, difficulty, capture, client, reader, stop,
     if not client.setup_camera() or stop.is_set():
         return
     log("Camera ready. Starting game.")
-    run_matches(capture, client, reader, stop, log, assets, entries, status,
-                monitor_capture or capture, reward_dir, entries_provider, allow_active=match_confirmed,
-                on_result=on_result)
+    return True
 
 
 def start_game(capture, client, stop, assets, active_hud=None):
@@ -217,7 +225,7 @@ def start_game(capture, client, stop, assets, active_hud=None):
 
 
 def finish_match(capture, client, reader, stop, log, status, reward_dir, started, find_start,
-                 on_result=lambda *args: None):
+                 on_result=lambda *args: None, next_match=None):
     end = EndScreenReader(reader, stop)
     previous, counted = None, False
     reward_logged = False
@@ -247,6 +255,8 @@ def finish_match(capture, client, reader, stop, log, status, reward_dir, started
                 # a fresh capture rather than clicking stale coordinates.
                 previous = outcome
                 continue
+            if outcome == 'victory' and next_match is not None:
+                return next_match()
             if reading["repeat"] is not None:
                 if not clicked_repeat:
                     log("Repeating stage.")
@@ -276,7 +286,7 @@ def finish_match(capture, client, reader, stop, log, status, reward_dir, started
 
 def run_matches(capture, client, reader, stop, log, assets, entries, status,
                 monitor_capture, reward_dir, entries_provider=None, allow_active=False,
-                on_result=lambda *args: None):
+                on_result=lambda *args: None, next_match=None):
     monitor = MatchMonitor(monitor_capture, assets, status)
     monitor.start()
     try:
@@ -317,7 +327,7 @@ def run_matches(capture, client, reader, stop, log, assets, entries, status,
             if stop.is_set() or not finish_match(capture, client, reader, stop, log,
                                                 status, reward_dir, started,
                                                 StartButtonLocator(assets / "start-game-template.png"),
-                                                on_result=on_result):
+                                                on_result=on_result, next_match=next_match):
                 return
     finally:
         monitor.close()

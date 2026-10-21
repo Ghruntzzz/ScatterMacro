@@ -9,7 +9,7 @@ from pathlib import Path
 
 from PySide6.QtCore import QPoint, QRect, QTimer, Qt, QRegularExpression
 from PySide6.QtGui import QColor, QFont, QFontDatabase, QIcon, QKeySequence, QRegularExpressionValidator, QLinearGradient, QPainter, QPainterPath, QPixmap, QRadialGradient, QRegion
-from PySide6.QtWidgets import QApplication, QComboBox, QDialog, QDialogButtonBox, QFrame, QHeaderView, QLabel, QLineEdit, QMessageBox, QPlainTextEdit, QPushButton, QSpinBox, QTableWidget, QVBoxLayout, QWidget, QSystemTrayIcon, QMenu
+from PySide6.QtWidgets import QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFrame, QHeaderView, QLabel, QLineEdit, QMessageBox, QPlainTextEdit, QPushButton, QSpinBox, QTableWidget, QVBoxLayout, QWidget, QSystemTrayIcon, QMenu
 
 
 ROOT = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parents[1]
@@ -138,6 +138,8 @@ def read_dashboard_values() -> dict[str, str]:
         "ping_defeat": notifications.get("Defeat", "1"),
         "ping_error": notifications.get("Error", "0"),
         "show_rewards": notifications.get("ShowRewards", "0"),
+        **{'challenge_'+key:dashboard.get('Challenge_'+key,'1') for key in
+           ('weekly','daily','regular1','regular2','regular3')},
     }
 
 
@@ -210,6 +212,12 @@ class KeybindEdit(QLineEdit):
         event.accept()
 
 
+class ActionOutput(QPlainTextEdit):
+    def appendPlainText(self,text):
+        super().appendPlainText(text)
+        self.verticalScrollBar().setValue(self.verticalScrollBar().maximum())
+
+
 def config_segment(value: str) -> str:
     return "_".join(part for part in "".join(char if char.isalnum() else " " for char in value).split())
 
@@ -260,6 +268,7 @@ def load_unit_indexes_from_path(config_path: Path, count: int = 6) -> list[dict[
                 "y": section.get(f"{prefix}Y", ""),
                 "place_at_wave": section.get(f"{prefix}PlaceAtWave", ""),
                 "auto_ability_wave": section.get(f"{prefix}AutoAbilityWave", ""),
+                "path": section.get(f"{prefix}Path", ""),
             }
         )
     return indexes
@@ -406,6 +415,17 @@ class DashboardWindow(QWidget):
         self.map_box = self._combo(config, "MAP", MODE_MAPS["Story"], self.values["map"], 314, 97, 320)
         self.difficulty_box = self._combo(config, "DIFFICULTY", ["Normal", "Hard"], self.values["difficulty"], 36, 187, 240)
         self.act_box = self._combo(config, "ACT", MODE_ACTS["Story"], self.values["act"], 314, 187, 320)
+        self.challenge_panel = QWidget(config)
+        self.challenge_panel.setGeometry(36,175,600,120)
+        self.challenge_boxes = {}
+        for i,(key,label) in enumerate((('weekly','Weekly'),('daily','Daily'),('regular1','Regular #1'),
+                                        ('regular2','Regular #2'),('regular3','Regular #3'))):
+            box=QCheckBox(label,self.challenge_panel)
+            box.setGeometry((i%3)*190,(i//3)*38,180,30)
+            box.setStyleSheet(f"color: {TEXT}; font: 11px 'Segoe UI';")
+            box.setChecked(self.values['challenge_'+key]=='1')
+            box.toggled.connect(self._save_dashboard)
+            self.challenge_boxes[key]=box
         self.mode_box.currentTextChanged.connect(self._mode_changed)
         for box in (self.map_box, self.difficulty_box):
             box.currentTextChanged.connect(self._save_dashboard)
@@ -429,7 +449,7 @@ class DashboardWindow(QWidget):
 
     def _deployment(self) -> None:
         deploy = self
-        start = self._button(deploy, "START" if self.mode_box.currentText() in {"Story", "Raid"} else "SAVE SETUP", 596, 577, 214, True)
+        start = self._button(deploy, "START" if self.mode_box.currentText() in {"Story", "Raid", "Challenges"} else "SAVE SETUP", 596, 577, 214, True)
         self.start_button = start
         settings = self._button(deploy, "SETTINGS", 830, 577, 164)
         exit_button = self._button(deploy, "EXIT", 1014, 577, 154)
@@ -541,7 +561,7 @@ class DashboardWindow(QWidget):
         self._refresh_route_controls()
         self._save_dashboard()
         if hasattr(self, "start_button"):
-            self.start_button.setText("START" if _mode in {"Story", "Raid"} else "SAVE SETUP")
+            self.start_button.setText("START" if _mode in {"Story", "Raid", "Challenges"} else "SAVE SETUP")
 
     def _act_changed(self, _act: str) -> None:
         if self.mode_box.currentText() == "Story":
@@ -559,6 +579,7 @@ class DashboardWindow(QWidget):
         self._set_combo_visible(self.map_box, True)
         self._set_combo_items(self.act_box, acts, previous_act)
         self._set_combo_visible(self.act_box, mode in {"Story", "Raid"})
+        self.challenge_panel.setVisible(mode=='Challenges')
 
         if mode == "Story":
             difficulties = ["Hard"] if self.act_box.currentText() in {"Infinite", "Mastery"} else ["Normal", "Hard"]
@@ -576,6 +597,9 @@ class DashboardWindow(QWidget):
         self._update_route()
 
     def _save_dashboard(self) -> None:
+        if hasattr(self,'challenge_boxes'):
+            update_config('Dashboard',{'Challenge_'+key:'1' if box.isChecked() else '0'
+                                      for key,box in self.challenge_boxes.items()})
         if not hasattr(self, "mode_box"):
             return
         mode = self.mode_box.currentText()
@@ -598,7 +622,7 @@ class DashboardWindow(QWidget):
 
     def _start_macro(self) -> None:
         self._save_dashboard()
-        if self.mode_box.currentText() not in {"Story", "Raid"}:
+        if self.mode_box.currentText() not in {"Story", "Raid", "Challenges"}:
             self._set_status("Setup saved. This mode's automation is not connected yet.")
             return
         from python_macro.capture import single_roblox_window
@@ -973,9 +997,12 @@ class RuntimeWindow(DashboardWindow):
         self._section_title(action, "ACTION OUTPUT", 20)
         self._label(action, "Live macro activity", 16, 58, 178, 18,
                     f"color: {MUTED}; font: 9px 'Segoe UI';")
-        self.log = QPlainTextEdit(action)
+        self.log = ActionOutput(action)
         self.log.setGeometry(16, 88, 178, 303)
         self.log.setReadOnly(True)
+        self.log.setMaximumBlockCount(80)
+        self.log.textChanged.connect(lambda: self.log.verticalScrollBar().setValue(self.log.verticalScrollBar().maximum()))
+        self.log.verticalScrollBar().rangeChanged.connect(lambda low,high:self.log.verticalScrollBar().setValue(high))
         self.log.setPlainText("Runtime is ready.\n\nWaiting for macro activity...")
         self.log.setStyleSheet(
             f"background: {blend_color(PANEL, '#000000', 0.45)}; "
@@ -1008,7 +1035,7 @@ class RuntimeWindow(DashboardWindow):
         from ui.unit_manager import UnitManager
         self.index_editor = UnitManager(self.unit_indexes, self._save_runtime_index,
                                        lambda: self.worker is not None and self.worker.isRunning(),
-                                       self.log.appendPlainText, manager)
+                                       self.log.appendPlainText, manager, record=self._record_path)
         self.index_editor.setGeometry(12, 12, 403, 894)
 
     def _save_runtime_index(self, index, entry):
@@ -1021,11 +1048,41 @@ class RuntimeWindow(DashboardWindow):
         requested_wave(entry.get("auto_ability_wave", ""))
         for key, suffix in (("unit", "Unit"), ("priority", "Priority"), ("upgrade", "Upgrade"),
                             ("auto_upgrade", "AutoUpgrade"), ("x", "X"), ("y", "Y"),
-                            ("place_at_wave", "PlaceAtWave"), ("auto_ability_wave", "AutoAbilityWave")):
+                            ("place_at_wave", "PlaceAtWave"), ("auto_ability_wave", "AutoAbilityWave"),('path','Path')):
             parser.set("UnitIndexes", f"Index{index + 1}{suffix}", entry.get(key, ""))
         write_ini(parser, self.unit_config_path)
         if self.worker is not None and self.worker.isRunning():
             self.worker.update_entry(index, entry)
+
+    def _record_path(self,index,mode):
+        recorder=getattr(self,'path_recorder',None)
+        if recorder is not None and recorder.active:
+            recorder.finish()
+            return
+        if self.worker is not None and self.worker.isRunning():
+            self.log.appendPlainText('Stop the macro before recording a path.')
+            return
+        if recorder is not None:
+            recorder.deleteLater()
+        try:
+            from threading import Event
+            from python_macro.capture import selected_roblox_window,single_roblox_window
+            from python_macro.input import RobloxClient
+            from ui.path_recorder import PathRecorder
+            hwnd,pid=self.values.get('roblox_hwnd'),self.values.get('roblox_pid')
+            target=selected_roblox_window(hwnd,pid) if hwnd and pid else single_roblox_window()
+            client=RobloxClient(target[0],Event(),selected_pid=target[2])
+            self.path_recorder=PathRecorder(client,mode,self)
+            self.path_recorder.finished.connect(lambda raw:self.index_editor.save_path(index,raw))
+            self.path_recorder.failed.connect(self._record_failed)
+            self.path_recorder.start()
+            self.index_editor.recording_changed(self.path_recorder.active)
+        except (OSError,RuntimeError,ValueError) as error:
+            self._record_failed(str(error))
+
+    def _record_failed(self,message):
+        self.index_editor.recording_changed(False)
+        self.log.appendPlainText('Path recording: '+message)
 
     def _render_unit_manager_page(self) -> None:
         """Redraw only the Unit Manager so page controls stay responsive."""
@@ -1110,6 +1167,8 @@ class RuntimeWindow(DashboardWindow):
         from python_macro.hotkeys import RuntimeHotkeys
         if event_type in (b"windows_generic_MSG", b"windows_dispatcher_MSG"):
             msg = wintypes.MSG.from_address(int(message))
+            if msg.message == 0x00ff and getattr(self,'path_recorder',None) is not None:
+                self.path_recorder.raw_mouse(msg.lParam)
             if msg.message == 0x0312 and not self.return_pending:
                 if msg.wParam == RuntimeHotkeys.START and self.isVisible():
                     self._start_story()
@@ -1203,8 +1262,13 @@ class RuntimeWindow(DashboardWindow):
         self.close()
 
     def _start_story(self) -> None:
-        if self.values["mode"] not in {"Story", "Raid"}:
-            self.log.appendPlainText("Only Story and Raid automation are available.")
+        if getattr(self,'path_recorder',None) is not None and self.path_recorder.active:
+            self.log.appendPlainText('Stop recording with F3 before starting the macro.')
+            return
+        if getattr(self,'path_recorder',None) is not None and ctypes.windll.user32.GetAsyncKeyState(0x72)&0x8000:
+            return
+        if self.values["mode"] not in {"Story", "Raid", "Challenges"}:
+            self.log.appendPlainText("Only Story, Raid and Challenge automation are available.")
             return
         if self.return_pending or (self.worker is not None and self.worker.isRunning()):
             return
@@ -1260,6 +1324,8 @@ class RuntimeWindow(DashboardWindow):
             self._click_overlay.show_at(point.x, point.y)
 
     def _stop_story(self) -> None:
+        if getattr(self,'path_recorder',None) is not None and self.path_recorder.active:
+            self.path_recorder.finish()
         if self.worker is not None and self.worker.isRunning():
             self.worker.stop.set()
             self.runtime_status.setText("STOPPING")
@@ -1283,6 +1349,8 @@ class RuntimeWindow(DashboardWindow):
         self.setup_dashboard.show()
 
     def closeEvent(self, event) -> None:
+        if getattr(self,'path_recorder',None) is not None and self.path_recorder.active:
+            self.path_recorder.finish()
         if hasattr(self, "_click_overlay"):
             self._click_overlay.hide()
         if hasattr(self, "hotkeys"):

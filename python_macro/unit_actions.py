@@ -233,7 +233,8 @@ class UnitIndexer:
 
     def click(self, point, frame):
         self.heartbeat()
-        if self.stop.is_set() or self.client.direct_click(*point, frame.shape) is False:
+        send = self.client.unit_click if hasattr(type(self.client),'unit_click') else self.client.direct_click
+        if self.stop.is_set() or send(*point, frame.shape) is False:
             raise InterruptedError()
 
     def key(self, value):
@@ -242,7 +243,7 @@ class UnitIndexer:
             raise InterruptedError()
 
     def all_done(self):
-        return all(i in self.completed or str(e.get("unit", "0")) not in {"1","2","3","4","5","6"}
+        return all(i in self.completed or (not e.get('path') and str(e.get("unit", "0")) not in {"1","2","3","4","5","6"})
                    for i, e in enumerate(self.entries))
 
     def check_abilities(self, wave):
@@ -282,7 +283,11 @@ class UnitIndexer:
     def next_ready(self, wave):
         # Strict numerical order: an earlier configured wave blocks later indexes.
         for index, entry in enumerate(self.entries):
-            if index in self.completed or str(entry.get("unit", "0")) not in {"1","2","3","4","5","6"}:
+            if index in self.completed:
+                continue
+            if entry.get('path'):
+                return index
+            if str(entry.get("unit", "0")) not in {"1","2","3","4","5","6"}:
                 continue
             if not all(str(entry.get(key, "")).isdecimal() for key in ("x", "y")):
                 raise RuntimeError(f"Set the position for Index {index+1} before starting.")
@@ -336,11 +341,11 @@ class UnitIndexer:
                     raise RuntimeError(f"Index {index+1} position is outside Roblox.")
                 continue
             self.key(str(entry["unit"]))
-            self.wait(0.15)
+            self.wait(0.08)
             self.last_place_point = point
             self.click(point, frame)
             for scan in range(4):
-                self.wait(0.12)
+                self.wait(0.06)
                 frame, panel = self.snapshot()
                 panel = self.placement_panel(frame, panel)
                 if panel is not None:
@@ -353,6 +358,15 @@ class UnitIndexer:
 
     def run(self, index):
         entry = self.entries[index]
+        if entry.get('path'):
+            from python_macro.pathing import replay_path,decode_path
+            decode_path(entry['path'])
+            self.close()
+            self.log(f'Running path Index {index+1}.')
+            replay_path(entry['path'],self.client,self.stop,self.heartbeat)
+            self.completed.add(index)
+            self.log(f'Index {index+1} complete.')
+            return
         desired = entry.get("priority", "First")
         auto, goal = int(entry.get("auto_upgrade", "0")), int(entry.get("upgrade", "0"))
         if desired not in TARGETS or not 0 <= auto <= 6 or not 0 <= goal <= 15:

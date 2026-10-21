@@ -73,6 +73,25 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual(window.start_button.text(),'START')
         window.close()
 
+    def test_challenge_choices_are_saved_and_runtime_log_is_bounded(self):
+        window=dashboard.DashboardWindow()
+        window.mode_box.setCurrentText('Challenges')
+        window.challenge_boxes['weekly'].setChecked(False)
+        window.challenge_boxes['regular2'].setChecked(False)
+        values=dashboard.read_dashboard_values()
+        self.assertEqual(values['challenge_weekly'],'0')
+        self.assertEqual(values['challenge_regular2'],'0')
+        self.assertEqual(values['challenge_daily'],'1')
+        window.close()
+        runtime=dashboard.RuntimeWindow()
+        for i in range(120):
+            runtime.log.appendPlainText(f'Activity {i}')
+        self.assertLessEqual(runtime.log.document().blockCount(),80)
+        self.assertTrue(runtime.log.toPlainText().endswith('Activity 119'))
+        self.assertNotIn('Activity 0\n',runtime.log.toPlainText())
+        self.assertEqual(runtime.log.verticalScrollBar().value(),runtime.log.verticalScrollBar().maximum())
+        runtime.close()
+
     def test_defaults_and_custom_keybinds_persist_with_notifications(self):
         values=dashboard.read_dashboard_values()
         self.assertEqual((values['start_key'],values['stop_key']),('F1','F2'))
@@ -207,7 +226,7 @@ class NotificationTests(unittest.TestCase):
                 notify.send('victory',60,directory)
         payload=json.loads(opener.open.call_args.args[0].data)
         fields={f['name']:f['value'] for f in payload['embeds'][0]['fields']}
-        self.assertEqual(fields['Rewards Earned'],'25x Gem\n?x Unknown')
+        self.assertNotIn('Rewards Earned',fields)
         self.assertEqual(fields['Total Rewards (Session)'],'100x Gem')
         self.assertEqual(fields['Total Waves Completed'],'30')
         self.assertEqual(fields['Total Kills'],'600')

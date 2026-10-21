@@ -110,8 +110,6 @@ class Notifier:
             for name,value in self.stat_totals.items():
                 fields.append({'name':name,'value':f'{value:,}','inline':True})
         if self.settings.get('show_rewards','0') == '1' and reward_dir is not None:
-            rewards = '\n'.join(str(item) for item in metadata.get('rewards',[]))
-            fields.append({'name':'Rewards Earned', 'value':rewards[:1024] or 'Could not read rewards.', 'inline':False})
             totals = '\n'.join(f'{count:,}x {name}' for name,count in self.reward_totals.values())
             fields.append({'name':'Total Rewards (Session)', 'value':totals[:1024] or 'No readable rewards yet.', 'inline':False})
         if fields:

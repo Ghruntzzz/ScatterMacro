@@ -22,7 +22,7 @@ Select Install on Anime Expeditions, then Open. The installed setup app provides
 - Per-route modern PySide6 Unit Manager in the runtime dashboard: 104 selectable indexes,\n  unit slots 0–6, target/upgrade editing, copy/paste, reset, and client-relative position capture.\n  Numbered placement markers appear on the Roblox screenshot through Set position\n  or the read-only View markers control. Upgrade and auto-upgrade are dropdowns;\n  X/Y fields have no spinner arrows. The runtime omits the extra Stop button,\n  but the F2 stop hotkey remains available. Changes auto-save to the route's INI.
 - Saved keybind preferences and other settings.
 
-Current Story flow: choose a route -> Start opens the runtime -> press the start
+Current Story/Raid flow: choose a route -> Start opens the runtime -> press the start
 shortcut. F1 starts and F2 stops by default; both can be changed and saved in
 Settings. Matching in-game details skip lobby navigation. The first run sets
 the camera, then starts the game and processes indexes in numerical order.
@@ -32,8 +32,8 @@ without ending the macro; returning to Roblox resumes them.
 The runtime clicks through detected reward prompts, counts each Victory/Defeat
 once, sends enabled Discord notifications, and retries Repeat Stage until the
 next Start Game appears. Repeats do not redo camera setup or match-detail reading.
-Discord's optional Show rewards earned attaches only the current Gained Rewards
-area, never the full game screen. Visible reward tiles are extracted dynamically,
+Discord's optional Show rewards earned lists accumulated session rewards and
+attaches the Roblox client screenshot, not the Windows desktop. Visible reward tiles are extracted dynamically,
 not from a fixed item list; offscreen/scrolling rewards are not yet collected.
 The latest capture is stored in the macro config folder under rewards/latest.
 
@@ -41,7 +41,27 @@ Auto Ability Check takes a wave number (blank disables it). At that wave the
 macro opens the placed unit and enables a detected red/off ability switch.
 Changes to unit indexes during a run are saved for the next run. Settings Apply
 and Save update the visible theme. Private server links are stored only;
-automatic reconnect and automation for modes other than Story are future work.
+automatic reconnect remains future work.
+
+Challenges run enabled Weekly, Daily, then Regular #1-3 in that order. Uncheck
+individual challenges in Match Settings to skip them. The macro reads available
+entries and remaining limits, waits when selected challenges are unavailable,
+and returns through View Party -> Change Gamemode after victories. Defeats can
+retry the same stage. Challenges currently share the Challenge unit configuration.
+
+## Recorded paths
+
+Select an index in Unit Manager, choose Keyboard, Mouse, or Both, and press
+Record. Roblox is focused automatically. F3 or Stop Recording finishes and saves
+the path. Keyboard records WASD; Mouse records relative movement and right-button
+camera dragging, not left-clicks. Recording pauses outside Roblox and is limited
+to five minutes. A path index cannot also contain unit placement or upgrade
+settings; Reset removes its path. Paths replay in numerical index order.
+
+Replay is timed input, not position-aware navigation. Use the same starting
+position, camera, sensitivity, and game settings as the recording. Movement can
+vary with collisions or lag. The stop shortcut interrupts playback and releases
+held inputs. Action Output follows the latest message and keeps only 80 lines.
 
 ## Installation and updates
 
