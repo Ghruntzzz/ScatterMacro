@@ -8,12 +8,12 @@
     {
       "id": "anime-expeditions",
       "name": "Anime Expeditions",
-      "version": "0.1.53",
+      "version": "0.1.54",
       "setup_only": false,
       "entrypoint": "AnimeExpeditions.exe",
-      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.53/AnimeExpeditions-0.1.53-windows.zip",
-      "sha256": "a6e55bdde4d9c5ea11d363e31d93656d359ff8c4178c750dd3c551813f047910",
-      "description": "Fixes Tower victory clicking Repeat Floor by requiring exact outcome-specific button text."
+      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.54/AnimeExpeditions-0.1.54-windows.zip",
+      "sha256": "e91499792df41fef4a9fb0e0cb8df04330203cd349c378ce0df80466364793e7",
+      "description": "Expedition navigation and saved card priorities with per-run no-repeat selection. Checkpoint checks and shops remain manual."
     }
   ]
 }
