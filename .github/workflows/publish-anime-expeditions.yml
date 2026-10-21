@@ -64,8 +64,8 @@ jobs:
       - name: Upload tested Windows build
         uses: actions/upload-artifact@v4
         with:
-          name: AnimeExpeditions-0.1.52-windows
-          path: dist/AnimeExpeditions-0.1.52-windows.zip
+          name: AnimeExpeditions-0.1.53-windows
+          path: dist/AnimeExpeditions-0.1.53-windows.zip
           if-no-files-found: error
           retention-days: 7
       - name: Publish and verify macro archive
@@ -74,12 +74,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '0.1.52'
+          $version = '0.1.53'
           $tag = "anime-expeditions-v$version"
           $name = "AnimeExpeditions-$version-windows.zip"
           $archive = "dist/$name"
           if (!(Test-Path $archive)) { throw "Missing macro ZIP: $archive" }
-          gh release create $tag $archive --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Anime Expeditions $version - Tower In-Game Operations" --notes "Tower now uses the shared in-game unit setup, upgrades, abilities, wave monitoring, reward collection, statistics and webhook flow. Victory uses the supplied Next Floor button; defeat uses Repeat Floor. Each floor refreshes its detected map profile within Trait or Traitless. New floors set up the camera; repeats reuse it. Existing Tower matches skip navigation. Removes unit-profile messages from Action Output. 251 tests passed; live gameplay validation remains recommended."
+          gh release create $tag $archive --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Anime Expeditions $version - Tower Victory Button Fix" --notes "Tower floor transitions now require the exact button label: Next Floor for victory and Repeat Floor for defeat. Removes image-only acceptance that could confuse the similarly shaped buttons. Missing or ambiguous labels cause waiting rather than clicking the wrong action. 253 tests passed, including rejection of an incorrect image hit and both buttons visible together. Real OCR verified against the supplied button images."
           if ($LASTEXITCODE -ne 0) { throw 'Macro release upload failed' }
           New-Item -ItemType Directory -Force 'dist/verified' | Out-Null
           gh release download $tag --repo $env:GITHUB_REPOSITORY --pattern $name --dir 'dist/verified'
@@ -91,7 +91,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '0.1.52'
+          $version = '0.1.53'
           $archive = "dist/AnimeExpeditions-$version-windows.zip"
           $sha256 = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
           $url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/anime-expeditions-v$version/AnimeExpeditions-$version-windows.zip"
@@ -104,7 +104,7 @@ jobs:
           $macro[0].version = $version
           $macro[0].url = $url
           $macro[0].sha256 = $sha256
-          $macro[0].description = "Tower in-game operations with Next Floor on victory, Repeat Floor on defeat, and quieter Action Output."
+          $macro[0].description = "Fixes Tower victory clicking Repeat Floor by requiring exact outcome-specific button text."
           $catalog | ConvertTo-Json -Depth 20 | Set-Content catalog.json -Encoding utf8
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

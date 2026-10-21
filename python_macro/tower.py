@@ -116,10 +116,11 @@ class TowerFlow(ChallengeFlow):
         if outcome not in ('victory','defeat'):
             return False
         label='Next Floor' if outcome=='victory' else 'Repeat Floor'
-        icon=self.next_floor if outcome=='victory' else self.repeat_floor
         self.log('Advancing floor.' if outcome=='victory' else 'Repeating floor.')
         start_game=self.game_start
-        if not self.press(label,lambda frame:icon(frame) or self.text(label)(frame),
+        # The two buttons have nearly identical grayscale shapes. Require the
+        # exact outcome-specific text instead of accepting an image-only hit.
+        if not self.press(label,self.text(label),
                           lambda after,before:start_game(after) is not None):
             return False
         map_name=self.wait_map(map_names)

@@ -10,6 +10,35 @@ from test_unit_actions import FastStop
 
 
 class TowerTests(unittest.TestCase):
+    def test_victory_rejects_repeat_even_if_image_match_is_wrong(self):
+        flow=self.flow()
+        flow.next_floor=Mock(return_value=(100,100))
+        flow.game_start=Mock()
+        flow.wait_map=Mock(return_value='East Town')
+        flow.reader.read.return_value=[label('Repeat Floor',20,20)]
+        frame=np.zeros((200,400,3),np.uint8)
+        def press(name,locate,advanced):
+            self.assertEqual(name,'Next Floor')
+            self.assertIsNone(locate(frame))
+            return False
+        flow.press=press
+        self.assertFalse(flow.transition('victory',['East Town'],Mock()))
+        flow.client.direct_click.assert_not_called()
+        flow.next_floor.assert_not_called()
+
+    def test_outcome_locator_selects_exact_label_with_both_buttons_visible(self):
+        for outcome,point in [('victory',(100,28)),('defeat',(300,28))]:
+            flow=self.flow()
+            flow.game_start=Mock()
+            flow.wait_map=Mock(return_value='East Town')
+            flow.reader.read.return_value=[label('Next Floor',20,20),label('Repeat Floor',220,20)]
+            frame=np.zeros((200,400,3),np.uint8)
+            def press(name,locate,advanced):
+                self.assertEqual(locate(frame),point)
+                return True
+            flow.press=press
+            self.assertTrue(flow.transition(outcome,['East Town'],Mock()))
+
     def test_outcome_selects_next_only_on_victory(self):
         for outcome,expected in [('victory','Next Floor'),('defeat','Repeat Floor')]:
             flow=self.flow()
