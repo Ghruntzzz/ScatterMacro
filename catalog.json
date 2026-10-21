@@ -8,12 +8,12 @@
     {
       "id": "anime-expeditions",
       "name": "Anime Expeditions",
-      "version": "0.1.50",
+      "version": "0.1.51",
       "setup_only": false,
       "entrypoint": "AnimeExpeditions.exe",
-      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.50/AnimeExpeditions-0.1.50-windows.zip",
-      "sha256": "4da8c050fe92aad406f3a3c27ab883347d2908c073969634e8b051e518dfd2ad",
-      "description": "Tower navigation with highest visible floor selection and separate per-map Trait and Traitless profiles."
+      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.51/AnimeExpeditions-0.1.51-windows.zip",
+      "sha256": "fc256c15e3610f0941f55bfe17d0813d05e79cafd2b4b67abe827eaacb87fbda",
+      "description": "Fixes repeated Tower tab clicks and excludes tab-card Floor labels from playable floor selection."
     }
   ]
 }
