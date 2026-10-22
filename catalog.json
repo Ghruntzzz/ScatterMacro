@@ -8,12 +8,12 @@
     {
       "id": "anime-expeditions",
       "name": "Anime Expeditions",
-      "version": "0.1.54",
+      "version": "0.1.55",
       "setup_only": false,
       "entrypoint": "AnimeExpeditions.exe",
-      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.54/AnimeExpeditions-0.1.54-windows.zip",
-      "sha256": "e91499792df41fef4a9fb0e0cb8df04330203cd349c378ce0df80466364793e7",
-      "description": "Expedition navigation and saved card priorities with per-run no-repeat selection. Checkpoint checks and shops remain manual."
+      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.55/AnimeExpeditions-0.1.55-windows.zip",
+      "sha256": "e24d92383dac8f75181e1f0bdf7b65cf8b709897c88d6b1796920c3d66d514ae",
+      "description": "Per-map shop route recording, ten Expedition slots and damage-only hammer use. Automatic shopping remains unfinished."
     }
   ]
 }
