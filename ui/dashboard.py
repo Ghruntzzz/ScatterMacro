@@ -431,9 +431,6 @@ class DashboardWindow(QWidget):
         self.anvil_priority_button=self._button(config,'ANVIL PRIORITY',480,209,154,False)
         self.anvil_priority_button.setFixedHeight(34)
         self.anvil_priority_button.clicked.connect(self._anvil_priority)
-        self.gate_routes_button=self._button(config,'GATE ROUTES',314,209,154,False)
-        self.gate_routes_button.setFixedHeight(34)
-        self.gate_routes_button.clicked.connect(self._gate_routes)
         self.challenge_panel.setGeometry(36,175,600,120)
         self.challenge_boxes = {}
         for i,(key,label) in enumerate((('weekly','Weekly'),('daily','Daily'),('regular1','Regular #1'),
@@ -625,7 +622,6 @@ class DashboardWindow(QWidget):
         self.challenge_panel.setVisible(mode=='Challenges')
         self.card_priority_button.setVisible(mode=='Expeditions')
         self.anvil_priority_button.setVisible(mode=='Expeditions')
-        self.gate_routes_button.setVisible(mode=='Boss Rush')
 
         if mode == "Story":
             difficulties = ["Hard"] if self.act_box.currentText() in {"Infinite", "Mastery"} else ["Normal", "Hard"]

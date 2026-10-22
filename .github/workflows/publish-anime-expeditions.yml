@@ -64,8 +64,8 @@ jobs:
       - name: Upload tested Windows build
         uses: actions/upload-artifact@v4
         with:
-          name: AnimeExpeditions-0.1.61-windows
-          path: dist/AnimeExpeditions-0.1.61-windows.zip
+          name: AnimeExpeditions-0.1.62-windows
+          path: dist/AnimeExpeditions-0.1.62-windows.zip
           if-no-files-found: error
           retention-days: 7
       - name: Publish and verify macro archive
@@ -74,12 +74,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '0.1.61'
+          $version = '0.1.62'
           $tag = "anime-expeditions-v$version"
           $name = "AnimeExpeditions-$version-windows.zip"
           $archive = "dist/$name"
           if (!(Test-Path $archive)) { throw "Missing macro ZIP: $archive" }
-          gh release create $tag $archive --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Anime Expeditions $version - Boss Rush" --notes "Adds Boss Rush navigation, verified District 7 Hard Mode match detection, six user-recorded gate routes and E entrance handling. Gate-completion dialogs drive Continue for gates 1-5 and Fight Boss after gate 6 only. Units run at gate 1 and in a separate Boss map profile, never on later gates; Repeat resets to gate 1. All six routes must be recorded before starting. Adds Once/Repeated manual WASD paths across modes, compact Expedition priority buttons, improved strict three-title OCR, fixed difficulty click counts, safer cursor parking and shorter index waits. Expedition shop automation is retired. 297 tests passed, including two simulated complete Boss Rush runs; supplied match-details and card screenshots passed real OCR checks. Live gameplay validation remains required."
+          gh release create $tag $archive --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Anime Expeditions $version - Runtime Gate Routes" --notes "Gate Routes is now available only on the Boss Rush runtime dashboard, below Session Stats, and removed from setup. Existing gate recordings and settings are preserved. 297 tests passed; live gameplay validation remains required."
           if ($LASTEXITCODE -ne 0) { throw 'Macro release upload failed' }
           New-Item -ItemType Directory -Force 'dist/verified' | Out-Null
           gh release download $tag --repo $env:GITHUB_REPOSITORY --pattern $name --dir 'dist/verified'
@@ -91,7 +91,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '0.1.61'
+          $version = '0.1.62'
           $archive = "dist/AnimeExpeditions-$version-windows.zip"
           $sha256 = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
           $url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/anime-expeditions-v$version/AnimeExpeditions-$version-windows.zip"

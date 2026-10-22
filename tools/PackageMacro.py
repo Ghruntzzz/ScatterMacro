@@ -31,7 +31,7 @@ def package_macro(source, archive):
     with tempfile.TemporaryDirectory(prefix="macro-install-check-") as temporary:
         library = Library(temporary)
         library.install_archive({"id": "anime-expeditions", "name": "Anime Expeditions",
-                                 "version": "0.1.61", "entrypoint": "AnimeExpeditions.exe",
+                                 "version": "0.1.62", "entrypoint": "AnimeExpeditions.exe",
                                  "sha256": digest}, archive)
         if not library.executable("anime-expeditions").is_file():
             raise RuntimeError("Packaged executable missing")
@@ -39,4 +39,4 @@ def package_macro(source, archive):
 
 
 if __name__ == "__main__":
-    package_macro(ROOT / "dist/AnimeExpeditions", ROOT / "dist/AnimeExpeditions-0.1.61-windows.zip")
+    package_macro(ROOT / "dist/AnimeExpeditions", ROOT / "dist/AnimeExpeditions-0.1.62-windows.zip")

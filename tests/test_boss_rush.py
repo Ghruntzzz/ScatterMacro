@@ -65,7 +65,7 @@ class BossRushTests(unittest.TestCase):
             dashboard.update_config('Dashboard',{'Mode':'Boss Rush','Map':'Gate map'})
             setup=dashboard.DashboardWindow()
             self.assertEqual(setup.mode_box.currentText(),'Boss Rush')
-            self.assertFalse(setup.gate_routes_button.isHidden())
+            self.assertFalse(hasattr(setup,'gate_routes_button'))
             self.assertTrue(setup.card_priority_button.isHidden())
             setup.close()
             window=dashboard.RuntimeWindow()
