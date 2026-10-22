@@ -8,12 +8,12 @@
     {
       "id": "anime-expeditions",
       "name": "Anime Expeditions",
-      "version": "0.1.57",
+      "version": "0.1.58",
       "setup_only": false,
       "entrypoint": "AnimeExpeditions.exe",
-      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.57/AnimeExpeditions-0.1.57-windows.zip",
-      "sha256": "855ae0c242f2b861d8368d5dd533a58b576ef22baa9438612312708f375022a1",
-      "description": "Left-card map selection, verified plus-only difficulty and four default shop routes. Automatic shop playback and purchases remain unfinished."
+      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.58/AnimeExpeditions-0.1.58-windows.zip",
+      "sha256": "2d8ce9d30639b6e1dae3f7ad8a3981d5c9dd735cecc0a162869c733f2bf89db5",
+      "description": "Recognizes the second Expedition Continue button. Includes left-card map selection and default shop routes. Automatic shopping remains unfinished."
     }
   ]
 }
