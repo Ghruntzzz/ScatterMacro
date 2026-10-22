@@ -21,6 +21,7 @@ class ExpeditionFlow(ChallengeFlow):
         self.map_card=Icon(assets/('expedition-map-'+map_name.replace(' ','_')+'.png'),threshold=.85)
         self.plus=Icon(assets/'expedition-plus.png',threshold=.9)
         self.continue_button=Icon(assets/'expedition-continue.png',threshold=.9)
+        self.second_continue=Icon(assets/'expedition-continue-second.png',threshold=.9)
         self.confirm=Icon(assets/'expedition-confirm.png',threshold=.9)
         self.settings=Icon(assets/'expedition-settings.png',threshold=.92)
         self.teleport_row=Icon(assets/'expedition-teleport-row.png',threshold=.88)
@@ -122,7 +123,7 @@ class ExpeditionFlow(ChallengeFlow):
             return
         if self.confirm(frame) is not None:
             target=self.text('Continue')(frame)
-        elif self.continue_button(frame) is not None:
+        elif self.continue_button(frame) is not None or self.second_continue(frame) is not None:
             target=self.text('Continue')(frame)
         else:
             return

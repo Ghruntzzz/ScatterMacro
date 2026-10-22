@@ -64,8 +64,8 @@ jobs:
       - name: Upload tested Windows build
         uses: actions/upload-artifact@v4
         with:
-          name: AnimeExpeditions-0.1.57-windows
-          path: dist/AnimeExpeditions-0.1.57-windows.zip
+          name: AnimeExpeditions-0.1.58-windows
+          path: dist/AnimeExpeditions-0.1.58-windows.zip
           if-no-files-found: error
           retention-days: 7
       - name: Publish and verify macro archive
@@ -74,12 +74,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '0.1.57'
+          $version = '0.1.58'
           $tag = "anime-expeditions-v$version"
           $name = "AnimeExpeditions-$version-windows.zip"
           $archive = "dist/$name"
           if (!(Test-Path $archive)) { throw "Missing macro ZIP: $archive" }
-          gh release create $tag $archive --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Anime Expeditions $version - Map Selection and Default Routes" --notes "Restricts map-name clicks to the matching left-hand map card, excluding the details title. Uses the supplied Plus button with verified difficulty increments before Select Stage and Start; stops if difficulty is already above the requested value. Bundles user-recorded default shop routes for all four maps; custom routes override defaults. Includes new difficulty references. Automatic shop route playback and purchases remain unfinished. 278 tests passed; live gameplay validation remains required."
+          gh release create $tag $archive --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Anime Expeditions $version - Second Continue Button" --notes "Adds the second green Expedition Continue button reference while preserving exact Continue text verification and waiting for unit setup. Includes regression coverage for the supplied image and rejecting Cancel. Preserves left-card map selection, plus-only difficulty and default shop routes. Automatic shop playback and purchases remain unfinished. 279 tests passed; live gameplay validation remains required."
           if ($LASTEXITCODE -ne 0) { throw 'Macro release upload failed' }
           New-Item -ItemType Directory -Force 'dist/verified' | Out-Null
           gh release download $tag --repo $env:GITHUB_REPOSITORY --pattern $name --dir 'dist/verified'
@@ -91,7 +91,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '0.1.57'
+          $version = '0.1.58'
           $archive = "dist/AnimeExpeditions-$version-windows.zip"
           $sha256 = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
           $url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/anime-expeditions-v$version/AnimeExpeditions-$version-windows.zip"
@@ -104,7 +104,7 @@ jobs:
           $macro[0].version = $version
           $macro[0].url = $url
           $macro[0].sha256 = $sha256
-          $macro[0].description = "Left-card map selection, verified plus-only difficulty and four default shop routes. Automatic shop playback and purchases remain unfinished."
+          $macro[0].description = "Recognizes the second Expedition Continue button. Includes left-card map selection and default shop routes. Automatic shopping remains unfinished."
           $catalog | ConvertTo-Json -Depth 20 | Set-Content catalog.json -Encoding utf8
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

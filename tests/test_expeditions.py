@@ -101,6 +101,27 @@ class ExpeditionTests(unittest.TestCase):
         flow.service(Mock())
         flow.client.direct_click.assert_called_once_with(100,100,frame.shape)
 
+    def test_second_continue_reference_is_clicked_but_not_cancel(self):
+        flow=self.flow()
+        frame=cv2.imread('assets/expedition-continue-second.png')
+        self.assertIsNotNone(flow.second_continue(frame))
+        flow.capture.return_value=frame
+        flow.cards.handle=Mock(return_value=False)
+        flow.game_start=Mock(return_value=None)
+        flow.confirm=Mock(return_value=None)
+        flow.continue_button=Mock(return_value=None)
+        flow.reader.read.return_value=[label('Continue',0,5)]
+        indexer=Mock()
+        indexer.all_done.return_value=True
+        flow.service(indexer)
+        flow.client.direct_click.assert_called_once_with(80,13,frame.shape)
+        flow.client.direct_click.reset_mock()
+        flow.last_service=0
+        flow.capture.return_value=frame.copy()
+        flow.reader.read.return_value=[label('Cancel',0,5)]
+        flow.service(indexer)
+        flow.client.direct_click.assert_not_called()
+
     def test_return_to_spawn_clicks_small_icon_then_closes_settings(self):
         flow=self.flow()
         frame=cv2.imread('assets/expedition-teleport-row.png')
