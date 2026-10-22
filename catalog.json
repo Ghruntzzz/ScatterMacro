@@ -8,12 +8,12 @@
     {
       "id": "anime-expeditions",
       "name": "Anime Expeditions",
-      "version": "0.1.60",
+      "version": "0.1.61",
       "setup_only": false,
       "entrypoint": "AnimeExpeditions.exe",
-      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.60/AnimeExpeditions-0.1.60-windows.zip",
-      "sha256": "82f65629cb8f2f23916b78cad3917f38beac05feccef22c62018959b202a0789",
-      "description": "Improved strict three-card detection, anvil priorities and Continue handling. Expedition no-wave runtime and Completed webhooks. Automatic shopping remains unfinished."
+      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.61/AnimeExpeditions-0.1.61-windows.zip",
+      "sha256": "b46ad9dda60af07f9d4978141df5d4c1cd65b9953e7dacd5684e1b938b9429ac",
+      "description": "Boss Rush six-gate routing, separate Gate/Boss profiles and Once/Repeated manual paths. Improved Expedition card reading and faster indexes. Record all six routes before Boss Rush."
     }
   ]
 }
