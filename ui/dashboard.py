@@ -1053,9 +1053,6 @@ class RuntimeWindow(DashboardWindow):
             f"border: 1px solid {OUTLINE}; border-radius: 6px; "
             f"color: {TEXT}; padding: 8px; font: 9px 'Consolas';")
         self.worker = None
-        if self.values['mode']=='Boss Rush':
-            self.runtime_gate_routes=self._small_button(stats_panel,'GATE ROUTES',16,342,178)
-            self.runtime_gate_routes.clicked.connect(self._gate_routes)
         self.return_pending = False
         self._label(action, f"{self.values['start_key']}: START   |   {self.values['stop_key']}: STOP", 16, 409, 178, 28, f"color: {TEXT}; font: 700 9px 'Bahnschrift';")
         # The F2 emergency stop remains active via RuntimeHotkeys; no extra button.

@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "map": "Gate 1",
+  "path": {
+    "version": 1,
+    "mode": "Keyboard",
+    "duration": 2.656,
+    "events": [
+      [
+        0.531,
+        "key",
+        "D",
+        1
+      ],
+      [
+        0.969,
+        "key",
+        "D",
+        0
+      ],
+      [
+        1.359,
+        "key",
+        "W",
+        1
+      ],
+      [
+        1.656,
+        "key",
+        "W",
+        0
+      ]
+    ]
+  }
+}

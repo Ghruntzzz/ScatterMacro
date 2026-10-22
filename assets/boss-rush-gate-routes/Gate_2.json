@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "map": "Gate 2",
+  "path": {
+    "version": 1,
+    "mode": "Keyboard",
+    "duration": 2.016,
+    "events": [
+      [
+        0.063,
+        "key",
+        "S",
+        1
+      ],
+      [
+        0.344,
+        "key",
+        "S",
+        0
+      ]
+    ]
+  }
+}

@@ -12,6 +12,18 @@ from test_challenges import label
 
 
 class BossRushTests(unittest.TestCase):
+    def test_bundled_gate_routes_load_without_user_recordings(self):
+        defaults=Path(__file__).resolve().parents[1]/'assets'/'boss-rush-gate-routes'
+        with tempfile.TemporaryDirectory() as folder:
+            routes=GateRoutes(Path(folder),defaults)
+            for name in routes.names:
+                route=routes.load(name)
+                self.assertEqual(route['map'],name)
+                self.assertTrue(route['path']['events'])
+            custom=dict(version=1,mode='Keyboard',duration=1,events=[[0,'key','W',1],[1,'key','W',0]])
+            routes.save('Gate 1',custom)
+            self.assertEqual(routes.load('Gate 1')['path'],custom)
+
     def test_match_details_require_starting_area_not_menu(self):
         matches=[label('Boss Rush District 7 - Boss Rush',0,0),label('Hard Mode',0,20)]
         self.assertTrue(matches_details(matches))
@@ -69,7 +81,7 @@ class BossRushTests(unittest.TestCase):
             self.assertTrue(setup.card_priority_button.isHidden())
             setup.close()
             window=dashboard.RuntimeWindow()
-            self.assertTrue(hasattr(window,'runtime_gate_routes'))
+            self.assertFalse(hasattr(window,'runtime_gate_routes'))
             window._save_runtime_index(0,dict(EMPTY_INDEX,path_repeat='Repeated'))
             self.assertEqual(dashboard.load_unit_indexes(window.values)[0]['path_repeat'],'Repeated')
             gate=dashboard.active_unit_config(dict(mode='Boss Rush',map='Gate map'))
