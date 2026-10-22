@@ -189,9 +189,10 @@ class UnitPanel:
 
 class UnitIndexer:
     def __init__(self, entries, client, capture, panel, stop, log, clock=time.monotonic,
-                 heartbeat=lambda: None, allow_paths=True, allow_incomplete=False):
+                 heartbeat=lambda: None, allow_paths=True, allow_incomplete=False,slot_count=6):
         self.entries = entries
         self.allow_incomplete=allow_incomplete
+        self.slots={str(n) for n in range(1,slot_count+1)}
         self.client, self.capture, self.panel = client, capture, panel
         self.stop, self.log = stop, log
         def active_clock():
@@ -248,7 +249,7 @@ class UnitIndexer:
             raise InterruptedError()
 
     def all_done(self):
-        return all(i in self.completed or (not e.get('path') and str(e.get("unit", "0")) not in {"1","2","3","4","5","6"})
+        return all(i in self.completed or (not e.get('path') and str(e.get("unit", "0")) not in self.slots)
                    for i, e in enumerate(self.entries))
 
     def check_abilities(self, wave):
@@ -292,7 +293,7 @@ class UnitIndexer:
                 continue
             if entry.get('path'):
                 return index
-            if str(entry.get("unit", "0")) not in {"1","2","3","4","5","6"}:
+            if str(entry.get("unit", "0")) not in self.slots:
                 continue
             if not all(str(entry.get(key, "")).isdecimal() for key in ("x", "y")):
                 if self.allow_incomplete:
@@ -347,7 +348,7 @@ class UnitIndexer:
                 if attempt == 0:
                     raise RuntimeError(f"Index {index+1} position is outside Roblox.")
                 continue
-            self.key(str(entry["unit"]))
+            self.key('0' if str(entry['unit'])=='10' else str(entry['unit']))
             self.wait(0.08)
             self.last_place_point = point
             self.click(point, frame)

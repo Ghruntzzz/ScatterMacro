@@ -85,13 +85,14 @@ class UnitManager(QWidget):
     save(index_zero_based, entry_dict), busy() and log(message).
     """
 
-    def __init__(self, entries, save, busy, log, parent=None, record=None):
+    def __init__(self, entries, save, busy, log, parent=None, record=None,slot_count=6):
         super().__init__(parent)
         self.entries, self.save, self.busy, self.log = entries, save, busy, log
         self.selected, self.page, self.loading = 0, 0, False
         self.copied_index = None
         self.record_callback=record
         self.recording=False
+        self.slot_count=slot_count
 
         self.setObjectName("unit-editor")
         self.setStyleSheet("""
@@ -182,7 +183,7 @@ class UnitManager(QWidget):
                 row, col = 6, 1
             target_grid.addWidget(self._text(name, "subtitle"), row, col)
             if key in ("unit", "priority", "upgrade", "auto_upgrade"):
-                options = {"unit": [str(n) for n in range(7)],
+                options = {"unit": [str(n) for n in range(self.slot_count+1)],
                            "priority": TARGETS,
                            "upgrade": [str(n) for n in range(16)],
                            "auto_upgrade": [str(n) for n in range(7)]}
@@ -290,7 +291,7 @@ class UnitManager(QWidget):
                 if key == "unit":
                     # Older profiles used None or Unit N; 0 is the empty slot.
                     value = value.removeprefix("Unit ")
-                    if value not in {str(n) for n in range(7)}:
+                    if value not in {str(n) for n in range(self.slot_count+1)}:
                         value = "0"
                 if field.findText(value) < 0:
                     # Retain historical upgrade or target choices.

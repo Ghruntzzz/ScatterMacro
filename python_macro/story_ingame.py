@@ -180,7 +180,8 @@ def run_story_ingame(map_name, act, difficulty, capture, client, reader, stop,
         return
     run_matches(capture, client, reader, stop, log, assets, entries, status,
                 monitor_capture or capture, reward_dir, entries_provider, allow_active=match_confirmed,
-                on_result=on_result, next_match=next_match,service=service)
+                on_result=on_result, next_match=next_match,service=service,
+                slot_count=10 if mode=='Expedition' else 6)
 
 
 def prepare_match(map_name,act,difficulty,capture,client,reader,stop,log,
@@ -326,7 +327,7 @@ def finish_match(capture, client, reader, stop, log, status, reward_dir, started
 
 def run_matches(capture, client, reader, stop, log, assets, entries, status,
                 monitor_capture, reward_dir, entries_provider=None, allow_active=False,
-                on_result=lambda *args: None, next_match=None, transition_match=None,service=None):
+                on_result=lambda *args: None, next_match=None, transition_match=None,service=None,slot_count=6):
     monitor = MatchMonitor(monitor_capture, assets, status)
     monitor.start()
     first_run = True
@@ -352,7 +353,7 @@ def run_matches(capture, client, reader, stop, log, assets, entries, status,
             indexer = UnitIndexer(entries_provider() if entries_provider else entries,
                                   client, capture, UnitPanel(reader, stop, assets),
                                   stop, log, heartbeat=checkpoint, allow_paths=first_run,
-                                  allow_incomplete=bool(entries_provider))
+                                  allow_incomplete=bool(entries_provider),slot_count=slot_count)
             first_run = False
             waiting_logged = False
             try:

@@ -421,6 +421,8 @@ class DashboardWindow(QWidget):
         self.challenge_panel = QWidget(config)
         self.card_priority_button=self._button(config,'CARD PRIORITY',314,215,320,False)
         self.card_priority_button.clicked.connect(self._card_priority)
+        self.shop_routes_button=self._button(config,'SHOP ROUTES',314,263,320,False)
+        self.shop_routes_button.clicked.connect(self._shop_routes)
         self.challenge_panel.setGeometry(36,175,600,120)
         self.challenge_boxes = {}
         for i,(key,label) in enumerate((('weekly','Weekly'),('daily','Daily'),('regular1','Regular #1'),
@@ -443,6 +445,15 @@ class DashboardWindow(QWidget):
         dialog=CardPriorityDialog(read_dashboard_values().get('card_priority',''),self)
         if dialog.exec()==QDialog.DialogCode.Accepted:
             update_config('Dashboard',{'CardPriority':'|'.join(dialog.order())})
+
+    def _shop_routes(self):
+        from python_macro.shop_routes import ShopRoutes
+        from ui.shop_routes import ShopRoutesDialog
+        root=active_unit_config(dict(mode='Expeditions',map='School Grounds')).parent/'ShopRoutes'
+        dialog=ShopRoutesDialog(ShopRoutes(root,ASSETS/'expedition-shop-routes'),self,
+                               busy=lambda:hasattr(self,'runtime_window') and self.runtime_window.worker is not None
+                               and self.runtime_window.worker.isRunning())
+        dialog.exec()
 
     def _private_server(self) -> None:
         side = self._card(714, 208, 468, 316, 8)
@@ -592,6 +603,7 @@ class DashboardWindow(QWidget):
         self._set_combo_visible(self.act_box, mode in {"Story", "Raid"})
         self.challenge_panel.setVisible(mode=='Challenges')
         self.card_priority_button.setVisible(mode=='Expeditions')
+        self.shop_routes_button.setVisible(mode=='Expeditions')
 
         if mode == "Story":
             difficulties = ["Hard"] if self.act_box.currentText() in {"Infinite", "Mastery"} else ["Normal", "Hard"]
@@ -1047,7 +1059,8 @@ class RuntimeWindow(DashboardWindow):
         from ui.unit_manager import UnitManager
         self.index_editor = UnitManager(self.unit_indexes, self._save_runtime_index,
                                        lambda: self.worker is not None and self.worker.isRunning(),
-                                       self.log.appendPlainText, manager, record=self._record_path)
+                                       self.log.appendPlainText, manager, record=self._record_path,
+                                       slot_count=10 if self.values['mode']=='Expeditions' else 6)
         self.index_editor.setGeometry(12, 12, 403, 894)
 
     def _challenge_profile(self,mode,map_name,act,entries):

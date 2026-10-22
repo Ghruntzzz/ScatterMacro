@@ -31,6 +31,36 @@ class ExpeditionFlow(ChallengeFlow):
         from python_macro.expedition_cards import CardSelector
         self.cards=CardSelector(assets,reader,client,capture,stop,log,priority)
         self.card_run=None
+        from python_macro.expedition_inventory import HammerInventory
+        self.hammers=HammerInventory(assets/'shop-inventory-hammer.png')
+        self.last_health_check=0
+        self.pending_hammer_count=None
+
+    def heal_if_needed(self,frame):
+        now=time.monotonic()
+        if now-self.last_health_check<2 or self.stop.is_set():
+            return False
+        self.last_health_check=now
+        hammers=self.hammers.find(frame)
+        if self.pending_hammer_count is not None:
+            if len(hammers)>=self.pending_hammer_count:
+                return False
+            self.pending_hammer_count=None
+        if not hammers:
+            return False
+        from python_macro.expedition_inventory import payload_health
+        from python_macro.vision import Region
+        h,w=frame.shape[:2]
+        matches=self.reader.read(frame,Region(0,0,w,int(h*.78)),scale=2,max_variants=1,
+                                 min_confidence=.7,cancelled=self.stop.is_set)
+        health=payload_health(matches)
+        if health is None or health[0]>=health[1] or self.stop.is_set():
+            return False
+        if self.client.direct_click(*hammers[0],frame.shape) is False:
+            raise InterruptedError()
+        self.pending_hammer_count=len(hammers)
+        self.log('Using Repair Hammer.')
+        return True
 
     def difficulty_reading(self,frame):
         point=self.ocr.unique(frame,lambda text:re.fullmatch(r'difficulty[123]',normalize(text)) is not None)
@@ -89,6 +119,7 @@ class ExpeditionFlow(ChallengeFlow):
         if indexer is not self.card_run:
             self.card_run=indexer
             self.cards.reset()
+            self.pending_hammer_count=None
         now=time.monotonic()
         if now-self.last_service<.25 or self.stop.is_set():
             return
@@ -105,6 +136,8 @@ class ExpeditionFlow(ChallengeFlow):
             self.client.direct_click(*hit[:2],frame.shape)
             return
         if not indexer.all_done():
+            return
+        if self.heal_if_needed(frame):
             return
         if self.confirm(frame) is not None:
             target=self.text('Continue')(frame)
