@@ -8,12 +8,12 @@
     {
       "id": "anime-expeditions",
       "name": "Anime Expeditions",
-      "version": "0.1.56",
+      "version": "0.1.57",
       "setup_only": false,
       "entrypoint": "AnimeExpeditions.exe",
-      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.56/AnimeExpeditions-0.1.56-windows.zip",
-      "sha256": "96be22fa8e54170f864eb85ae0b6069db68ec80e693ed20c89f6e881ca370172",
-      "description": "Runtime shop route recording and ten Expedition slots. Payload-health and Repair Hammer features removed. Automatic shopping remains unfinished."
+      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.57/AnimeExpeditions-0.1.57-windows.zip",
+      "sha256": "855ae0c242f2b861d8368d5dd533a58b576ef22baa9438612312708f375022a1",
+      "description": "Left-card map selection, verified plus-only difficulty and four default shop routes. Automatic shop playback and purchases remain unfinished."
     }
   ]
 }
