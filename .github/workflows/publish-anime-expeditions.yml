@@ -64,8 +64,8 @@ jobs:
       - name: Upload tested Windows build
         uses: actions/upload-artifact@v4
         with:
-          name: AnimeExpeditions-0.1.55-windows
-          path: dist/AnimeExpeditions-0.1.55-windows.zip
+          name: AnimeExpeditions-0.1.56-windows
+          path: dist/AnimeExpeditions-0.1.56-windows.zip
           if-no-files-found: error
           retention-days: 7
       - name: Publish and verify macro archive
@@ -74,12 +74,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '0.1.55'
+          $version = '0.1.56'
           $tag = "anime-expeditions-v$version"
           $name = "AnimeExpeditions-$version-windows.zip"
           $archive = "dist/$name"
           if (!(Test-Path $archive)) { throw "Missing macro ZIP: $archive" }
-          gh release create $tag $archive --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Anime Expeditions $version - Shop Routes and Inventory" --notes "Adds a Shop Routes dialog for separate WASD recordings on all four Expedition maps, with F3/Stop Recording and JSON import/export. Adds Expedition unit slots 1-10, with slot 10 using key 0. Counts separate visible Repair Hammer slots and uses a hammer only when payload damage is readable after unit setup; waits for inventory consumption before another use. Shop policy supports two reserve hammers while healthy, Unbound-first traits, and repeated anvils with freshly read prices. Automatic shop navigation, purchases and checkpoint unit checks remain unfinished; routes can be recorded/exported but are not automatically executed yet. Latest trait screenshots could not be bundled because the supplied files were unavailable. 278 tests passed; live gameplay validation remains required."
+          gh release create $tag $archive --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Anime Expeditions $version - Runtime Shop Routes" --notes "Moves Shop Routes to the Expedition runtime dashboard. Removes payload-health detection and all Repair Hammer detection, use and purchase planning. Preserves ten unit slots, trait priorities and rising-price anvil planning. Bundles corrected Draconic, Foresaken, Primordial and Unbound reference images. Automatic shop navigation and purchases remain unfinished. 274 tests passed; live gameplay validation remains required."
           if ($LASTEXITCODE -ne 0) { throw 'Macro release upload failed' }
           New-Item -ItemType Directory -Force 'dist/verified' | Out-Null
           gh release download $tag --repo $env:GITHUB_REPOSITORY --pattern $name --dir 'dist/verified'
@@ -91,7 +91,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '0.1.55'
+          $version = '0.1.56'
           $archive = "dist/AnimeExpeditions-$version-windows.zip"
           $sha256 = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
           $url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/anime-expeditions-v$version/AnimeExpeditions-$version-windows.zip"
@@ -104,7 +104,7 @@ jobs:
           $macro[0].version = $version
           $macro[0].url = $url
           $macro[0].sha256 = $sha256
-          $macro[0].description = "Per-map shop route recording, ten Expedition slots and damage-only hammer use. Automatic shopping remains unfinished."
+          $macro[0].description = "Runtime shop route recording and ten Expedition slots. Payload-health and Repair Hammer features removed. Automatic shopping remains unfinished."
           $catalog | ConvertTo-Json -Depth 20 | Set-Content catalog.json -Encoding utf8
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

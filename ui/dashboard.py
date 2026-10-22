@@ -421,8 +421,6 @@ class DashboardWindow(QWidget):
         self.challenge_panel = QWidget(config)
         self.card_priority_button=self._button(config,'CARD PRIORITY',314,215,320,False)
         self.card_priority_button.clicked.connect(self._card_priority)
-        self.shop_routes_button=self._button(config,'SHOP ROUTES',314,263,320,False)
-        self.shop_routes_button.clicked.connect(self._shop_routes)
         self.challenge_panel.setGeometry(36,175,600,120)
         self.challenge_boxes = {}
         for i,(key,label) in enumerate((('weekly','Weekly'),('daily','Daily'),('regular1','Regular #1'),
@@ -451,8 +449,7 @@ class DashboardWindow(QWidget):
         from ui.shop_routes import ShopRoutesDialog
         root=active_unit_config(dict(mode='Expeditions',map='School Grounds')).parent/'ShopRoutes'
         dialog=ShopRoutesDialog(ShopRoutes(root,ASSETS/'expedition-shop-routes'),self,
-                               busy=lambda:hasattr(self,'runtime_window') and self.runtime_window.worker is not None
-                               and self.runtime_window.worker.isRunning())
+                               busy=lambda:self.worker is not None and self.worker.isRunning())
         dialog.exec()
 
     def _private_server(self) -> None:
@@ -603,7 +600,6 @@ class DashboardWindow(QWidget):
         self._set_combo_visible(self.act_box, mode in {"Story", "Raid"})
         self.challenge_panel.setVisible(mode=='Challenges')
         self.card_priority_button.setVisible(mode=='Expeditions')
-        self.shop_routes_button.setVisible(mode=='Expeditions')
 
         if mode == "Story":
             difficulties = ["Hard"] if self.act_box.currentText() in {"Infinite", "Mastery"} else ["Normal", "Hard"]
@@ -1016,6 +1012,9 @@ class RuntimeWindow(DashboardWindow):
         self.runtime_status = self._label(
             stats_panel, "●  READY", 16, 319, 178, 22,
             "color: #47e887; font: 700 10px 'Bahnschrift';")
+        self.shop_routes_button=self._small_button(stats_panel,'SHOP ROUTES',16,342,178)
+        self.shop_routes_button.setVisible(self.values['mode']=='Expeditions')
+        self.shop_routes_button.clicked.connect(self._shop_routes)
 
         action = self._card(18, 406, 210, 528, 8)
         self._section_title(action, "ACTION OUTPUT", 20)

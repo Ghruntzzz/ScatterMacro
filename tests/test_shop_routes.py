@@ -47,16 +47,15 @@ class ShopTests(unittest.TestCase):
 
     def test_unbound_first_and_no_anvil_if_traits_present(self):
         items=[ShopItem('Anvil',5000,(1,1)),ShopItem('Foresaken',15000,(2,2)),ShopItem('Unbound',30000,(3,3))]
-        self.assertEqual([i.name for i in purchase_plan(items,45000,False,2)],['Unbound','Foresaken'])
-        self.assertEqual(purchase_plan(items,5000,False,2),[])
+        self.assertEqual([i.name for i in purchase_plan(items,45000)],['Unbound','Foresaken'])
+        self.assertEqual(purchase_plan(items,5000),[])
 
-    def test_hammer_requires_inventory_damage_and_budget(self):
+    def test_hammer_is_never_bought_and_does_not_block_refresh(self):
         hammer=ShopItem('Repair Hammer',15000,(1,1))
-        self.assertEqual(purchase_plan([hammer],15000,True,None),[])
-        self.assertEqual(purchase_plan([hammer],15000,False,0),[hammer])
-        self.assertEqual(purchase_plan([hammer],15000,True,2),[])
-        self.assertEqual(purchase_plan([hammer],14999,True,0),[])
-        self.assertEqual(purchase_plan([hammer],15000,True,0),[hammer])
+        self.assertEqual(purchase_plan([hammer],15000),[])
+        self.assertTrue(should_refresh([hammer],1,False))
+        anvil=ShopItem('Anvil',5000,(2,2))
+        self.assertEqual(purchase_plan([hammer,anvil],20000),[anvil])
 
     def test_refresh_once_only_when_no_target_items(self):
         self.assertTrue(should_refresh([ShopItem('Unknown',5000,(1,1))],1,False))
