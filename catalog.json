@@ -8,12 +8,12 @@
     {
       "id": "anime-expeditions",
       "name": "Anime Expeditions",
-      "version": "0.1.62",
+      "version": "0.1.63",
       "setup_only": false,
       "entrypoint": "AnimeExpeditions.exe",
-      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.62/AnimeExpeditions-0.1.62-windows.zip",
-      "sha256": "72f80640a501a366319f75ba7367caa2fef8b5bd0fc0d88b67b134a4f269df65",
-      "description": "Boss Rush six-gate routing, separate Gate/Boss profiles and Once/Repeated manual paths. Improved Expedition card reading and faster indexes. Record all six routes before Boss Rush."
+      "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/anime-expeditions-v0.1.63/AnimeExpeditions-0.1.63-windows.zip",
+      "sha256": "469df0c9dca00da34699956b0ea6a5ba0d2d0c75069061b9d613981a4d29ddc4",
+      "description": "Boss Rush with six built-in gate routes and separate Gate/Boss profiles. Custom recordings override defaults. Gate Routes button removed."
     }
   ]
 }
