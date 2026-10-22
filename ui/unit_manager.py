@@ -181,7 +181,8 @@ class UnitManager(QWidget):
                 row, col = 4, 1
             elif key == "auto_ability_wave":
                 row, col = 6, 1
-            target_grid.addWidget(self._text(name, "subtitle"), row, col)
+            caption=self._text(name, "subtitle")
+            target_grid.addWidget(caption, row, col)
             if key in ("unit", "priority", "upgrade", "auto_upgrade"):
                 options = {"unit": [str(n) for n in range(self.slot_count+1)],
                            "priority": TARGETS,
@@ -211,6 +212,9 @@ class UnitManager(QWidget):
                 field.valueChanged.connect(self.changed)
             self.fields[key] = field
             target_grid.addWidget(field, row + 1, col)
+            if self.slot_count==10 and key in ('place_at_wave','auto_ability_wave'):
+                caption.hide()
+                field.hide()
         editor.addLayout(grid)
 
         position_actions = QHBoxLayout()
@@ -356,6 +360,9 @@ class UnitManager(QWidget):
             wave_label = f"Wave {wave}" if wave else "Any wave"
             ability = entry.get('auto_ability_wave','')
             ability_label = f"Ability: wave {ability}" if ability else "Ability: on completion"
+            if self.slot_count==10:
+                wave_label='Ready'
+                ability_label=''
             button.setText(
                 f"{index + 1:02d}   Unit {entry['unit']}  ·  {entry['priority']}\n"
                 f"Upgrade {entry['upgrade']}  /  Auto {entry['auto_upgrade']}\n"

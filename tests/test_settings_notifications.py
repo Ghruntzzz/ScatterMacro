@@ -14,6 +14,16 @@ from python_macro.notifications import Notifier, webhook_url
 
 
 class SettingsTests(unittest.TestCase):
+    def test_expedition_runtime_hides_wave_controls_and_shop_routes(self):
+        dashboard.update_config('Dashboard',{'Mode':'Expeditions'})
+        window=dashboard.RuntimeWindow()
+        self.assertNotIn('SHOP ROUTES',[b.text() for b in window.findChildren(QPushButton)])
+        self.assertTrue(window.index_editor.fields['place_at_wave'].isHidden())
+        self.assertTrue(window.index_editor.fields['auto_ability_wave'].isHidden())
+        for name in ('VICTORIES','DEFEATS','WAVES COMPLETED'):
+            self.assertTrue(window.stat_values[name].parentWidget().isHidden())
+        window.close()
+
     @classmethod
     def setUpClass(cls):
         cls.app=QApplication.instance() or QApplication([])
@@ -184,6 +194,21 @@ class NotificationTests(unittest.TestCase):
         notify.settings['webhook']=''
         self.assertFalse(notify.send('victory'))
         opener.open.assert_not_called()
+
+    def test_endless_defeat_is_completed(self):
+        for mode,act in [('Expeditions','Expedition'),('Story','Infinite')]:
+            opener=self.opener()
+            settings=self.settings()
+            settings.update(mode=mode,act=act,ping_defeat='1')
+            notify=Notifier(settings,Event(),Mock(),opener)
+            self.assertTrue(notify.send('defeat',60))
+            embed=json.loads(opener.open.call_args.args[0].data)['embeds'][0]
+            self.assertTrue(embed['title'].endswith('Completed'))
+            names={f['name'] for f in embed['fields']}
+            self.assertNotIn('Defeats',names)
+            self.assertNotIn('Victories',names)
+            if mode=='Expeditions':
+                self.assertNotIn('Total Waves Completed',names)
 
     def test_reward_text_and_full_client_attachment(self):
         opener=self.opener()

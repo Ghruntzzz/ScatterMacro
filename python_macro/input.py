@@ -351,6 +351,13 @@ class RobloxClient:
         """Allow the lobby Start hover/animation to settle before pressing."""
         return self._direct_click(x, y, shape, method="input", settle_seconds=0.35)
 
+    def park_cursor(self,shape):
+        if self.stop.is_set():
+            return False
+        point,_=self._validated_point(shape[1]-8,shape[0]-8,shape)
+        self._move(point.x,point.y)
+        return True
+
     def _direct_click(self, x, y, shape, method, settle_seconds=None, hold_seconds=CLICK_HOLD_SECONDS):
         point = self._prepare_click_target(x, y, shape, settle_seconds=settle_seconds)
         if point is None or self.stop.is_set():

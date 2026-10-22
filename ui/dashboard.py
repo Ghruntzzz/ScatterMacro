@@ -121,6 +121,7 @@ def read_dashboard_values() -> dict[str, str]:
         "difficulty": dashboard.get("ExpeditionDifficulty", dashboard.get("Difficulty", "1")) if mode == "Expeditions" else dashboard.get("Difficulty", "Normal"),
         "expedition_difficulty": dashboard.get("ExpeditionDifficulty", "1"),
         "card_priority": dashboard.get("CardPriority", ""),
+        "anvil_priority": dashboard.get("AnvilPriority", ""),
         "tower_type": dashboard.get("TowerType", "Trait Tower"),
         "private_server": roblox.get("PrivateServerLink", ""),
         "roblox_hwnd": "",  # Legacy selector values must never bind a new session.
@@ -421,6 +422,8 @@ class DashboardWindow(QWidget):
         self.challenge_panel = QWidget(config)
         self.card_priority_button=self._button(config,'CARD PRIORITY',314,215,320,False)
         self.card_priority_button.clicked.connect(self._card_priority)
+        self.anvil_priority_button=self._button(config,'ANVIL PRIORITY',314,263,320,False)
+        self.anvil_priority_button.clicked.connect(self._anvil_priority)
         self.challenge_panel.setGeometry(36,175,600,120)
         self.challenge_boxes = {}
         for i,(key,label) in enumerate((('weekly','Weekly'),('daily','Daily'),('regular1','Regular #1'),
@@ -443,6 +446,14 @@ class DashboardWindow(QWidget):
         dialog=CardPriorityDialog(read_dashboard_values().get('card_priority',''),self)
         if dialog.exec()==QDialog.DialogCode.Accepted:
             update_config('Dashboard',{'CardPriority':'|'.join(dialog.order())})
+
+    def _anvil_priority(self):
+        from ui.card_priority import CardPriorityDialog
+        from python_macro.expedition_cards import anvil_order
+        dialog=CardPriorityDialog(read_dashboard_values().get('anvil_priority',''),self,
+                                  normalize_order=anvil_order,title='Anvil Card Priority')
+        if dialog.exec()==QDialog.DialogCode.Accepted:
+            update_config('Dashboard',{'AnvilPriority':'|'.join(dialog.order())})
 
     def _shop_routes(self):
         from python_macro.shop_routes import ShopRoutes
@@ -600,6 +611,7 @@ class DashboardWindow(QWidget):
         self._set_combo_visible(self.act_box, mode in {"Story", "Raid"})
         self.challenge_panel.setVisible(mode=='Challenges')
         self.card_priority_button.setVisible(mode=='Expeditions')
+        self.anvil_priority_button.setVisible(mode=='Expeditions')
 
         if mode == "Story":
             difficulties = ["Hard"] if self.act_box.currentText() in {"Infinite", "Mastery"} else ["Normal", "Hard"]
@@ -1004,6 +1016,8 @@ class RuntimeWindow(DashboardWindow):
             tile = self._card(0, 0, 178, 42, 6)
             tile.setParent(stats_panel)
             tile.move(16, y)
+            if self.values['mode']=='Expeditions' and label in ('VICTORIES','DEFEATS','WAVES COMPLETED'):
+                tile.hide()
             self._label(tile, label, 9, 7, 157, 16,
                         f"color: {MUTED}; font: 700 8px 'Bahnschrift';")
             self.stat_values[label] = self._label(
@@ -1012,9 +1026,6 @@ class RuntimeWindow(DashboardWindow):
         self.runtime_status = self._label(
             stats_panel, "●  READY", 16, 319, 178, 22,
             "color: #47e887; font: 700 10px 'Bahnschrift';")
-        self.shop_routes_button=self._small_button(stats_panel,'SHOP ROUTES',16,342,178)
-        self.shop_routes_button.setVisible(self.values['mode']=='Expeditions')
-        self.shop_routes_button.clicked.connect(self._shop_routes)
 
         action = self._card(18, 406, 210, 528, 8)
         self._section_title(action, "ACTION OUTPUT", 20)

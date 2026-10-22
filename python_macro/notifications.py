@@ -95,7 +95,9 @@ class Notifier:
         if outcome == 'error':
             # Never include exception text that might expose URLs or tokens.
             description = 'The macro needs attention. Check Action Output.'
-        embed = {'title': 'Anime Expeditions - ' + outcome.title(),
+        endless=self.settings.get('mode') in ('Expedition','Expeditions') or self.settings.get('act')=='Infinite'
+        display='Completed' if endless and outcome=='defeat' else outcome.title()
+        embed = {'title': 'Anime Expeditions - ' + display,
                  'description':description[:4000], 'color':0x7E1726}
         fields = []
         if outcome != 'error':
@@ -113,6 +115,10 @@ class Notifier:
             totals = '\n'.join(f'{count:,}x {name}' for name,count in self.reward_totals.values())
             fields.append({'name':'Total Rewards (Session)', 'value':totals[:1024] or 'No readable rewards yet.', 'inline':False})
         if fields:
+            if endless:
+                fields=[f for f in fields if f['name'] not in ('Victories','Defeats')]
+            if self.settings.get('mode') in ('Expedition','Expeditions'):
+                fields=[f for f in fields if f['name']!='Total Waves Completed']
             embed['fields'] = fields[:25]
         payload = {'embeds':[embed], 'allowed_mentions':{'parse':[], 'users':[mention] if mention else []}}
         if mention:

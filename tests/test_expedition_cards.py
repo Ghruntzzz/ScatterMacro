@@ -38,7 +38,7 @@ class CardTests(unittest.TestCase):
         for i,card in enumerate(self.choices):
             matches += [label(card['name'],i*250,200),label('Select Upgrade',i*250,350)]
         reader=Mock()
-        reader.read.return_value=matches
+        reader.read.side_effect=[matches,matches,[],[]]
         client=Mock()
         selector=CardSelector(Path('assets'),reader,client,lambda:frame,FastStop(),Mock())
         selector.header=Mock(side_effect=[(10,10),(10,10),(10,10),None,None])
@@ -47,6 +47,24 @@ class CardTests(unittest.TestCase):
         self.assertEqual(selector.selected,{'Razor Focus'})
         selector.reset()
         self.assertEqual(selector.selected,set())
+
+    def test_anvil_priority_and_all_three_required(self):
+        selector=CardSelector(Path('assets'),Mock(),Mock(),Mock(),FastStop(),Mock())
+        matches=[]
+        for i,name in enumerate(('Damage','Range','Spa')):
+            matches.extend([label(name,i*250,200),label('Select Upgrade',i*250,350)])
+        self.assertEqual(selector.choose(matches)['name'],'Range')
+        self.assertIsNone(selector.choose(matches[:-2]))
+
+    def test_close_scans_recover_all_titles(self):
+        frame=cv2.imread('assets/expedition-card-screen.png')
+        reader=Mock()
+        buttons=[label('Select Upgrade',i*250,350) for i in range(3)]
+        reader.read.side_effect=[buttons]+[[label(c['name'],i*250,200)] for i,c in enumerate(self.choices)]
+        selector=CardSelector(Path('assets'),reader,Mock(),Mock(),FastStop(),Mock())
+        self.assertIsNotNone(selector.choose(selector.read_choices(frame)))
+        self.assertEqual(reader.read.call_count,4)
+        self.assertEqual(reader.read.call_args.kwargs['scale'],3)
 
     def test_priority_menu_reorder_and_settings_round_trip(self):
         from PySide6.QtWidgets import QApplication

@@ -41,7 +41,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: scattermacro-anime-expeditions-publish
+  group: scattermacro-publish
   cancel-in-progress: false
 
 jobs:
@@ -64,8 +64,8 @@ jobs:
       - name: Upload tested Windows build
         uses: actions/upload-artifact@v4
         with:
-          name: AnimeExpeditions-0.1.58-windows
-          path: dist/AnimeExpeditions-0.1.58-windows.zip
+          name: AnimeExpeditions-0.1.59-windows
+          path: dist/AnimeExpeditions-0.1.59-windows.zip
           if-no-files-found: error
           retention-days: 7
       - name: Publish and verify macro archive
@@ -74,12 +74,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '0.1.58'
+          $version = '0.1.59'
           $tag = "anime-expeditions-v$version"
           $name = "AnimeExpeditions-$version-windows.zip"
           $archive = "dist/$name"
           if (!(Test-Path $archive)) { throw "Missing macro ZIP: $archive" }
-          gh release create $tag $archive --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Anime Expeditions $version - Second Continue Button" --notes "Adds the second green Expedition Continue button reference while preserving exact Continue text verification and waiting for unit setup. Includes regression coverage for the supplied image and rejecting Cancel. Preserves left-card map selection, plus-only difficulty and default shop routes. Automatic shop playback and purchases remain unfinished. 279 tests passed; live gameplay validation remains required."
+          gh release create $tag $archive --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Anime Expeditions $version - Expedition Runtime Improvements" --notes "Requires all three card titles before selection, adds enlarged per-card OCR retries and header-independent card detection. Adds saved anvil bonus priorities (SPA deduplicated); anvil screen layout still needs live validation. Prioritizes the second Continue button using bounded text matching and throttles retries. Parks the cursor after Expedition card, Start Game and Continue clicks. Removes Shop Routes from runtime, hides Expedition wave/result controls, disables wave scheduling and repeats defeat-only runs. Expedition and Infinite webhooks say Completed. Automatic shop playback and purchases remain unfinished. 286 tests passed; live gameplay validation remains required."
           if ($LASTEXITCODE -ne 0) { throw 'Macro release upload failed' }
           New-Item -ItemType Directory -Force 'dist/verified' | Out-Null
           gh release download $tag --repo $env:GITHUB_REPOSITORY --pattern $name --dir 'dist/verified'
@@ -91,7 +91,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '0.1.58'
+          $version = '0.1.59'
           $archive = "dist/AnimeExpeditions-$version-windows.zip"
           $sha256 = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
           $url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/anime-expeditions-v$version/AnimeExpeditions-$version-windows.zip"
@@ -104,7 +104,7 @@ jobs:
           $macro[0].version = $version
           $macro[0].url = $url
           $macro[0].sha256 = $sha256
-          $macro[0].description = "Recognizes the second Expedition Continue button. Includes left-card map selection and default shop routes. Automatic shopping remains unfinished."
+          $macro[0].description = "Improved strict three-card detection, anvil priorities and Continue handling. Expedition no-wave runtime and Completed webhooks. Automatic shopping remains unfinished."
           $catalog | ConvertTo-Json -Depth 20 | Set-Content catalog.json -Encoding utf8
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

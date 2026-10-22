@@ -14,6 +14,13 @@ from python_macro.library import Library, VERSION
 
 
 class LauncherTests(unittest.TestCase):
+    def test_open_minimizes_after_successful_launch(self):
+        from pathlib import Path
+        with patch.object(self.window.library,'executable',return_value=Path(self.folder.name)/'macro.exe'), \
+             patch('ui.launcher.subprocess.Popen'),patch.object(self.window,'showMinimized') as minimize:
+            self.window.launch_macro(self.window.catalog[0])
+            minimize.assert_called_once()
+
     @classmethod
     def setUpClass(cls):
         cls.app = QApplication.instance() or QApplication([])

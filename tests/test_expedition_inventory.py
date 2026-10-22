@@ -7,6 +7,10 @@ from test_unit_actions import FastStop
 
 
 class InventoryTests(unittest.TestCase):
+    def test_expedition_ignores_wave_requirement(self):
+        worker=UnitIndexer([dict(unit='1',x='10',y='20',place_at_wave='999')],Mock(),Mock(),Mock(),FastStop(),Mock(),slot_count=10)
+        self.assertEqual(worker.next_ready(None),0)
+
     def test_repeat_anvil_uses_updated_price_and_balance(self):
         self.assertIsNotNone(next_purchase([ShopItem('Anvil',5000,(1,1))],15000))
         self.assertIsNotNone(next_purchase([ShopItem('Anvil',7500,(1,1))],10000))

@@ -181,7 +181,8 @@ def run_story_ingame(map_name, act, difficulty, capture, client, reader, stop,
     run_matches(capture, client, reader, stop, log, assets, entries, status,
                 monitor_capture or capture, reward_dir, entries_provider, allow_active=match_confirmed,
                 on_result=on_result, next_match=next_match,service=service,
-                slot_count=10 if mode=='Expedition' else 6)
+                slot_count=10 if mode=='Expedition' else 6,
+                defeat_only=mode=='Expedition' or act=='Infinite')
 
 
 def prepare_match(map_name,act,difficulty,capture,client,reader,stop,log,
@@ -231,7 +232,7 @@ def prepare_match(map_name,act,difficulty,capture,client,reader,stop,log,
     return True
 
 
-def start_game(capture, client, stop, assets, active_hud=None):
+def start_game(capture, client, stop, assets, active_hud=None,park=False):
     find_start = StartButtonLocator(assets / "start-game-template.png")
     # Wait through loading indefinitely; retries are fresh detections, and
     # disappearing for two captures confirms that the button was dismissed.
@@ -246,6 +247,8 @@ def start_game(capture, client, stop, assets, active_hud=None):
             absent = 0
             if client.start_click(int(target[0]), int(target[1]), frame.shape) is False:
                 return
+            if park:
+                client.park_cursor(frame.shape)
             clicked = True
             if stop.wait(0.6):
                 return
@@ -264,7 +267,7 @@ def start_game(capture, client, stop, assets, active_hud=None):
 
 
 def finish_match(capture, client, reader, stop, log, status, reward_dir, started, find_start,
-                 on_result=lambda *args: None, next_match=None, transition_match=None):
+                 on_result=lambda *args: None, next_match=None, transition_match=None,defeat_only=False):
     end = EndScreenReader(reader, stop)
     previous, counted = None, False
     reward_logged = False
@@ -277,10 +280,12 @@ def finish_match(capture, client, reader, stop, log, status, reward_dir, started
         if stop.is_set():
             return False
         outcome = reading["outcome"]
+        if defeat_only and outcome=='victory':
+            outcome=None
         if outcome and outcome == previous:
             if not counted:
                 counted = True
-                log(f"{outcome.title()} detected.")
+                log('Run completed.' if defeat_only else f"{outcome.title()} detected.")
                 duration = time.monotonic()-started
                 status({"result": outcome, "duration": duration})
                 saved = None
@@ -327,14 +332,14 @@ def finish_match(capture, client, reader, stop, log, status, reward_dir, started
 
 def run_matches(capture, client, reader, stop, log, assets, entries, status,
                 monitor_capture, reward_dir, entries_provider=None, allow_active=False,
-                on_result=lambda *args: None, next_match=None, transition_match=None,service=None,slot_count=6):
-    monitor = MatchMonitor(monitor_capture, assets, status)
+                on_result=lambda *args: None, next_match=None, transition_match=None,service=None,slot_count=6,defeat_only=False):
+    monitor = MatchMonitor(monitor_capture, assets, status,no_waves=slot_count==10,defeat_only=defeat_only)
     monitor.start()
     first_run = True
     try:
         while not stop.is_set():
-            active_hud = HudReader(reader, stop, assets) if allow_active else None
-            if not start_game(capture, client, stop, assets, active_hud):
+            active_hud = HudReader(reader, stop, assets) if allow_active and slot_count!=10 else None
+            if not (allow_active and slot_count==10) and not start_game(capture, client, stop, assets, active_hud,park=slot_count==10):
                 return
             allow_active = False
             started = time.monotonic()
@@ -376,7 +381,7 @@ def run_matches(capture, client, reader, stop, log, assets, entries, status,
                                                 status, reward_dir, started,
                                                 StartButtonLocator(assets / "start-game-template.png"),
                                                 on_result=on_result, next_match=next_match,
-                                                transition_match=transition_match):
+                                                transition_match=transition_match,defeat_only=defeat_only):
                 return
     finally:
         monitor.close()

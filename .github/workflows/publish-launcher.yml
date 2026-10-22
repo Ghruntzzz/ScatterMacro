@@ -17,7 +17,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: scattermacro-launcher-publish
+  group: scattermacro-publish
   cancel-in-progress: false
 
 jobs:
@@ -65,6 +65,8 @@ jobs:
           $archive = "dist/ScatterLauncher-$version-windows.zip"
           $sha256 = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
           $url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/launcher-v$version/ScatterLauncher-$version-windows.zip"
+          git pull --ff-only origin main
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot sync current release catalog.' }
           $catalog = Get-Content catalog.json -Raw | ConvertFrom-Json
           $catalog.launcher.version = $version
           $catalog.launcher.url = $url

@@ -192,6 +192,7 @@ class UnitIndexer:
                  heartbeat=lambda: None, allow_paths=True, allow_incomplete=False,slot_count=6):
         self.entries = entries
         self.allow_incomplete=allow_incomplete
+        self.no_waves=slot_count==10
         self.slots={str(n) for n in range(1,slot_count+1)}
         self.client, self.capture, self.panel = client, capture, panel
         self.stop, self.log = stop, log
@@ -253,7 +254,7 @@ class UnitIndexer:
                    for i, e in enumerate(self.entries))
 
     def check_abilities(self, wave):
-        if wave is None or self.checking_ability:
+        if self.no_waves or wave is None or self.checking_ability:
             return
         self.checking_ability = True
         try:
@@ -299,7 +300,7 @@ class UnitIndexer:
                 if self.allow_incomplete:
                     return None
                 raise RuntimeError(f"Set the position for Index {index+1} before starting.")
-            required = requested_wave(entry.get("place_at_wave", ""))
+            required = None if self.no_waves else requested_wave(entry.get("place_at_wave", ""))
             return index if required is None or (wave is not None and wave >= required) else None
         return None
 

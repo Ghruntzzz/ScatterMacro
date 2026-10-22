@@ -83,6 +83,9 @@ class ExpeditionTests(unittest.TestCase):
         flow.capture.return_value=frame
         flow.game_start=Mock(return_value=None)
         flow.confirm=Mock(return_value=(150,60))
+        flow.continue_button=Mock(return_value=(80,98,160,35))
+        flow.second_continue=Mock(return_value=None)
+        flow.cards.handle=Mock(return_value=False)
         flow.reader.read.return_value=[label('Continue',0,90),label('Cancel',200,90)]
         indexer=Mock()
         indexer.all_done.return_value=False
@@ -98,8 +101,27 @@ class ExpeditionTests(unittest.TestCase):
         frame=np.zeros((160,400,3),np.uint8)
         flow.capture.return_value=frame
         flow.game_start=Mock(return_value=(100,100))
+        flow.cards.handle=Mock(return_value=False)
         flow.service(Mock())
         flow.client.direct_click.assert_called_once_with(100,100,frame.shape)
+        flow.client.park_cursor.assert_called_once_with(frame.shape)
+
+    def test_second_continue_wins_when_both_visible(self):
+        flow=self.flow()
+        frame=np.zeros((500,600,3),np.uint8)
+        flow.capture.return_value=frame
+        flow.cards.handle=Mock(return_value=False)
+        flow.game_start=Mock(return_value=None)
+        flow.continue_button=Mock(return_value=(80,98,160,35))
+        flow.second_continue=Mock(return_value=(280,298,160,35))
+        flow.reader.read.return_value=[label('Continue',0,90),label('Continue',200,290)]
+        indexer=Mock()
+        indexer.all_done.return_value=True
+        flow.service(indexer)
+        flow.client.direct_click.assert_called_once_with(280,298,frame.shape)
+        flow.last_service=0
+        flow.service(indexer)
+        flow.client.direct_click.assert_called_once()
 
     def test_second_continue_reference_is_clicked_but_not_cancel(self):
         flow=self.flow()

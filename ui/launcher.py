@@ -314,6 +314,7 @@ class Launcher(QMainWindow):
             [str(executable), "--config-dir", str(self.library.config_dir(macro["id"]))],
             cwd=executable.parent, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         self.status.setText(macro["name"] + " opened.")
+        self.showMinimized()
 
     def update_launcher(self):
         if not self.release or version_tuple(self.release["version"]) <= version_tuple(VERSION):

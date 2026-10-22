@@ -96,6 +96,8 @@ class StoryWorker(QThread):
                 flow=ExpeditionFlow(capture,client,self.reader,self.stop,self.message.emit,
                                     root/'assets',self.map_name,self.difficulty,
                                     priority=self.notification_settings.get('card_priority',''))
+                from python_macro.expedition_cards import anvil_order
+                flow.cards.anvil_priority=anvil_order(self.notification_settings.get('anvil_priority',''))
                 in_match=already_in_match(capture,self.reader,self.stop,self.map_name,
                                           'Expedition',self.difficulty,mode='Expedition')
                 if not in_match and not flow.navigate(play_icon):

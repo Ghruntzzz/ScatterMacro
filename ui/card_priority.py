@@ -3,16 +3,16 @@ from python_macro.expedition_cards import priority_order
 
 
 class CardPriorityDialog(QDialog):
-    def __init__(self,order,parent=None):
+    def __init__(self,order,parent=None,normalize_order=priority_order,title='Expedition Card Priority'):
         super().__init__(parent)
-        self.setWindowTitle('Expedition Card Priority')
+        self.setWindowTitle(title)
         self.resize(380,430)
         layout=QVBoxLayout(self)
         hint=QLabel('Highest priority at the top. Drag categories or use Up / Down.')
         hint.setWordWrap(True)
         layout.addWidget(hint)
         self.list=QListWidget()
-        self.list.addItems(priority_order(order))
+        self.list.addItems(normalize_order(order))
         self.list.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
         layout.addWidget(self.list)
         row=QHBoxLayout()

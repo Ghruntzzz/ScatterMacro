@@ -32,6 +32,21 @@ class ExpeditionFlow(ChallengeFlow):
         from python_macro.expedition_cards import CardSelector
         self.cards=CardSelector(assets,reader,client,capture,stop,log,priority)
         self.card_run=None
+        self.continue_pending=None
+        self.continue_clicked=0
+
+    def click_and_park(self,point,frame):
+        if self.client.direct_click(*point,frame.shape) is False:
+            raise InterruptedError()
+        self.client.park_cursor(frame.shape)
+
+    def continue_target(self,frame,hit):
+        from python_macro.end_screen import center
+        self.text('Continue')(frame)
+        x,y,w,h=hit
+        options=[center(m) for m in self.ocr.matches if normalize(m.text)=='continue'
+                 and abs(center(m)[0]-x)<=w/2 and abs(center(m)[1]-y)<=h/2]
+        return options[0] if len(options)==1 else None
 
     def map_target(self,frame):
         hit=self.map_card(frame)
@@ -104,6 +119,7 @@ class ExpeditionFlow(ChallengeFlow):
         if indexer is not self.card_run:
             self.card_run=indexer
             self.cards.reset()
+            self.continue_pending=None
         now=time.monotonic()
         if now-self.last_service<.25 or self.stop.is_set():
             return
@@ -117,18 +133,24 @@ class ExpeditionFlow(ChallengeFlow):
             return
         hit=self.game_start(frame)
         if hit is not None:
-            self.client.direct_click(*hit[:2],frame.shape)
+            self.click_and_park(hit[:2],frame)
             return
         if not indexer.all_done():
             return
-        if self.confirm(frame) is not None:
-            target=self.text('Continue')(frame)
-        elif self.continue_button(frame) is not None or self.second_continue(frame) is not None:
-            target=self.text('Continue')(frame)
-        else:
+        second=self.second_continue(frame)
+        first=self.continue_button(frame) if second is None else None
+        kind='second' if second is not None else 'first'
+        hit=second or first
+        if hit is None:
+            self.continue_pending=None
             return
+        if self.continue_pending==kind and now-self.continue_clicked<2:
+            return
+        target=self.continue_target(frame,hit)
         if target is not None and not self.stop.is_set():
-            self.client.direct_click(*target,frame.shape)
+            self.click_and_park(target,frame)
+            self.continue_pending=kind
+            self.continue_clicked=now
 
     def return_to_payload(self):
         if not self.press('Settings',self.settings,

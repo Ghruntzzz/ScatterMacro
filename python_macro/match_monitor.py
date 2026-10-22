@@ -6,7 +6,8 @@ from python_macro.end_screen import EndScreenReader
 
 
 class MatchMonitor:
-    def __init__(self, capture, assets, status, reader_factory=None):
+    def __init__(self, capture, assets, status, reader_factory=None,no_waves=False,defeat_only=False):
+        self.no_waves,self.defeat_only=no_waves,defeat_only
         self.capture, self.assets, self.status = capture, assets, status
         self.reader_factory = reader_factory
         self.stop = Event()
@@ -59,10 +60,12 @@ class MatchMonitor:
                     if self.stop.wait(.15):
                         return
                     continue
-                wave = hud.wave(frame)
+                wave = None if self.no_waves else hud.wave(frame)
                 trusted = wave if wave is not None and wave == previous_wave else None
                 previous_wave = wave
                 reading = end.read(frame)
+                if self.defeat_only and reading['outcome']=='victory':
+                    reading['outcome']=None
                 outcome = reading["outcome"] if reading["outcome"] == previous_result else None
                 previous_result = reading["outcome"]
                 with self.lock:
