@@ -12,6 +12,27 @@ from test_challenges import label
 
 
 class BossRushTests(unittest.TestCase):
+    def test_in_match_skips_navigation(self):
+        flow=self.flow()
+        flow.wait_details=Mock(return_value=True)
+        flow.navigate=Mock()
+        self.assertTrue(flow.ensure_match(Mock()))
+        flow.navigate.assert_not_called()
+        flow.wait_details.assert_called_once_with(timeout=3)
+
+    def test_lobby_navigates_then_verifies_match(self):
+        flow=self.flow()
+        flow.wait_details=Mock(side_effect=[False,True])
+        flow.navigate=Mock(return_value=True)
+        self.assertTrue(flow.ensure_match(Mock()))
+        flow.navigate.assert_called_once()
+
+    def test_start_game_text_fallback(self):
+        flow=self.flow()
+        flow.game_start=Mock(return_value=None)
+        flow.reader.read.return_value=[label('Start Game',20,50)]
+        self.assertEqual(flow.game_start_target(np.zeros((200,400,3),np.uint8)),(100,58))
+
     def test_bundled_gate_routes_load_without_user_recordings(self):
         defaults=Path(__file__).resolve().parents[1]/'assets'/'boss-rush-gate-routes'
         with tempfile.TemporaryDirectory() as folder:
@@ -96,12 +117,12 @@ class BossRushTests(unittest.TestCase):
         flow.navigate=Mock(return_value=True)
         flow.wait_details=Mock(return_value=True)
         flow.client.setup_camera.return_value=True
-        state={'gate':0,'boss':False,'placed':False}
+        state={'gate':0,'boss':False,'placed':False,'started':False}
         profiles=[]
         placements=[]
         decisions=[]
         def enter(gate):
-            state.update(gate=gate,placed=False)
+            state.update(gate=gate,placed=False,started=False)
             return True
         flow.enter_gate=Mock(side_effect=enter)
         flow.decide=Mock(side_effect=lambda gate:decisions.append(gate) or True)
@@ -109,7 +130,11 @@ class BossRushTests(unittest.TestCase):
                          (state['gate']>1 or state['placed']) else None)
         def profile(name):
             profiles.append(name)
-            state.update(boss=name=='Boss map',placed=False)
+            state.update(boss=name=='Boss map',placed=False,started=False)
+        def start(*args,**kwargs):
+            state['started']=True
+            return True
+        test=self
         class Indexer:
             def __init__(self,entries,*args,**kwargs):
                 self.entries=entries
@@ -117,6 +142,7 @@ class BossRushTests(unittest.TestCase):
             def next_ready(self,wave):
                 return None if 0 in self.completed else 0
             def run(self,index):
+                test.assertTrue(state['started'])
                 placements.append('boss' if state['boss'] else state['gate'])
                 state['placed']=True
                 self.completed.add(index)
@@ -131,7 +157,7 @@ class BossRushTests(unittest.TestCase):
         with patch('python_macro.boss_rush.UnitIndexer',Indexer), \
              patch('python_macro.boss_rush.time.monotonic',side_effect=iter(range(1000))), \
              patch('python_macro.match_monitor.MatchMonitor',return_value=monitor), \
-             patch('python_macro.story_ingame.start_game',return_value=True), \
+             patch('python_macro.story_ingame.start_game',side_effect=start), \
              patch('python_macro.story_ingame.finish_match',side_effect=finish):
             flow.run(Mock(),profile,lambda:[dict(unit='1')],Mock(),Mock(),None,Mock())
         self.assertEqual(decisions,list(range(1,7))*2)

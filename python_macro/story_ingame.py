@@ -232,8 +232,8 @@ def prepare_match(map_name,act,difficulty,capture,client,reader,stop,log,
     return True
 
 
-def start_game(capture, client, stop, assets, active_hud=None,park=False):
-    find_start = StartButtonLocator(assets / "start-game-template.png")
+def start_game(capture, client, stop, assets, active_hud=None,park=False,find_start=None):
+    find_start = find_start or StartButtonLocator(assets / "start-game-template.png")
     # Wait through loading indefinitely; retries are fresh detections, and
     # disappearing for two captures confirms that the button was dismissed.
     clicked, absent = False, 0

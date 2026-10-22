@@ -46,8 +46,9 @@ class BossRushFlow(ChallengeFlow):
                 and self.press('Select Stage',self.text('Select Stage'),lambda a,b:self.start(a) is not None)
                 and self.press('Start',self.start,lambda a,b:self.start(a) is None))
 
-    def wait_details(self):
+    def wait_details(self,timeout=None):
         confirmed=0
+        deadline=time.monotonic()+timeout if timeout is not None else float('inf')
         while not self.stop.is_set():
             frame=self.capture()
             h,w=frame.shape[:2]
@@ -57,9 +58,20 @@ class BossRushFlow(ChallengeFlow):
             confirmed=confirmed+1 if valid else 0
             if confirmed>=2:
                 return True
+            if time.monotonic()>=deadline:
+                return False
             if self.stop.wait(.15):
                 return False
         return False
+
+    def game_start_target(self,frame):
+        return self.game_start(frame) or self.text('Start Game')(frame)
+
+    def ensure_match(self,find_play):
+        if self.wait_details(timeout=3):
+            self.log('Boss Rush match found. Skipping lobby navigation.')
+            return True
+        return not self.stop.is_set() and self.navigate(find_play) and self.wait_details()
 
     def enter_gate(self,number):
         route=self.routes.load('Gate '+str(number))
@@ -71,7 +83,7 @@ class BossRushFlow(ChallengeFlow):
         def enter_key(x,y,shape):
             return self.client.hold_key('E',.1)
         return click_and_confirm('Gate entrance',self.enter,
-                                 lambda a,b:self.game_start(a) is not None,
+                                 lambda a,b:self.game_start_target(a) is not None,
                                  self.capture,enter_key,self.stop,self.log,timeout=30)
 
     def decision_target(self,frame,gate):
@@ -102,7 +114,7 @@ class BossRushFlow(ChallengeFlow):
         for name in self.routes.names:
             if self.routes.load(name) is None:
                 raise RuntimeError(f'Record {name} in Gate Routes before starting Boss Rush.')
-        if not self.navigate(find_play):
+        if not self.ensure_match(find_play):
             return
         monitor=MatchMonitor(monitor_capture,self.assets,status)
         monitor.start()
@@ -110,9 +122,9 @@ class BossRushFlow(ChallengeFlow):
         try:
             while not self.stop.is_set():
                 on_profile('Gate map')
-                if not self.wait_details() or not self.client.setup_camera():
+                if (not first_run and not self.wait_details()) or not self.client.setup_camera():
                     return
-                if not start_game(self.capture,self.client,self.stop,self.assets):
+                if not start_game(self.capture,self.client,self.stop,self.assets,find_start=self.game_start_target,park=True):
                     return
                 started=time.monotonic()
                 status(dict(new_run=True,wave=None))
@@ -148,7 +160,10 @@ class BossRushFlow(ChallengeFlow):
                             return
                 try:
                     for gate in range(1,7):
-                        if not self.enter_gate(gate) or not start_game(self.capture,self.client,self.stop,self.assets):
+                        if not self.enter_gate(gate):
+                            return
+                        self.log(f'Starting Gate {gate} before indexes.')
+                        if not start_game(self.capture,self.client,self.stop,self.assets,find_start=self.game_start_target,park=True):
                             return
                         monitor.reset()
                         try:
@@ -159,7 +174,7 @@ class BossRushFlow(ChallengeFlow):
                             return
                     boss=True
                     on_profile('Boss map')
-                    if not start_game(self.capture,self.client,self.stop,self.assets):
+                    if not start_game(self.capture,self.client,self.stop,self.assets,find_start=self.game_start_target,park=True):
                         return
                     monitor.reset()
                     phase(True)
@@ -168,7 +183,7 @@ class BossRushFlow(ChallengeFlow):
                 if self.stop.is_set():
                     return
                 if not finish_match(self.capture,self.client,self.reader,self.stop,self.log,status,reward_dir,
-                                    started,self.game_start,on_result=notifier.send):
+                                    started,self.game_start_target,on_result=notifier.send):
                     return
                 first_run=False
         finally:
