@@ -14,6 +14,7 @@ EMPTY_INDEX = {
     "auto_upgrade": "0", "x": "", "y": "", "place_at_wave": "",
     "auto_ability_wave": "",
     "path": "",
+    "path_repeat": "Once",
 }
 PAGE_SIZE = 6
 TARGETS = ["First", "Last", "Closest", "Strongest", "Boss",
@@ -152,7 +153,11 @@ class UnitManager(QWidget):
         editor.addWidget(self.heading)
         path_row=QHBoxLayout()
         self.record_button=self._button('Record',self.toggle_record,'primary')
-        path_row.addWidget(self._text('WASD Auto Path','subtitle'))
+        path_row.addWidget(self._text('WASD Manual Path','subtitle'))
+        self.path_repeat=QComboBox()
+        self.path_repeat.addItems(['Once','Repeated'])
+        self.path_repeat.currentTextChanged.connect(self.change_path_repeat)
+        path_row.addWidget(self.path_repeat)
         path_row.addWidget(self.record_button)
         editor.addLayout(path_row)
         self.path_note=self._text('Path recording: F3 stops. Reset removes a saved path.','subtitle')
@@ -311,6 +316,10 @@ class UnitManager(QWidget):
 
     def update_path_controls(self):
         path=bool(self.entries[self.selected].get('path'))
+        self.path_repeat.blockSignals(True)
+        self.path_repeat.setCurrentText(self.entries[self.selected].get('path_repeat','Once'))
+        self.path_repeat.blockSignals(False)
+        self.path_repeat.setEnabled(not self.recording)
         for field in self.fields.values():
             field.setEnabled(not path and not self.recording)
         for button in (self.capture_button,self.clear_position_button):
@@ -320,8 +329,13 @@ class UnitManager(QWidget):
         self.paste_button.setEnabled(self.copied_index is not None and not self.recording)
         self.record_button.setText('Stop Recording' if self.recording else 'Record')
         self.path_note.setText('Recording Roblox movement. F3 stops.' if self.recording else
-                              'First run only. Reset removes the path.' if path else
-                              'WASD only, first run only. F3 stops recording.')
+                              self.path_repeat.currentText()+'. Reset removes the path.' if path else
+                              'Manual WASD recording. F3 stops recording.')
+
+    def change_path_repeat(self,value):
+        if not self.loading and not self.recording:
+            self._commit({**self.entries[self.selected],'path_repeat':value})
+            self.refresh_cards()
 
     def toggle_record(self):
         if self.record_callback is None:
@@ -340,7 +354,7 @@ class UnitManager(QWidget):
         self.recording_changed(False)
         if raw:
             self.selected=index
-            if self._commit({**EMPTY_INDEX,'path':raw}):
+            if self._commit({**EMPTY_INDEX,'path':raw,'path_repeat':self.path_repeat.currentText()}):
                 self.select(index)
                 self.log(f'Path saved to Index {index+1}.')
 
@@ -372,7 +386,7 @@ class UnitManager(QWidget):
                 try:
                     from python_macro.pathing import decode_path
                     path=decode_path(entry['path'])
-                    button.setText(f"{index+1:02d}   PATH\nWASD  /  {path['duration']:.1f}s\nFirst run only")
+                    button.setText(f"{index+1:02d}   PATH\nWASD  /  {path['duration']:.1f}s\n{entry.get('path_repeat','Once')}")
                 except ValueError:
                     button.setText(f'{index+1:02d}   PATH\nInvalid recording - please record again')
             button.setProperty("selected", index == self.selected)
@@ -390,7 +404,7 @@ class UnitManager(QWidget):
             if entry.get('path'):
                 from python_macro.pathing import decode_path
                 decode_path(entry['path'])
-                entry={**EMPTY_INDEX,'path':entry['path']}
+                entry={**EMPTY_INDEX,'path':entry['path'],'path_repeat':entry.get('path_repeat','Once')}
             self.save(self.selected, entry)
         except (OSError, ValueError) as error:
             self.log(f"Could not save index: {error}")

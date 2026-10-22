@@ -354,7 +354,7 @@ class RobloxClient:
     def park_cursor(self,shape):
         if self.stop.is_set():
             return False
-        point,_=self._validated_point(shape[1]-8,shape[0]-8,shape)
+        point,_=self._validated_point(max(0,int(shape[1]*.9)),max(0,int(shape[0]*.85)),shape)
         self._move(point.x,point.y)
         return True
 

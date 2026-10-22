@@ -149,7 +149,7 @@ class UnitPanel:
                 return None
             return {"close": close[:2], "region": region, "priority": None, "upgrade": upgrade}
         priority_region = Region(max(0, x-13*w), max(0, y+6*h), 4*w, 3*h)
-        matches = self.reader.read(frame, priority_region, scale=3, max_variants=1,
+        matches = self.reader.read(frame, priority_region, scale=2, max_variants=1,
                                    min_confidence=0.75, cancelled=self.stop.is_set)
         priority = priority_value([m.text for m in matches])
         upgrade = None
@@ -201,7 +201,7 @@ class UnitIndexer:
             return clock() - (paused if isinstance(paused, (float,int)) else 0.0)
         self.clock = active_clock
         self.completed = {i for i, entry in enumerate(entries)
-                          if entry.get('path') and not allow_paths}
+                          if entry.get('path') and not allow_paths and entry.get('path_repeat','Once')!='Repeated'}
         self.heartbeat = heartbeat
         self.placed = {}
         self.ability_checked = set()
@@ -233,7 +233,7 @@ class UnitIndexer:
             frame, panel = self.snapshot(need_upgrade=True) if need_upgrade else self.snapshot()
             if panel is not None and predicate(panel):
                 return frame, panel
-            self.wait(0.15)
+            self.wait(0.05)
         if self.stop.is_set():
             raise InterruptedError()
         raise RuntimeError("Could not read the unit panel. Check the selected unit and try again.")
@@ -246,7 +246,7 @@ class UnitIndexer:
 
     def key(self, value):
         self.heartbeat()
-        if self.stop.is_set() or not self.client.hold_key(value, 0.10):
+        if self.stop.is_set() or not self.client.hold_key(value, 0.05):
             raise InterruptedError()
 
     def all_done(self):
@@ -315,7 +315,7 @@ class UnitIndexer:
                 return False
             found = self.panel.ability_state(frame)
             if found is None:
-                self.wait(.1)
+                self.wait(.04)
             elif found[0] == 'on':
                 return True
             else:
@@ -350,7 +350,7 @@ class UnitIndexer:
                     raise RuntimeError(f"Index {index+1} position is outside Roblox.")
                 continue
             self.key('0' if str(entry['unit'])=='10' else str(entry['unit']))
-            self.wait(0.08)
+            self.wait(0.04)
             self.last_place_point = point
             self.click(point, frame)
             for scan in range(4):
@@ -408,13 +408,13 @@ class UnitIndexer:
                 break
             old = panel["priority"]
             self.key("R")
-            self.wait(0.12)
+            self.wait(0.04)
             _, panel = self.read_until(lambda panel: panel["priority"] not in (None, old))
         else:
             raise RuntimeError(f"Could not set target priority for Index {index+1}.")
         for _ in range(auto):
             self.key("K")
-            self.wait(0.1)
+            self.wait(0.04)
         if goal:
             last, stalled = None, self.clock()+120
             while not self.stop.is_set():
@@ -452,11 +452,11 @@ class UnitIndexer:
             frame = self.capture()
             point = self.panel.close_icon(frame)
             if point is None:
-                self.wait(0.15)
+                self.wait(0.05)
                 if self.panel.close_icon(self.capture()) is None:
                     return
                 continue
             self.click(point[:2], frame)
-            self.wait(0.2)
+            self.wait(0.06)
         if self.panel.close_icon(self.capture()) is not None:
             raise RuntimeError("Could not close the unit panel.")

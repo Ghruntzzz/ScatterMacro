@@ -1,6 +1,7 @@
 """Category-ranked card selection with per-run history and verified buttons."""
 import json
 import time
+import re
 from python_macro.story import normalize
 from python_macro.end_screen import center
 from python_macro.unit_actions import Icon
@@ -42,7 +43,9 @@ def offered_cards(matches,catalog):
         rarity=[center(m)[1] for m in matches if left<center(m)[0]<right
                 and normalize(m.text) in ('commonupgrade','rareupgrade','epicupgrade','legendaryupgrade','mythicupgrade')
                 and center(m)[1]<by]
-        title_bottom=min(rarity) if rarity else by
+        counters=[center(m)[1] for m in matches if left<center(m)[0]<right
+                  and re.fullmatch(r'\s*\d+\s*/\s*\d+\s*',m.text) and center(m)[1]<by]
+        title_bottom=min(rarity+counters) if rarity or counters else by
         titles=[m for m in matches if normalize(m.text) in names
                 and left<center(m)[0]<right and center(m)[1]<title_bottom]
         if len(titles)!=1:
@@ -65,20 +68,30 @@ class CardSelector:
     def read_choices(self,frame):
         h,w=frame.shape[:2]
         matches=self.reader.read(frame,Region(0,0,w,h),scale=2,max_variants=3,
-                                min_confidence=.65,cancelled=self.stop.is_set)
+                                min_confidence=.65,cancelled=self.stop.is_set,
+                                accept=lambda found:self.choose(found) is not None)
         if self.choose(matches) is not None:
             return matches
         buttons=sorted([m for m in matches if normalize(m.text)=='selectupgrade'],key=lambda m:center(m)[0])
         if len(buttons)!=3:
-            return matches
+            footer=self.reader.read(frame,Region(0,h//2,w,h-h//2),scale=3,max_variants=3,
+                                    min_confidence=.6,cancelled=self.stop.is_set,
+                                    accept=lambda found:sum(normalize(m.text)=='selectupgrade' for m in found)==3)
+            buttons=sorted([m for m in footer if normalize(m.text)=='selectupgrade'],key=lambda m:center(m)[0])
+            if len(buttons)!=3:
+                return matches
+            matches=[m for m in matches if normalize(m.text)!='selectupgrade']+buttons
         names={normalize(c['name']) for c in self.catalog}|{normalize(n) for n in ANVIL_PRIORITY}
         result=[m for m in matches if normalize(m.text) not in names]
         xs=[center(b)[0] for b in buttons]
         for i,button in enumerate(buttons):
             left=int((xs[i-1]+xs[i])/2) if i else 0
             right=int((xs[i+1]+xs[i])/2) if i<2 else w
-            close=self.reader.read(frame,Region(left,0,right-left,max(1,center(button)[1])),
-                                   scale=3,max_variants=3,min_confidence=.65,cancelled=self.stop.is_set)
+            top=max(0,int(center(button)[1]-h*.42))
+            bottom=min(h,int(center(button)[1]-h*.12))
+            close=self.reader.read(frame,Region(left,top,right-left,max(1,bottom-top)),
+                                   scale=3,max_variants=3,min_confidence=.65,cancelled=self.stop.is_set,
+                                   accept=lambda found:len([m for m in found if normalize(m.text) in names])==1)
             titles=[m for m in close if normalize(m.text) in names]
             result.extend(titles)
         return result

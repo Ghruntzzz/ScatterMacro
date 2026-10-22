@@ -64,8 +64,8 @@ jobs:
       - name: Upload tested Windows build
         uses: actions/upload-artifact@v4
         with:
-          name: AnimeExpeditions-0.1.60-windows
-          path: dist/AnimeExpeditions-0.1.60-windows.zip
+          name: AnimeExpeditions-0.1.61-windows
+          path: dist/AnimeExpeditions-0.1.61-windows.zip
           if-no-files-found: error
           retention-days: 7
       - name: Publish and verify macro archive
@@ -74,12 +74,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '0.1.60'
+          $version = '0.1.61'
           $tag = "anime-expeditions-v$version"
           $name = "AnimeExpeditions-$version-windows.zip"
           $archive = "dist/$name"
           if (!(Test-Path $archive)) { throw "Missing macro ZIP: $archive" }
-          gh release create $tag $archive --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Anime Expeditions $version - Verified Anvil Card Detection" --notes "Adds the supplied Stat Anvil header and excludes description text below rarity labels from card-title matching. Real OCR correctly identified Range, Element Damage and Critical Damage in the supplied screenshot. Preserves strict all-three-title selection, closer OCR retries, saved anvil priorities, corrected Continue targeting, cursor parking, no-wave Expedition controls and Completed webhooks. Launcher 0.3.2 minimizes after opening a macro. Automatic shop playback and purchases remain unfinished. 287 tests passed; live gameplay validation remains required."
+          gh release create $tag $archive --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Anime Expeditions $version - Boss Rush" --notes "Adds Boss Rush navigation, verified District 7 Hard Mode match detection, six user-recorded gate routes and E entrance handling. Gate-completion dialogs drive Continue for gates 1-5 and Fight Boss after gate 6 only. Units run at gate 1 and in a separate Boss map profile, never on later gates; Repeat resets to gate 1. All six routes must be recorded before starting. Adds Once/Repeated manual WASD paths across modes, compact Expedition priority buttons, improved strict three-title OCR, fixed difficulty click counts, safer cursor parking and shorter index waits. Expedition shop automation is retired. 297 tests passed, including two simulated complete Boss Rush runs; supplied match-details and card screenshots passed real OCR checks. Live gameplay validation remains required."
           if ($LASTEXITCODE -ne 0) { throw 'Macro release upload failed' }
           New-Item -ItemType Directory -Force 'dist/verified' | Out-Null
           gh release download $tag --repo $env:GITHUB_REPOSITORY --pattern $name --dir 'dist/verified'
@@ -91,7 +91,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '0.1.60'
+          $version = '0.1.61'
           $archive = "dist/AnimeExpeditions-$version-windows.zip"
           $sha256 = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
           $url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/anime-expeditions-v$version/AnimeExpeditions-$version-windows.zip"
@@ -104,7 +104,7 @@ jobs:
           $macro[0].version = $version
           $macro[0].url = $url
           $macro[0].sha256 = $sha256
-          $macro[0].description = "Improved strict three-card detection, anvil priorities and Continue handling. Expedition no-wave runtime and Completed webhooks. Automatic shopping remains unfinished."
+          $macro[0].description = "Boss Rush six-gate routing, separate Gate/Boss profiles and Once/Repeated manual paths. Improved Expedition card reading and faster indexes. Record all six routes before Boss Rush."
           $catalog | ConvertTo-Json -Depth 20 | Set-Content catalog.json -Encoding utf8
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

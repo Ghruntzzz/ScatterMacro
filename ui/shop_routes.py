@@ -6,18 +6,18 @@ from python_macro.shop_routes import MAPS
 
 
 class ShopRoutesDialog(QDialog):
-    def __init__(self,store,parent=None,busy=lambda:False):
+    def __init__(self,store,parent=None,busy=lambda:False,title='Expedition Shop Routes',hint_text=None):
         super().__init__(parent)
         self.store,self.busy=store,busy
         self.recorder=None
-        self.setWindowTitle('Expedition Shop Routes')
+        self.setWindowTitle(title)
         self.resize(470,280)
         layout=QVBoxLayout(self)
-        hint=QLabel('Record one WASD route per map, from the payload to the shop. Use the macro camera setup. F3 or Stop Recording saves. Export a route to share it as a default.')
+        hint=QLabel(hint_text or 'Record one WASD route per map. Use the macro camera setup. F3 or Stop Recording saves.')
         hint.setWordWrap(True)
         layout.addWidget(hint)
         self.map=QComboBox()
-        self.map.addItems(MAPS)
+        self.map.addItems(store.names)
         self.map.currentTextChanged.connect(self.refresh)
         layout.addWidget(self.map)
         self.info=QLabel()
@@ -56,7 +56,7 @@ class ShopRoutesDialog(QDialog):
             self.recorder.finish()
             return
         if self.busy():
-            self.info.setText('Stop the macro before recording a shop route.')
+            self.info.setText('Stop the macro before recording a route.')
             return
         try:
             from python_macro.capture import single_roblox_window
@@ -71,7 +71,7 @@ class ShopRoutesDialog(QDialog):
             self.controls(True)
             self.recorder.start()
             if self.recorder.active:
-                self.info.setText('Recording WASD. Press F3 near the shop to save.')
+                self.info.setText('Recording WASD. Press F3 at the destination to save.')
         except (OSError,RuntimeError,ValueError) as error:
             self.failed(str(error))
 
@@ -89,7 +89,7 @@ class ShopRoutesDialog(QDialog):
         self.info.setText(message)
 
     def import_route(self):
-        name,_=QFileDialog.getOpenFileName(self,'Import shop route','','JSON routes (*.json)')
+        name,_=QFileDialog.getOpenFileName(self,'Import route','','JSON routes (*.json)')
         if not name:
             return
         try:
@@ -107,7 +107,7 @@ class ShopRoutesDialog(QDialog):
             data=self.store.load(self.map.currentText())
             if data is None:
                 return
-            name,_=QFileDialog.getSaveFileName(self,'Export shop route',self.store.path(self.map.currentText()).name,'JSON routes (*.json)')
+            name,_=QFileDialog.getSaveFileName(self,'Export route',self.store.path(self.map.currentText()).name,'JSON routes (*.json)')
             if name:
                 Path(name).write_text(json.dumps(data,indent=2),encoding='utf-8')
         except (OSError,ValueError) as error:

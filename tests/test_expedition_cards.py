@@ -38,9 +38,9 @@ class CardTests(unittest.TestCase):
         for i,card in enumerate(self.choices):
             matches += [label(card['name'],i*250,200),label('Select Upgrade',i*250,350)]
         reader=Mock()
-        reader.read.side_effect=[matches,matches,[],[]]
         client=Mock()
         selector=CardSelector(Path('assets'),reader,client,lambda:frame,FastStop(),Mock())
+        selector.read_choices=Mock(side_effect=[matches,matches,[],[]])
         selector.header=Mock(side_effect=[(10,10),(10,10),(10,10),None,None])
         self.assertTrue(selector.handle(frame))
         client.direct_click.assert_called_once()

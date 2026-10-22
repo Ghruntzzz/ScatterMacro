@@ -6,12 +6,13 @@ MAPS=('School Grounds','Flower Forest','Rose Kingdom','East Town')
 
 
 class ShopRoutes:
+    names=MAPS
     def __init__(self,root,defaults=None):
         self.root,self.defaults=root,defaults
 
     def path(self,map_name):
-        if map_name not in MAPS:
-            raise ValueError('Choose one of the four Expedition maps.')
+        if map_name not in self.names:
+            raise ValueError('Choose a supported route.')
         return self.root/(map_name.replace(' ','_')+'.json')
 
     def validate(self,data,map_name):

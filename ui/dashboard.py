@@ -39,6 +39,7 @@ MODE_MAPS = {
     "Raid": ["Spirit City", "Snowy Castle"],
     "Tower": ["Trait Tower", "Traitless Tower"],
     "Expeditions": ["School Grounds", "Flower Forest", "Rose Kingdom", "East Town"],
+    "Boss Rush": ["Gate map", "Boss map"],
 }
 MODE_ACTS = {
     "Story": ["Act 1", "Act 2", "Act 3", "Act 4", "Act 5", "Infinite", "Mastery"],
@@ -46,6 +47,7 @@ MODE_ACTS = {
     "Raid": ["Act 1", "Act 2", "Act 3"],
     "Tower": ["Floors"],
     "Expeditions": ["Expedition"],
+    "Boss Rush": ["Gates"],
 }
 
 
@@ -239,6 +241,8 @@ def active_unit_config(values: dict[str, str]) -> Path:
         return config_root / "Challenges" / "Auto.ini"
     if mode == "Expeditions":
         return config_root / "Expeditions" / f"{config_segment(values['map'])}.ini"
+    if mode == 'Boss Rush':
+        return config_root / 'BossRush' / (config_segment(values['map'])+'.ini')
     if values.get('act') in {'Mastery', 'Infinite'}:
         return config_root / "Story" / values['act'] / f"{config_segment(values['map'])}.ini"
     # Preserve the existing map profile for all five standard Story acts.
@@ -273,6 +277,7 @@ def load_unit_indexes_from_path(config_path: Path, count: int = 6) -> list[dict[
                 "place_at_wave": section.get(f"{prefix}PlaceAtWave", ""),
                 "auto_ability_wave": section.get(f"{prefix}AutoAbilityWave", ""),
                 "path": section.get(f"{prefix}Path", ""),
+                "path_repeat": section.get(f"{prefix}PathRepeat", "Once"),
             }
         )
     return indexes
@@ -415,15 +420,20 @@ class DashboardWindow(QWidget):
         config = self._card(18, 208, 680, 316, 8)
         self._section_title(config, "MATCH SETTINGS", 20)
         self._label(config, "ROUTE CONFIGURATION", 36, 66, 220, 18, f"color: {WINE}; font: 700 9px 'Bahnschrift';")
-        self.mode_box = self._combo(config, "MODE", ["Story", "Challenges", "Raid", "Tower", "Expeditions"], self.values["mode"], 36, 97, 240)
+        self.mode_box = self._combo(config, "MODE", ["Story", "Challenges", "Raid", "Tower", "Expeditions", "Boss Rush"], self.values["mode"], 36, 97, 240)
         self.map_box = self._combo(config, "MAP", MODE_MAPS["Story"], self.values["map"], 314, 97, 320)
         self.difficulty_box = self._combo(config, "DIFFICULTY", ["Normal", "Hard"], self.values["difficulty"], 36, 187, 240)
         self.act_box = self._combo(config, "ACT", MODE_ACTS["Story"], self.values["act"], 314, 187, 320)
         self.challenge_panel = QWidget(config)
-        self.card_priority_button=self._button(config,'CARD PRIORITY',314,215,320,False)
+        self.card_priority_button=self._button(config,'CARD PRIORITY',314,209,154,False)
+        self.card_priority_button.setFixedHeight(34)
         self.card_priority_button.clicked.connect(self._card_priority)
-        self.anvil_priority_button=self._button(config,'ANVIL PRIORITY',314,263,320,False)
+        self.anvil_priority_button=self._button(config,'ANVIL PRIORITY',480,209,154,False)
+        self.anvil_priority_button.setFixedHeight(34)
         self.anvil_priority_button.clicked.connect(self._anvil_priority)
+        self.gate_routes_button=self._button(config,'GATE ROUTES',314,209,154,False)
+        self.gate_routes_button.setFixedHeight(34)
+        self.gate_routes_button.clicked.connect(self._gate_routes)
         self.challenge_panel.setGeometry(36,175,600,120)
         self.challenge_boxes = {}
         for i,(key,label) in enumerate((('weekly','Weekly'),('daily','Daily'),('regular1','Regular #1'),
@@ -455,12 +465,15 @@ class DashboardWindow(QWidget):
         if dialog.exec()==QDialog.DialogCode.Accepted:
             update_config('Dashboard',{'AnvilPriority':'|'.join(dialog.order())})
 
-    def _shop_routes(self):
-        from python_macro.shop_routes import ShopRoutes
+    def _gate_routes(self):
+        from python_macro.boss_rush import GateRoutes
         from ui.shop_routes import ShopRoutesDialog
-        root=active_unit_config(dict(mode='Expeditions',map='School Grounds')).parent/'ShopRoutes'
-        dialog=ShopRoutesDialog(ShopRoutes(root,ASSETS/'expedition-shop-routes'),self,
-                               busy=lambda:self.worker is not None and self.worker.isRunning())
+        root=active_unit_config(dict(mode='Boss Rush',map='Gate map')).parent/'GateRoutes'
+        runtime=getattr(self,'runtime_window',self)
+        dialog=ShopRoutesDialog(GateRoutes(root),self,
+                               busy=lambda:getattr(runtime,'worker',None) is not None and runtime.worker.isRunning(),
+                               title='Boss Rush Gate Routes',
+                               hint_text='Gate 1 starts at the six-gate starting area after camera setup. Gates 2-6 start where Continue leaves you. Record up to the E prompt; the macro presses E. F3 saves.')
         dialog.exec()
 
     def _private_server(self) -> None:
@@ -479,7 +492,7 @@ class DashboardWindow(QWidget):
 
     def _deployment(self) -> None:
         deploy = self
-        start = self._button(deploy, "START" if self.mode_box.currentText() in {"Story", "Raid", "Challenges", "Tower", "Expeditions"} else "SAVE SETUP", 596, 577, 214, True)
+        start = self._button(deploy, "START" if self.mode_box.currentText() in {"Story", "Raid", "Challenges", "Tower", "Expeditions", "Boss Rush"} else "SAVE SETUP", 596, 577, 214, True)
         self.start_button = start
         settings = self._button(deploy, "SETTINGS", 830, 577, 164)
         exit_button = self._button(deploy, "EXIT", 1014, 577, 154)
@@ -591,7 +604,7 @@ class DashboardWindow(QWidget):
         self._refresh_route_controls()
         self._save_dashboard()
         if hasattr(self, "start_button"):
-            self.start_button.setText("START" if _mode in {"Story", "Raid", "Challenges", "Tower", "Expeditions"} else "SAVE SETUP")
+            self.start_button.setText("START" if _mode in {"Story", "Raid", "Challenges", "Tower", "Expeditions", "Boss Rush"} else "SAVE SETUP")
 
     def _act_changed(self, _act: str) -> None:
         if self.mode_box.currentText() == "Story":
@@ -612,6 +625,7 @@ class DashboardWindow(QWidget):
         self.challenge_panel.setVisible(mode=='Challenges')
         self.card_priority_button.setVisible(mode=='Expeditions')
         self.anvil_priority_button.setVisible(mode=='Expeditions')
+        self.gate_routes_button.setVisible(mode=='Boss Rush')
 
         if mode == "Story":
             difficulties = ["Hard"] if self.act_box.currentText() in {"Infinite", "Mastery"} else ["Normal", "Hard"]
@@ -654,7 +668,7 @@ class DashboardWindow(QWidget):
 
     def _start_macro(self) -> None:
         self._save_dashboard()
-        if self.mode_box.currentText() not in {"Story", "Raid", "Challenges", "Tower", "Expeditions"}:
+        if self.mode_box.currentText() not in {"Story", "Raid", "Challenges", "Tower", "Expeditions", "Boss Rush"}:
             self._set_status("Setup saved. This mode's automation is not connected yet.")
             return
         from python_macro.capture import single_roblox_window
@@ -1043,6 +1057,9 @@ class RuntimeWindow(DashboardWindow):
             f"border: 1px solid {OUTLINE}; border-radius: 6px; "
             f"color: {TEXT}; padding: 8px; font: 9px 'Consolas';")
         self.worker = None
+        if self.values['mode']=='Boss Rush':
+            self.runtime_gate_routes=self._small_button(stats_panel,'GATE ROUTES',16,342,178)
+            self.runtime_gate_routes.clicked.connect(self._gate_routes)
         self.return_pending = False
         self._label(action, f"{self.values['start_key']}: START   |   {self.values['stop_key']}: STOP", 16, 409, 178, 28, f"color: {TEXT}; font: 700 9px 'Bahnschrift';")
         # The F2 emergency stop remains active via RuntimeHotkeys; no extra button.
@@ -1093,7 +1110,7 @@ class RuntimeWindow(DashboardWindow):
         requested_wave(entry.get("auto_ability_wave", ""))
         for key, suffix in (("unit", "Unit"), ("priority", "Priority"), ("upgrade", "Upgrade"),
                             ("auto_upgrade", "AutoUpgrade"), ("x", "X"), ("y", "Y"),
-                            ("place_at_wave", "PlaceAtWave"), ("auto_ability_wave", "AutoAbilityWave"),('path','Path')):
+                            ("place_at_wave", "PlaceAtWave"), ("auto_ability_wave", "AutoAbilityWave"),('path','Path'),('path_repeat','PathRepeat')):
             parser.set("UnitIndexes", f"Index{index + 1}{suffix}", entry.get(key, ""))
         write_ini(parser, self.unit_config_path)
         if self.worker is not None and self.worker.isRunning():
@@ -1310,7 +1327,7 @@ class RuntimeWindow(DashboardWindow):
             return
         if getattr(self,'path_recorder',None) is not None and ctypes.windll.user32.GetAsyncKeyState(0x72)&0x8000:
             return
-        if self.values["mode"] not in {"Story", "Raid", "Challenges", "Tower", "Expeditions"}:
+        if self.values["mode"] not in {"Story", "Raid", "Challenges", "Tower", "Expeditions", "Boss Rush"}:
             self.log.appendPlainText("Only Story, Raid, Challenge and Tower navigation are available.")
             return
         if self.return_pending or (self.worker is not None and self.worker.isRunning()):

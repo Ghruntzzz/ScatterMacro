@@ -15,6 +15,14 @@ from python_macro.input import (
 
 
 class ClickTests(unittest.TestCase):
+    def test_park_cursor_stays_well_inside_client(self):
+        client=self.client()
+        client._validated_point=Mock(return_value=(wintypes.POINT(900,680),None))
+        client._move=Mock()
+        self.assertTrue(client.park_cursor((800,1000,3)))
+        client._validated_point.assert_called_once_with(900,680,(800,1000,3))
+        client._move.assert_called_once_with(900,680)
+
     def test_preclick_delay_keeps_brief_hover_within_fast_budget(self):
         preparation = (PRECLICK_HOVER_SECONDS + PRECLICK_SETTLE_SECONDS
                        + len(PRECLICK_WIGGLE_OFFSETS) * PRECLICK_WIGGLE_SECONDS)

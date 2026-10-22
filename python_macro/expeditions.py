@@ -69,32 +69,26 @@ class ExpeditionFlow(ChallengeFlow):
         return int(normalize(match.text)[-1]),point
 
     def set_difficulty(self):
-        for _ in range(4):
-            reading=self.difficulty_reading(self.capture())
-            if reading is None:
-                raise RuntimeError('Could not read Expedition difficulty. No adjustment was clicked.')
-            value,_=reading
-            if value==self.difficulty:
-                return True
-            if value>self.difficulty:
-                raise RuntimeError('Expedition difficulty is above the selected value. Reset it before starting; navigation uses only Plus.')
-            def target(frame):
-                current=self.difficulty_reading(frame)
-                if current is None or current[0]!=value:
-                    return None
-                hit=self.plus(frame)
-                if hit is None:
-                    return None
-                x,y,w,h=hit
-                px,py=current[1]
-                if not 0<x-px<w*5 or abs(y-py)>h*2:
-                    return None
-                return x,y
-            if not self.press('Difficulty',target,
-                              lambda after,before:self.difficulty_reading(after) is not None
-                              and self.difficulty_reading(after)[0]==value+1):
+        from python_macro.story_verified import click_once
+        initial=self.difficulty_reading(self.capture())
+        if initial is None or initial[0]!=1:
+            raise RuntimeError('Expected default Difficulty 1 before applying the selected difficulty.')
+        for _ in range(self.difficulty-1):
+            def click(x,y,shape):
+                if self.client.direct_click(x,y,shape) is False:
+                    return False
+                return self.client.park_cursor(shape)
+            if not click_once('Difficulty Plus',self.plus,self.capture,click,self.stop):
                 return False
-        raise RuntimeError('Expedition difficulty did not reach the selected value.')
+            if self.stop.wait(.12):
+                return False
+        for _ in range(12):
+            reading=self.difficulty_reading(self.capture())
+            if reading is not None and reading[0]==self.difficulty:
+                return True
+            if self.stop.wait(.1):
+                return False
+        raise RuntimeError('Could not confirm the selected difficulty after the fixed Plus clicks.')
 
     def navigate(self,find_play):
         expedition=lambda frame:self.expedition(frame) or self.text('Expedition','Expeditions')(frame)

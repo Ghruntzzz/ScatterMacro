@@ -88,8 +88,27 @@ class StoryWorker(QThread):
             from python_macro.chat import ChatLocator, ChatSafeCapture
             capture = ChatSafeCapture(client.capture, client.direct_click,
                                       ChatLocator(root / "assets"), self.stop)
+            if self.mode=='Boss Rush':
+                from python_macro.boss_rush import BossRushFlow,GateRoutes
+                from ui.dashboard import active_unit_config
+                from python_macro.capture import capture_client
+                route_root=active_unit_config(dict(mode='Boss Rush',map='Gate map')).parent/'GateRoutes'
+                flow=BossRushFlow(capture,client,self.reader,self.stop,self.message.emit,root/'assets',GateRoutes(route_root))
+                def boss_capture():
+                    if client.user.GetForegroundWindow()!=client.hwnd or client.user.IsIconic(client.hwnd):
+                        return None
+                    try:
+                        return capture_client(client.hwnd)
+                    except RuntimeError:
+                        if client.user.GetForegroundWindow()!=client.hwnd or client.user.IsIconic(client.hwnd):
+                            return None
+                        raise
+                def boss_profile(name):
+                    self.map_entries('Boss Rush',name,'Gates')
+                    notifier.settings.update(mode='Boss Rush',map=name,act='Gates',difficulty='')
+                flow.run(play_icon,boss_profile,self.current_entries,update_status,boss_capture,self.reward_dir,notifier)
+                return
             if self.mode == 'Expeditions':
-                self.message.emit('Expedition checkpoint shops still require manual handling.')
                 from python_macro.expeditions import ExpeditionFlow
                 from python_macro.story_ingame import already_in_match,run_story_ingame
                 from python_macro.capture import capture_client
