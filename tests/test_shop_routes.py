@@ -10,6 +10,17 @@ PATH=dict(version=1,mode='Keyboard',duration=1,events=[[0,'key','W',1],[1,'key',
 
 
 class ShopTests(unittest.TestCase):
+    def test_bundled_routes_cover_all_maps(self):
+        defaults=Path(__file__).resolve().parents[1]/'assets'/'expedition-shop-routes'
+        with tempfile.TemporaryDirectory() as folder:
+            store=ShopRoutes(Path(folder),defaults)
+            for name in MAPS:
+                with self.subTest(map=name):
+                    route=store.load(name)
+                    self.assertEqual(route['map'],name)
+                    self.assertGreater(route['path']['duration'],0)
+                    self.assertTrue(route['path']['events'])
+
     def test_four_independent_routes_and_default_override(self):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder)

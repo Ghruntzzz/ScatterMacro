@@ -18,8 +18,8 @@ class ExpeditionFlow(ChallengeFlow):
         super().__init__(capture,client,reader,stop,log,assets,{})
         self.map_name,self.difficulty=map_name,int(difficulty)
         self.expedition=Icon(assets/'expedition-button.png',threshold=.88)
-        self.plus=Icon(assets/'expedition-difficulty.png',threshold=.9,crop=(170,32,43,42))
-        self.minus=Icon(assets/'expedition-difficulty.png',threshold=.9,crop=(17,32,42,42))
+        self.map_card=Icon(assets/('expedition-map-'+map_name.replace(' ','_')+'.png'),threshold=.85)
+        self.plus=Icon(assets/'expedition-plus.png',threshold=.9)
         self.continue_button=Icon(assets/'expedition-continue.png',threshold=.9)
         self.confirm=Icon(assets/'expedition-confirm.png',threshold=.9)
         self.settings=Icon(assets/'expedition-settings.png',threshold=.92)
@@ -31,6 +31,19 @@ class ExpeditionFlow(ChallengeFlow):
         from python_macro.expedition_cards import CardSelector
         self.cards=CardSelector(assets,reader,client,capture,stop,log,priority)
         self.card_run=None
+
+    def map_target(self,frame):
+        hit=self.map_card(frame)
+        if hit is None:
+            return None
+        x,y,w,h=hit
+        self.ocr.unique(frame,lambda text:normalize(text)==normalize(self.map_name))
+        from python_macro.end_screen import center
+        matches=[center(m) for m in self.ocr.matches
+                 if normalize(m.text)==normalize(self.map_name)
+                 and x-w/2<=center(m)[0]<=x+w/2
+                 and y<=center(m)[1]<=y+h/2]
+        return matches[0] if len(matches)==1 else None
 
     def difficulty_reading(self,frame):
         point=self.ocr.unique(frame,lambda text:re.fullmatch(r'difficulty[123]',normalize(text)) is not None)
@@ -47,22 +60,23 @@ class ExpeditionFlow(ChallengeFlow):
             value,_=reading
             if value==self.difficulty:
                 return True
-            direction=1 if value<self.difficulty else -1
+            if value>self.difficulty:
+                raise RuntimeError('Expedition difficulty is above the selected value. Reset it before starting; navigation uses only Plus.')
             def target(frame):
                 current=self.difficulty_reading(frame)
                 if current is None or current[0]!=value:
                     return None
-                hit=(self.plus if direction>0 else self.minus)(frame)
+                hit=self.plus(frame)
                 if hit is None:
                     return None
                 x,y,w,h=hit
                 px,py=current[1]
-                if not 0<(x-px)*direction<w*5 or abs(y-py)>h*2:
+                if not 0<x-px<w*5 or abs(y-py)>h*2:
                     return None
                 return x,y
             if not self.press('Difficulty',target,
                               lambda after,before:self.difficulty_reading(after) is not None
-                              and self.difficulty_reading(after)[0]==value+direction):
+                              and self.difficulty_reading(after)[0]==value+1):
                 return False
         raise RuntimeError('Expedition difficulty did not reach the selected value.')
 
@@ -71,9 +85,9 @@ class ExpeditionFlow(ChallengeFlow):
         if not self.press('Play',find_play,lambda after,before:expedition(after) is not None):
             return False
         if not self.press('Expedition',expedition,
-                          lambda after,before:self.text(self.map_name)(after) is not None):
+                          lambda after,before:self.map_target(after) is not None):
             return False
-        if not self.press(self.map_name,self.text(self.map_name),
+        if not self.press(self.map_name,self.map_target,
                           lambda after,before:self.difficulty_reading(after) is not None):
             return False
         if not self.set_difficulty():
