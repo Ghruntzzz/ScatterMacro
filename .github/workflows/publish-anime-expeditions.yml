@@ -64,8 +64,8 @@ jobs:
       - name: Upload tested Windows build
         uses: actions/upload-artifact@v4
         with:
-          name: AnimeExpeditions-0.1.59-windows
-          path: dist/AnimeExpeditions-0.1.59-windows.zip
+          name: AnimeExpeditions-0.1.60-windows
+          path: dist/AnimeExpeditions-0.1.60-windows.zip
           if-no-files-found: error
           retention-days: 7
       - name: Publish and verify macro archive
@@ -74,12 +74,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '0.1.59'
+          $version = '0.1.60'
           $tag = "anime-expeditions-v$version"
           $name = "AnimeExpeditions-$version-windows.zip"
           $archive = "dist/$name"
           if (!(Test-Path $archive)) { throw "Missing macro ZIP: $archive" }
-          gh release create $tag $archive --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Anime Expeditions $version - Expedition Runtime Improvements" --notes "Requires all three card titles before selection, adds enlarged per-card OCR retries and header-independent card detection. Adds saved anvil bonus priorities (SPA deduplicated); anvil screen layout still needs live validation. Prioritizes the second Continue button using bounded text matching and throttles retries. Parks the cursor after Expedition card, Start Game and Continue clicks. Removes Shop Routes from runtime, hides Expedition wave/result controls, disables wave scheduling and repeats defeat-only runs. Expedition and Infinite webhooks say Completed. Automatic shop playback and purchases remain unfinished. 286 tests passed; live gameplay validation remains required."
+          gh release create $tag $archive --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Anime Expeditions $version - Verified Anvil Card Detection" --notes "Adds the supplied Stat Anvil header and excludes description text below rarity labels from card-title matching. Real OCR correctly identified Range, Element Damage and Critical Damage in the supplied screenshot. Preserves strict all-three-title selection, closer OCR retries, saved anvil priorities, corrected Continue targeting, cursor parking, no-wave Expedition controls and Completed webhooks. Launcher 0.3.2 minimizes after opening a macro. Automatic shop playback and purchases remain unfinished. 287 tests passed; live gameplay validation remains required."
           if ($LASTEXITCODE -ne 0) { throw 'Macro release upload failed' }
           New-Item -ItemType Directory -Force 'dist/verified' | Out-Null
           gh release download $tag --repo $env:GITHUB_REPOSITORY --pattern $name --dir 'dist/verified'
@@ -91,7 +91,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '0.1.59'
+          $version = '0.1.60'
           $archive = "dist/AnimeExpeditions-$version-windows.zip"
           $sha256 = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
           $url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/anime-expeditions-v$version/AnimeExpeditions-$version-windows.zip"

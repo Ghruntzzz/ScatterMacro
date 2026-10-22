@@ -55,6 +55,14 @@ class CardTests(unittest.TestCase):
             matches.extend([label(name,i*250,200),label('Select Upgrade',i*250,350)])
         self.assertEqual(selector.choose(matches)['name'],'Range')
         self.assertIsNone(selector.choose(matches[:-2]))
+        matches.extend([label('Legendary Upgrade',i*250,230) for i in range(3)])
+        matches.append(label('Damage',250,300))
+        self.assertEqual(selector.choose(matches)['name'],'Range')
+
+    def test_anvil_screenshot_header(self):
+        selector=CardSelector(Path('assets'),Mock(),Mock(),Mock(),FastStop(),Mock())
+        self.assertIsNotNone(selector.anvil_header(cv2.imread('assets/expedition-anvil-screen.png')))
+        self.assertIsNone(selector.anvil_header(cv2.imread('assets/expedition-card-screen.png')))
 
     def test_close_scans_recover_all_titles(self):
         frame=cv2.imread('assets/expedition-card-screen.png')

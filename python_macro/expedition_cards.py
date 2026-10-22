@@ -39,8 +39,12 @@ def offered_cards(matches,catalog):
         bx,by=center(button)
         left=(xs[i-1]+bx)/2 if i else float('-inf')
         right=(xs[i+1]+bx)/2 if i<len(buttons)-1 else float('inf')
+        rarity=[center(m)[1] for m in matches if left<center(m)[0]<right
+                and normalize(m.text) in ('commonupgrade','rareupgrade','epicupgrade','legendaryupgrade','mythicupgrade')
+                and center(m)[1]<by]
+        title_bottom=min(rarity) if rarity else by
         titles=[m for m in matches if normalize(m.text) in names
-                and left<center(m)[0]<right and center(m)[1]<by]
+                and left<center(m)[0]<right and center(m)[1]<title_bottom]
         if len(titles)!=1:
             return []
         cards.append(dict(names[normalize(titles[0].text)],point=(bx,by)))
@@ -51,6 +55,7 @@ class CardSelector:
     def __init__(self,assets,reader,client,capture,stop,log,priority=DEFAULT_PRIORITY):
         self.catalog=json.loads((assets/'expedition-card-catalog.json').read_text())['cards']
         self.header=Icon(assets/'expedition-card-screen.png',threshold=.85,crop=(352,30,134,22))
+        self.anvil_header=Icon(assets/'expedition-anvil-screen.png',threshold=.85,crop=(360,50,148,47))
         self.reader,self.client,self.capture,self.stop,self.log=reader,client,capture,stop,log
         self.priority=priority_order(priority)
         self.selected=set()
@@ -90,7 +95,7 @@ class CardSelector:
 
     def handle(self,frame):
         matches=None
-        if self.header(frame) is None:
+        if self.header(frame) is None and self.anvil_header(frame) is None:
             if time.monotonic()-self.last_probe<.7:
                 return False
             self.last_probe=time.monotonic()
@@ -103,7 +108,8 @@ class CardSelector:
         logged=False
         while not self.stop.is_set():
             matches=matches if matches is not None else self.read_choices(frame)
-            visible=self.header(frame) is not None or sum(normalize(m.text)=='selectupgrade' for m in matches)==3
+            visible=(self.header(frame) is not None or self.anvil_header(frame) is not None
+                     or sum(normalize(m.text)=='selectupgrade' for m in matches)==3)
             if not visible:
                 absent+=1
                 if absent>=2:
