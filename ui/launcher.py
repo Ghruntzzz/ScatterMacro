@@ -309,6 +309,13 @@ class Launcher(QMainWindow):
         self.start_job("Downloading " + macro["name"] + "...", lambda: self.library.download_install(macro), done)
 
     def launch_macro(self, macro):
+        if hasattr(self, 'license_session'):
+            from python_macro.licensing import check_session, LicenseError
+            try:
+                self.license_session = check_session()
+            except LicenseError as error:
+                self.status.setText(str(error))
+                return
         executable = self.library.executable(macro["id"])
         self.processes[macro["id"]] = subprocess.Popen(
             [str(executable), "--config-dir", str(self.library.config_dir(macro["id"]))],
@@ -356,18 +363,16 @@ def main():
     app.setStyleSheet(STYLE)
     splash = LoadingScreen(ROOT / "assets/scattermacro.ico")
     splash.show()
-    window = Launcher()
+    from ui.license_gate import open_gate
+    def launch_verified():
+        window = Launcher()
+        window.license_session = app.license_session
+        window.show()
+        window.check_updates()
+        return window
     def ready():
-        splash.finish(window)
-        if "--render-preview" in sys.argv:
-            path = Path(sys.argv[sys.argv.index("--render-preview") + 1]).resolve()
-            path.parent.mkdir(parents=True, exist_ok=True)
-            def render():
-                window.grab().save(str(path))
-                app.quit()
-            QTimer.singleShot(300, render)
-        else:
-            window.check_updates()
+        gate = open_gate(app, launch_verified, ROOT / 'assets/scattermacro.ico')
+        splash.finish(gate)
     # Let the event loop paint and animate the splash, rather than hiding it
     # within the same startup call before users can see it.
     QTimer.singleShot(900, ready)

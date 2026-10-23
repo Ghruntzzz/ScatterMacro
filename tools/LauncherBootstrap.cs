@@ -8,9 +8,14 @@ using System.Security.Cryptography;
 using System.Threading;
 using System.Windows.Forms;
 
+[assembly: AssemblyVersion("0.4.0.0")]
+[assembly: AssemblyFileVersion("0.4.0.0")]
+[assembly: AssemblyInformationalVersion("0.4.0")]
+[assembly: AssemblyProduct("ScatterMacro Launcher")]
+
 class LauncherBootstrap
 {
-    const string EmbeddedVersion = "0.3.2";
+    const string EmbeddedVersion = "0.4.0";
 
     [STAThread]
     static int Main(string[] args)

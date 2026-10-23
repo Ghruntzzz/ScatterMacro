@@ -1477,31 +1477,15 @@ def main() -> int:
         raise SystemExit("--screen requires dashboard, settings, or runtime")
     saved_theme = read_dashboard_values()
     apply_theme_palette(saved_theme["primary_color"], saved_theme["accent_color"])
-    window = window_type()
-    render_path: Path | None = None
-    unit_manager_render = False
-    if "--render-preview" in sys.argv:
-        index = sys.argv.index("--render-preview")
-        if index + 1 >= len(sys.argv):
-            raise SystemExit("--render-preview requires an output path")
-        render_path = Path(sys.argv[index + 1]).resolve()
-    if "--render-unit-manager" in sys.argv:
-        unit_manager_render = True
-    if "--preview" in sys.argv:
-        window.setWindowFlag(Qt.WindowStaysOnTopHint, True)
-    window.show()
-    if render_path:
-        def capture_preview() -> None:
-            render_path.parent.mkdir(parents=True, exist_ok=True)
-            if unit_manager_render and isinstance(window, RuntimeWindow):
-                window.unit_manager.grab().save(str(render_path))
-            else:
-                window.grab().save(str(render_path))
-            app.quit()
-
-        QTimer.singleShot(250, capture_preview)
-    if "--preview" in sys.argv:
-        QTimer.singleShot(30000, app.quit)
+    from ui.license_gate import open_gate
+    from ui.launcher import STYLE
+    app.setStyleSheet(STYLE)
+    def launch_verified():
+        app.setStyleSheet('')
+        window = window_type()
+        window.show()
+        return window
+    open_gate(app, launch_verified, ASSETS / 'scattermacro.ico')
     return app.exec()
 
 

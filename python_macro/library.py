@@ -10,11 +10,12 @@ import tempfile
 import urllib.request
 import zipfile
 
-VERSION = "0.3.2"
-UPDATE_URL = "https://raw.githubusercontent.com/Ghruntz/ScatterMacro/main/launcher-update.json"
+VERSION = "0.4.0"
+UPDATE_URL = "https://scatter-macro.shopscatter.workers.dev/v2/catalog"
 
-CATALOG_URL = "https://raw.githubusercontent.com/Ghruntz/ScatterMacro/main/catalog.json"
+CATALOG_URL = "https://scatter-macro.shopscatter.workers.dev/v2/catalog"
 DOWNLOAD_PREFIX = "https://github.com/Ghruntz/ScatterMacro/releases/download/"
+CLOUDFLARE_PREFIX = "https://scatter-macro.shopscatter.workers.dev/download/packages/"
 
 
 def library_root():
@@ -59,7 +60,7 @@ def validate_catalog(catalog):
 
 def validate_release(release):
     version_tuple(release["version"])
-    if not release["url"].startswith(DOWNLOAD_PREFIX) or not re.fullmatch(r"[a-fA-F0-9]{64}", release["sha256"]):
+    if not release["url"].startswith((DOWNLOAD_PREFIX, CLOUDFLARE_PREFIX)) or not re.fullmatch(r"[a-fA-F0-9]{64}", release["sha256"]):
         raise ValueError("Invalid release source or checksum")
 
 
@@ -191,12 +192,12 @@ class Library:
 
     def download_install(self, macro):
         url = macro["url"]
-        if not url.startswith(DOWNLOAD_PREFIX):
-            raise ValueError("Package must come from the ScatterMacro repository")
+        from python_macro.licensing import package_request, NoRedirect
+        request = package_request(url)
         self.root.mkdir(parents=True, exist_ok=True)
         with tempfile.TemporaryDirectory(prefix=".download-", dir=self.root) as folder:
             archive = Path(folder) / "package.zip"
-            with urllib.request.urlopen(url, timeout=30) as response, archive.open("wb") as output:
+            with urllib.request.build_opener(NoRedirect()).open(request, timeout=30) as response, archive.open("wb") as output:
                 total = 0
                 while block := response.read(1024 * 1024):
                     total += len(block)

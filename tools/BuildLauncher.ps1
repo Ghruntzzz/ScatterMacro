@@ -3,7 +3,7 @@ $root = Split-Path -Parent $PSScriptRoot
 $python = (Get-Command python -ErrorAction Stop).Source
 Push-Location $root
 try {
-    & $python -m PyInstaller --noconfirm --clean --onedir --windowed --name ScatterLauncher --icon assets/scattermacro.ico --add-data 'assets;assets' --add-data 'catalog.json;.' main.py
+    & $python -m PyInstaller --noconfirm --clean --onedir --windowed --name ScatterLauncher --version-file tools/launcher-version.txt --icon assets/scattermacro.ico --add-data 'assets;assets' --add-data 'catalog.json;.' main.py
     if ($LASTEXITCODE -ne 0) { throw 'Launcher build failed' }
     # The bootloader searches _internal first. Python's older VC runtime must
     # not win over the runtime shipped with this exact Qt distribution.
@@ -17,8 +17,8 @@ try {
     $icu = Join-Path $root 'dist\ScatterLauncher\_internal\icuuc.dll'
     if (Test-Path -LiteralPath $icu) { Remove-Item -LiteralPath $icu }
     & (Join-Path $PSScriptRoot 'TestLauncherBuild.ps1')
-    Compress-Archive -Path dist/ScatterLauncher -DestinationPath dist/ScatterLauncher-0.3.2-windows.zip -Force
-    $archive = Join-Path $root 'dist\ScatterLauncher-0.3.2-windows.zip'
+    Compress-Archive -Path dist/ScatterLauncher -DestinationPath dist/ScatterLauncher-0.4.0-windows.zip -Force
+    $archive = Join-Path $root 'dist\ScatterLauncher-0.4.0-windows.zip'
     $hashFile = Join-Path $root 'dist\payload.sha256'
     [IO.File]::WriteAllText($hashFile, (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant())
     $compiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'

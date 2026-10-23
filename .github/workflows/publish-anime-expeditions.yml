@@ -4,41 +4,19 @@ on:
   push:
     branches: [main]
     paths:
-      - ui/unit_manager.py
-      - ui/dashboard.py
-      - ui/story_navigation.py
-      - ui/path_recorder.py
-      - assets/change-gamemode.png
-      - assets/view-party.png
-      - tests/test_challenges.py
-      - tests/test_pathing.py
+      - ui/**
       - python_macro/**
-      - assets/play-button-template.png
-      - assets/start-button-template.png
-      - assets/story-button-template.png
-      - assets/chat-open.png
-      - assets/chat-closed.png
-      - assets/start-game-template.png
-      - assets/yen-template.png
-      - assets/unit-close.png
-      - assets/unit-auto-upgrade.png
-      - tests/test_story.py
-      - tests/test_act_labels.py
-      - tests/test_python_vision.py
+      - assets/**
+      - anime_main.py
       - tools/BuildAnimeExpeditions.ps1
       - tools/PackageMacro.py
-      - tests/test_unit_manager.py
-      - tests/test_story.py
-      - tests/test_input.py
-      - tests/test_dashboard_setup.py
-      - tests/test_roblox_selection.py
-      - tests/test_deployment.py
-      - anime_main.py
+      - tools/PublishCloudflare.py
       - .github/workflows/publish-anime-expeditions.yml
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+  id-token: write
 
 concurrency:
   group: scattermacro-publish
@@ -59,57 +37,8 @@ jobs:
           QT_QPA_PLATFORM: offscreen
         run: python -m unittest discover -s tests
       - name: Build Windows macro and validate installer
+      # Publishing is restricted to this main-branch workflow by GitHub OIDC.
         shell: pwsh
         run: ./tools/BuildAnimeExpeditions.ps1
-      - name: Upload tested Windows build
-        uses: actions/upload-artifact@v4
-        with:
-          name: AnimeExpeditions-0.1.64-windows
-          path: dist/AnimeExpeditions-0.1.64-windows.zip
-          if-no-files-found: error
-          retention-days: 7
-      - name: Publish and verify macro archive
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $version = '0.1.64'
-          $tag = "anime-expeditions-v$version"
-          $name = "AnimeExpeditions-$version-windows.zip"
-          $archive = "dist/$name"
-          if (!(Test-Path $archive)) { throw "Missing macro ZIP: $archive" }
-          gh release create $tag $archive --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Anime Expeditions $version - Boss Rush In-Match Startup" --notes "Boss Rush checks District 7 match details before lobby navigation, allowing startup from the six-gate starting area. After each gate entrance it detects Start Game by image or exact text, clicks it and confirms dismissal before indexes. Preserves existing in-match checks in other modes. This does not infer the current gate when resuming midway through a run. 301 tests passed; live gameplay validation remains required."
-          if ($LASTEXITCODE -ne 0) { throw 'Macro release upload failed' }
-          New-Item -ItemType Directory -Force 'dist/verified' | Out-Null
-          gh release download $tag --repo $env:GITHUB_REPOSITORY --pattern $name --dir 'dist/verified'
-          if ($LASTEXITCODE -ne 0) { throw 'Macro release download failed' }
-          $sha256 = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
-          $published = (Get-FileHash "dist/verified/$name" -Algorithm SHA256).Hash.ToLowerInvariant()
-          if ($sha256 -ne $published) { throw 'Published macro checksum mismatch' }
-      - name: Publish to launcher Updates tab
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $version = '0.1.64'
-          $archive = "dist/AnimeExpeditions-$version-windows.zip"
-          $sha256 = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
-          $url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/anime-expeditions-v$version/AnimeExpeditions-$version-windows.zip"
-          # Fetch the newest main branch, including any independently published launcher feed.
-          git fetch origin main
-          git reset --hard origin/main
-          $catalog = Get-Content catalog.json -Raw | ConvertFrom-Json
-          $macro = @($catalog.macros | Where-Object { $_.id -eq 'anime-expeditions' })
-          if ($macro.Count -ne 1) { throw 'Anime Expeditions catalog entry missing or duplicated' }
-          $macro[0].version = $version
-          $macro[0].url = $url
-          $macro[0].sha256 = $sha256
-          $macro[0].description = "Boss Rush in-match startup from the six-gate starting area, built-in gate routes and verified Start Game before indexes."
-          $catalog | ConvertTo-Json -Depth 20 | Set-Content catalog.json -Encoding utf8
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add catalog.json
-          git commit -m "Publish verified Anime Expeditions $version in unified updates"
-          if ($LASTEXITCODE -ne 0) { throw 'Could not commit macro update feed' }
-          git push origin HEAD:main
-          if ($LASTEXITCODE -ne 0) { throw 'Could not publish macro update feed' }
+      - name: Publish verified private macro package
+        run: python tools/PublishCloudflare.py anime-expeditions 0.2.0

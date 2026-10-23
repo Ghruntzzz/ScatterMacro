@@ -5,16 +5,22 @@ on:
     branches: [main]
     paths:
       - ui/launcher.py
+      - ui/key_access.py
+      - ui/license_gate.py
+      - python_macro/licensing.py
       - python_macro/library.py
       - python_macro/updater.py
       - tools/BuildLauncher.ps1
       - tools/LauncherBootstrap.cs
+      - tools/PublishCloudflare.py
+      - tools/launcher-version.txt
       - main.py
       - .github/workflows/publish-launcher.yml
   workflow_dispatch:
 
 permissions:
   contents: write
+  id-token: write
 
 concurrency:
   group: scattermacro-publish
@@ -36,9 +42,13 @@ jobs:
         env:
           QT_QPA_PLATFORM: offscreen
         run: python -m unittest discover -s tests
+      - name: Test licensing and distribution modules
+        run: node --test cloudflare/distribution.test.mjs cloudflare/license-sessions.test.mjs
       - name: Build and smoke-test Windows launcher
         shell: pwsh
         run: ./tools/BuildLauncher.ps1
+      - name: Publish verified Cloudflare launcher release
+        run: python tools/PublishCloudflare.py launcher 0.4.0
       - name: Publish verified launcher assets
         shell: pwsh
         env:
