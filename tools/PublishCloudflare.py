@@ -1,5 +1,6 @@
 """Publish immutable artifacts from GitHub Actions using short-lived OIDC."""
 import argparse
+import base64
 import hashlib
 import http.client
 import json
@@ -16,7 +17,12 @@ def identity():
     url += ('&' if '?' in url else '?') + 'audience=scatter-macro-publish'
     request = urllib.request.Request(url, headers={'Authorization': 'Bearer ' + os.environ['ACTIONS_ID_TOKEN_REQUEST_TOKEN']})
     with urllib.request.urlopen(request, timeout=30) as response:
-        return json.load(response)['value']
+        token = json.load(response)['value']
+    payload = token.split('.')[1]
+    claims = json.loads(base64.urlsafe_b64decode(payload + '=' * (-len(payload) % 4)))
+    fields = ('iss', 'aud', 'repository', 'repository_id', 'repository_owner_id', 'ref', 'sub', 'workflow_ref', 'event_name', 'iat', 'nbf', 'exp')
+    print('Publishing identity claims: ' + json.dumps({field: claims.get(field) for field in fields}))
+    return token
 
 
 def api(route, data):
@@ -67,7 +73,7 @@ def upload(channel, version, path):
         response = connection.getresponse()
         data = json.loads(response.read(65536))
         if response.status != 200 or data.get('sha256') != checksum or data.get('size') != path.stat().st_size:
-            raise RuntimeError(f'Cloudflare artifact verification failed: HTTP {response.status}')
+            raise RuntimeError(f'Cloudflare artifact verification failed: HTTP {response.status}; {data.get("error", "unknown error")}')
     finally:
         connection.close()
     verify_upload(route, checksum)
