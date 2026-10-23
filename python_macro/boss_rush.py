@@ -81,12 +81,26 @@ class BossRushFlow(ChallengeFlow):
             raise RuntimeError(f'Record Gate {number} before starting Boss Rush.')
         self.log(f'Navigating to Gate {number}.')
         replay_path(route['path'],self.client,self.stop)
-        from python_macro.story_verified import click_and_confirm
-        def enter_key(x,y,shape):
-            return self.client.hold_key('E',.1)
-        return click_and_confirm('Gate entrance',self.enter,
-                                 lambda a,b:self.game_start_target(a) is not None,
-                                 self.capture,enter_key,self.stop,self.log,timeout=30)
+        deadline=time.monotonic()+30
+        retry_at=0
+        attempts=0
+        while not self.stop.is_set() and time.monotonic()<deadline:
+            frame=self.capture()
+            # Start can arrive after E disappears during a late transition.
+            if self.game_start_target(frame) is not None:
+                return True
+            if time.monotonic()>=retry_at and self.enter(frame) is not None:
+                if attempts>=3:
+                    raise RuntimeError('Gate entrance did not respond.')
+                if self.client.hold_key('E',.1) is False:
+                    return False
+                attempts+=1
+                retry_at=time.monotonic()+1.5
+            if self.stop.wait(.1):
+                return False
+        if self.stop.is_set():
+            return False
+        raise RuntimeError('Timed out waiting for the gate Start Game button.')
 
     def decision_target(self,frame,gate):
         if self.choice(frame) is None:

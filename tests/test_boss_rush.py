@@ -33,6 +33,15 @@ class BossRushTests(unittest.TestCase):
         flow.reader.read.return_value=[label('Start Game',20,50)]
         self.assertEqual(flow.game_start_target(np.zeros((200,400,3),np.uint8)),(100,58))
 
+    def test_gate_detects_late_start_after_enter_prompt_disappears(self):
+        flow=self.flow()
+        flow.routes.load.return_value={'path':{}}
+        flow.game_start_target=Mock(side_effect=[None,None,(500,110)])
+        flow.enter=Mock(side_effect=[(1,1),None])
+        with patch('python_macro.boss_rush.replay_path'):
+            self.assertTrue(flow.enter_gate(1))
+        flow.client.hold_key.assert_called_once_with('E',.1)
+
     def test_bundled_gate_routes_load_without_user_recordings(self):
         defaults=Path(__file__).resolve().parents[1]/'assets'/'boss-rush-gate-routes'
         with tempfile.TemporaryDirectory() as folder:

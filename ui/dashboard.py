@@ -392,24 +392,10 @@ class DashboardWindow(QWidget):
 
     def _header(self) -> None:
         header = self._card(18, 16, 1164, 108, 9)
-        logo_card = self._card(20, 20, 92, 84, 7)
-        logo_card.setParent(header)
-        logo_card.move(20, 20)
-        logo = QLabel(logo_card)
-        logo.setGeometry(13, 12, 66, 60)
-        logo.setPixmap(QPixmap(str(ASSETS / "sm-logo.png")))
-        logo.setScaledContents(True)
-        self._label(header, "SCATTERMACRO", 132, 28, 180, 16, f"color: {WINE}; font: 700 8px 'Bahnschrift';")
-        self._label(header, "ANIME EXPEDITION", 132, 46, 470, 42, f"color: {TEXT}; font: 700 28px 'Bahnschrift';")
+        self._label(header, "SCATTERMACRO", 24, 28, 180, 16, f"color: {WINE}; font: 700 8px 'Bahnschrift';")
+        self._label(header, "ANIME EXPEDITION", 24, 46, 470, 42, f"color: {TEXT}; font: 700 28px 'Bahnschrift';")
         self._label(header, "\u25cf", 783, 30, 16, 18, "color: #47e887; font: 700 14px 'Segoe UI';")
         self._label(header, "SETUP MODE", 803, 30, 180, 18, f"color: {TEXT}; font: 700 9px 'Bahnschrift';")
-        discord_card = self._card(1040, 20, 90, 84, 7)
-        discord_card.setParent(header)
-        discord_card.move(1040, 20)
-        discord = QLabel(discord_card)
-        discord.setGeometry(10, 13, 70, 58)
-        discord.setPixmap(QPixmap(str(ASSETS / "discord-logo.png")))
-        discord.setScaledContents(True)
 
     def _route(self) -> None:
         route = self._card(18, 140, 1164, 52, 7)

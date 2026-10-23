@@ -2,7 +2,7 @@
 import {HttpError, json, body, limit} from './core.mjs';
 
 export const ORIGIN = 'https://scatter-macro.shopscatter.workers.dev';
-export const REPOSITORY = 'Ghruntz/ScatterMacro';
+export const REPOSITORY = 'Ghruntzzz/ScatterMacro';
 const ISSUER = 'https://token.actions.githubusercontent.com';
 const AUDIENCE = 'scatter-macro-publish';
 const CHANNELS = ['launcher', 'anime-expeditions'];
@@ -18,9 +18,9 @@ function decode(value) {
 export function validateClaims(claims, now = Date.now() / 1000) {
   const workflows = CHANNELS.map(c => `${REPOSITORY}/.github/workflows/publish-${c}.yml@refs/heads/main`);
   if (claims.iss !== ISSUER || claims.aud !== AUDIENCE ||
-      claims.repository_id !== '1422708794' || claims.repository_owner_id !== '200452395' ||
+      claims.repository_id !== '1431454277' || claims.repository_owner_id !== '347072376' ||
       claims.repository !== REPOSITORY || claims.ref !== 'refs/heads/main' ||
-      claims.sub !== 'repo:Ghruntz@200452395/ScatterMacro@1422708794:ref:refs/heads/main' ||
+      claims.sub !== 'repo:Ghruntz@347072376/ScatterMacro@1431454277:ref:refs/heads/main' ||
       !workflows.includes(claims.workflow_ref) ||
       !['push', 'workflow_dispatch'].includes(claims.event_name) ||
       !Number.isFinite(claims.exp) || claims.exp <= now ||

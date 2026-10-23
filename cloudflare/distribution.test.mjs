@@ -55,17 +55,17 @@ test('publication saves verified manifest before cleanup; failed verification ne
 
 const claims = {
   iss: 'https://token.actions.githubusercontent.com', aud: 'scatter-macro-publish',
-  repository: 'Ghruntz/ScatterMacro', repository_id: '1422708794', repository_owner_id: '200452395',
-  ref: 'refs/heads/main', sub: 'repo:Ghruntz@200452395/ScatterMacro@1422708794:ref:refs/heads/main',
-  workflow_ref: 'Ghruntz/ScatterMacro/.github/workflows/publish-launcher.yml@refs/heads/main',
+  repository: 'Ghruntzzz/ScatterMacro', repository_id: '1431454277', repository_owner_id: '347072376',
+  ref: 'refs/heads/main', sub: 'repo:Ghruntz@347072376/ScatterMacro@1431454277:ref:refs/heads/main',
+  workflow_ref: 'Ghruntzzz/ScatterMacro/.github/workflows/publish-launcher.yml@refs/heads/main',
   event_name: 'push', iat: 1000, nbf: 1000, exp: 1300,
 };
 
 test('only the designated repository, branch and release workflows may publish', () => {
   assert.equal(validateClaims(claims, 1100), 'launcher');
   for (const [field, value] of Object.entries({aud: 'other', repository_id: '1', repository_owner_id: '2',
-    repository: 'attacker/ScatterMacro', ref: 'refs/heads/dev', sub: 'repo:Ghruntz/ScatterMacro:pull_request',
-    workflow_ref: 'Ghruntz/ScatterMacro/.github/workflows/other.yml@refs/heads/main', event_name: 'pull_request',
+    repository: 'attacker/ScatterMacro', ref: 'refs/heads/dev', sub: 'repo:Ghruntzzz/ScatterMacro:pull_request',
+    workflow_ref: 'Ghruntzzz/ScatterMacro/.github/workflows/other.yml@refs/heads/main', event_name: 'pull_request',
     exp: 1099, nbf: 2000, iat: 0})) {
     assert.throws(() => validateClaims({...claims, [field]: value}, 1100), undefined, field);
   }

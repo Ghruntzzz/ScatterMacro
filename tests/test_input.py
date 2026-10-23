@@ -17,15 +17,9 @@ from python_macro.input import (
 class ClickTests(unittest.TestCase):
     def test_park_cursor_stays_well_inside_client(self):
         client=self.client()
-        client._validated_point=Mock(return_value=(wintypes.POINT(900,680),None))
-        client._move=Mock()
-        client._send_mouse=Mock()
-        client._check_cursor=Mock()
+        client._prepare_click_target=Mock(return_value=wintypes.POINT(900,680))
         self.assertTrue(client.park_cursor((800,1000,3)))
-        client._validated_point.assert_called_once_with(900,680,(800,1000,3))
-        client._move.assert_called_once_with(900,680)
-        client._send_mouse.assert_called_once_with(MOUSE_MOVE)
-        client._check_cursor.assert_called_once_with(900,680)
+        client._prepare_click_target.assert_called_once_with(900,680,(800,1000,3),settle_seconds=.06)
 
     def test_preclick_delay_keeps_brief_hover_within_fast_budget(self):
         preparation = (PRECLICK_HOVER_SECONDS + PRECLICK_SETTLE_SECONDS
@@ -111,12 +105,16 @@ class ClickTests(unittest.TestCase):
         self.assertEqual(events[-2:], [("wait", CLICK_HOLD_SECONDS),
                                        ("input", MOUSE_LEFT_UP)])
 
-    def test_unit_click_uses_short_timing_without_menu_wiggles(self):
+    def test_unit_click_hovers_wiggles_then_presses(self):
         client = self.client()
-        self.assertTrue(client.unit_click(20, 30, (80, 100, 4)))
-        self.assertEqual([c.args[0] for c in client.stop.wait.call_args_list], [.01, .04])
-        self.assertEqual([c.args[1]._obj.data.mi.dwFlags for c in client.user.SendInput.call_args_list],
-                         [MOUSE_MOVE, MOUSE_LEFT_DOWN, MOUSE_LEFT_UP])
+        events=[]
+        client.user.SendInput.side_effect=lambda n,p,size:(events.append(
+            (p._obj.data.mi.dwFlags,p._obj.data.mi.dx)) or 1)
+        self.assertTrue(client.unit_click(20,30,(80,100,4)))
+        self.assertIn((MOUSE_MOVE,1),events)
+        self.assertIn((MOUSE_MOVE,-1),events)
+        self.assertIn(.12,[c.args[0] for c in client.stop.wait.call_args_list])
+        self.assertEqual(events[-2:],[(MOUSE_LEFT_DOWN,0),(MOUSE_LEFT_UP,0)])
 
     def test_unit_click_stops_before_pressing(self):
         client = self.client()
