@@ -56,7 +56,7 @@ test('publication saves verified manifest before cleanup; failed verification ne
 const claims = {
   iss: 'https://token.actions.githubusercontent.com', aud: 'scatter-macro-publish',
   repository: 'Ghruntzzz/ScatterMacro', repository_id: '1431454277', repository_owner_id: '347072376',
-  ref: 'refs/heads/main', sub: 'repo:Ghruntz@347072376/ScatterMacro@1431454277:ref:refs/heads/main',
+  ref: 'refs/heads/main', sub: 'repo:Ghruntzzz@347072376/ScatterMacro@1431454277:ref:refs/heads/main',
   workflow_ref: 'Ghruntzzz/ScatterMacro/.github/workflows/publish-launcher.yml@refs/heads/main',
   event_name: 'push', iat: 1000, nbf: 1000, exp: 1300,
 };
