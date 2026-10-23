@@ -17,8 +17,8 @@ try {
     $icu = Join-Path $root 'dist\ScatterLauncher\_internal\icuuc.dll'
     if (Test-Path -LiteralPath $icu) { Remove-Item -LiteralPath $icu }
     & (Join-Path $PSScriptRoot 'TestLauncherBuild.ps1')
-    Compress-Archive -Path dist/ScatterLauncher -DestinationPath dist/ScatterLauncher-0.4.1-windows.zip -Force
-    $archive = Join-Path $root 'dist\ScatterLauncher-0.4.1-windows.zip'
+    Compress-Archive -Path dist/ScatterLauncher -DestinationPath dist/ScatterLauncher-0.4.2-windows.zip -Force
+    $archive = Join-Path $root 'dist\ScatterLauncher-0.4.2-windows.zip'
     $hashFile = Join-Path $root 'dist\payload.sha256'
     [IO.File]::WriteAllText($hashFile, (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant())
     $compiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'

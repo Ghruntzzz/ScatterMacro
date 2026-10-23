@@ -371,8 +371,7 @@ def main():
         window.check_updates()
         return window
     def ready():
-        gate = open_gate(app, launch_verified, ROOT / 'assets/scattermacro.ico')
-        splash.finish(gate)
+        open_gate(app, launch_verified, ROOT / 'assets/scattermacro.ico', loading=splash)
     # Let the event loop paint and animate the splash, rather than hiding it
     # within the same startup call before users can see it.
     QTimer.singleShot(900, ready)

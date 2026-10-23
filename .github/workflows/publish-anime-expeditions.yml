@@ -41,4 +41,4 @@ jobs:
         shell: pwsh
         run: ./tools/BuildAnimeExpeditions.ps1
       - name: Publish verified private macro package
-        run: python tools/PublishCloudflare.py anime-expeditions 0.2.0
+        run: python tools/PublishCloudflare.py anime-expeditions 0.2.1

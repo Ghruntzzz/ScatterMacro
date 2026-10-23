@@ -50,7 +50,7 @@ jobs:
         shell: pwsh
         run: ./tools/BuildLauncher.ps1
       - name: Publish verified Cloudflare launcher release
-        run: python tools/PublishCloudflare.py launcher 0.4.1
+        run: python tools/PublishCloudflare.py launcher 0.4.2
       - name: Publish verified launcher assets
         shell: pwsh
         env:

@@ -7,9 +7,13 @@ from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QMessageBox
 from python_macro.licensing import check_session, restore_access
 from ui.key_access import KeyAccess
+from ui.loading import LoadingScreen
 
 
-def open_gate(app, factory, icon_path):
+def open_gate(app, factory, icon_path, loading=None):
+    loading = loading or LoadingScreen(icon_path)
+    app.access_loading = loading
+    loading.show()
     gate = KeyAccess(icon_path)
     app.access_gate = gate
     executor = ThreadPoolExecutor(max_workers=1)
@@ -22,6 +26,7 @@ def open_gate(app, factory, icon_path):
         nonlocal active
         app.license_session = session
         app.licensed_window = factory()
+        loading.close()
         active = True
         heartbeat.start()
 
@@ -59,6 +64,8 @@ def open_gate(app, factory, icon_path):
                 gate.unlock.setEnabled(True)
                 gate.key.setEnabled(True)
                 gate.status.setText('Enter your key to continue.')
+                gate.show()
+                loading.close()
         else:
             if not active:
                 unlocked(session)
@@ -80,8 +87,9 @@ def open_gate(app, factory, icon_path):
     polling.start()
     app.aboutToQuit.connect(lambda: executor.shutdown(wait=False, cancel_futures=True))
     gate.unlocked.connect(unlocked)
-    gate.show()
     if '--render-preview' in sys.argv:
+        gate.show()
+        loading.close()
         # Previews render only the locked screen; there is no activation bypass.
         path = Path(sys.argv[sys.argv.index('--render-preview') + 1]).resolve()
         path.parent.mkdir(parents=True, exist_ok=True)

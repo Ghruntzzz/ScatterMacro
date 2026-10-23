@@ -77,7 +77,7 @@ export async function storedLauncher(env) {
   if (!manifest || !await releaseManifest(env, 'anime-expeditions')) return null;
   return {
     version: manifest.version, platform: 'windows', download_url: manifest.installer.url,
-    published_at: manifest.published_at, notes: 'Standalone launcher; runtime files are installed in LocalAppData.',
+    published_at: manifest.published_at, notes: 'ScatterMacro launcher for Windows.',
     file_name: 'ScatterMacro.exe', size: manifest.installer.size, release_url: ORIGIN + '/downloads', automatic: true,
   };
 }

@@ -13,7 +13,7 @@ export function selectLauncher(releases, repo) {
     return {
       version: release.tag_name.replace(/^launcher[-_]v?/i, ''), platform: 'windows',
       download_url: asset.browser_download_url, published_at: release.published_at,
-      notes: 'Standalone launcher. Runtime files are installed in LocalAppData.',
+      notes: 'ScatterMacro launcher for Windows.',
       file_name: asset.name, size: asset.size, release_url: release.html_url, automatic: true,
     };
   }

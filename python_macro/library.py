@@ -10,7 +10,7 @@ import tempfile
 import urllib.request
 import zipfile
 
-VERSION = "0.4.1"
+VERSION = "0.4.2"
 UPDATE_URL = "https://scatter-macro.shopscatter.workers.dev/v2/catalog"
 
 CATALOG_URL = "https://scatter-macro.shopscatter.workers.dev/v2/catalog"
