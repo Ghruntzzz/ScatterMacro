@@ -1,0 +1,44 @@
+name: Build and publish Anime Expeditions
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ui/**
+      - python_macro/**
+      - assets/**
+      - anime_main.py
+      - tools/BuildAnimeExpeditions.ps1
+      - tools/PackageMacro.py
+      - tools/PublishCloudflare.py
+      - .github/workflows/publish-anime-expeditions.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: scattermacro-publish-anime-expeditions
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: python -m pip install -r ui/requirements-python.txt
+      - name: Test macro code
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -m unittest discover -s tests
+      - name: Build Windows macro and validate installer
+      # Publishing is restricted to this main-branch workflow by GitHub OIDC.
+        shell: pwsh
+        run: ./tools/BuildAnimeExpeditions.ps1
+      - name: Publish verified private macro package
+        run: python tools/PublishCloudflare.py anime-expeditions 0.2.3

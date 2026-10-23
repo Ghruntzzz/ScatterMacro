@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "map": "East Town",
+  "path": {"version": 1, "mode": "Keyboard", "duration": 2.047,
+    "events": [[0.281,"key","S",1],[0.531,"key","S",0],[0.859,"key","D",1],[1.578,"key","D",0]]}
+}

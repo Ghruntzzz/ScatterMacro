@@ -1,0 +1,172 @@
+"""Expedition navigation and serialized handling of recurring match controls."""
+import re
+import time
+
+from python_macro.challenges import ChallengeFlow
+from python_macro.story import normalize
+from python_macro.story_verified import changed_screen
+from python_macro.unit_actions import Icon
+from python_macro.vision import StartButtonLocator
+
+MAPS=('School Grounds','Flower Forest','Rose Kingdom','East Town')
+
+
+class ExpeditionFlow(ChallengeFlow):
+    def __init__(self,capture,client,reader,stop,log,assets,map_name,difficulty,priority=None):
+        if map_name not in MAPS or str(difficulty) not in ('1','2','3'):
+            raise ValueError('Choose an Expedition map and difficulty 1-3.')
+        super().__init__(capture,client,reader,stop,log,assets,{})
+        self.map_name,self.difficulty=map_name,int(difficulty)
+        self.expedition=Icon(assets/'expedition-button.png',threshold=.88)
+        self.map_card=Icon(assets/('expedition-map-'+map_name.replace(' ','_')+'.png'),threshold=.85)
+        self.plus=Icon(assets/'expedition-plus.png',threshold=.9)
+        self.continue_button=Icon(assets/'expedition-continue.png',threshold=.9)
+        self.second_continue=Icon(assets/'expedition-continue-second.png',threshold=.9)
+        self.confirm=Icon(assets/'expedition-confirm.png',threshold=.9)
+        self.settings=Icon(assets/'expedition-settings.png',threshold=.92)
+        self.teleport_row=Icon(assets/'expedition-teleport-row.png',threshold=.88)
+        self.teleport=Icon(assets/'expedition-teleport.png',threshold=.92)
+        self.close_icon=Icon(assets/'unit-close.png',threshold=.9)
+        self.game_start=StartButtonLocator(assets/'start-game-template.png')
+        self.last_service=0
+        from python_macro.expedition_cards import CardSelector
+        self.cards=CardSelector(assets,reader,client,capture,stop,log,priority)
+        self.card_run=None
+        self.continue_pending=None
+        self.continue_clicked=0
+
+    def click_and_park(self,point,frame):
+        if self.client.direct_click(*point,frame.shape) is False:
+            raise InterruptedError()
+        self.client.park_cursor(frame.shape)
+
+    def continue_target(self,frame,hit):
+        from python_macro.end_screen import center
+        self.text('Continue')(frame)
+        x,y,w,h=hit
+        options=[center(m) for m in self.ocr.matches if normalize(m.text)=='continue'
+                 and abs(center(m)[0]-x)<=w/2 and abs(center(m)[1]-y)<=h/2]
+        return options[0] if len(options)==1 else None
+
+    def map_target(self,frame):
+        hit=self.map_card(frame)
+        if hit is None:
+            return None
+        x,y,w,h=hit
+        self.ocr.unique(frame,lambda text:normalize(text)==normalize(self.map_name))
+        from python_macro.end_screen import center
+        matches=[center(m) for m in self.ocr.matches
+                 if normalize(m.text)==normalize(self.map_name)
+                 and x-w/2<=center(m)[0]<=x+w/2
+                 and y<=center(m)[1]<=y+h/2]
+        return matches[0] if len(matches)==1 else None
+
+    def difficulty_reading(self,frame):
+        point=self.ocr.unique(frame,lambda text:re.fullmatch(r'difficulty[123]',normalize(text)) is not None)
+        if point is None:
+            return None
+        match=next(m for m in self.ocr.matches if re.fullmatch(r'difficulty[123]',normalize(m.text)))
+        return int(normalize(match.text)[-1]),point
+
+    def set_difficulty(self):
+        from python_macro.story_verified import click_once
+        initial=self.difficulty_reading(self.capture())
+        if initial is None or initial[0]!=1:
+            raise RuntimeError('Expected default Difficulty 1 before applying the selected difficulty.')
+        for _ in range(self.difficulty-1):
+            def click(x,y,shape):
+                if self.client.direct_click(x,y,shape) is False:
+                    return False
+                return self.client.park_cursor(shape)
+            if not click_once('Difficulty Plus',self.plus,self.capture,click,self.stop):
+                return False
+            if self.stop.wait(.12):
+                return False
+        for _ in range(12):
+            reading=self.difficulty_reading(self.capture())
+            if reading is not None and reading[0]==self.difficulty:
+                return True
+            if self.stop.wait(.1):
+                return False
+        raise RuntimeError('Could not confirm the selected difficulty after the fixed Plus clicks.')
+
+    def navigate(self,find_play):
+        expedition=lambda frame:self.expedition(frame) or self.text('Expedition','Expeditions')(frame)
+        if not self.press('Play',find_play,lambda after,before:expedition(after) is not None):
+            return False
+        if not self.press('Expedition',expedition,
+                          lambda after,before:self.map_target(after) is not None):
+            return False
+        if not self.press(self.map_name,self.map_target,
+                          lambda after,before:self.difficulty_reading(after) is not None):
+            return False
+        if not self.set_difficulty():
+            return False
+        if not self.press('Select Stage',self.text('Select Stage'),
+                          lambda after,before:self.start(after) is not None):
+            return False
+        return self.press('Start',self.start,
+                          lambda after,before:self.start(after) is None and changed_screen(before,after))
+
+    def service(self,indexer):
+        # Inputs stay on the unit worker thread, never race background monitors.
+        if indexer is not self.card_run:
+            self.card_run=indexer
+            self.cards.reset()
+            self.continue_pending=None
+        now=time.monotonic()
+        if now-self.last_service<.25 or self.stop.is_set():
+            return
+        self.last_service=now
+        frame=self.capture()
+        if self.cards.handle(frame):
+            active=getattr(indexer,'active_index',None)
+            point=indexer.placed.get(active) if active is not None else None
+            if point is not None and not self.stop.is_set():
+                self.client.direct_click(*point,self.capture().shape)
+            return
+        hit=self.game_start(frame)
+        if hit is not None:
+            self.click_and_park(hit[:2],frame)
+            return
+        if not indexer.all_done():
+            return
+        second=self.second_continue(frame)
+        first=self.continue_button(frame) if second is None else None
+        kind='second' if second is not None else 'first'
+        hit=second or first
+        if hit is None:
+            self.continue_pending=None
+            return
+        if self.continue_pending==kind and now-self.continue_clicked<2:
+            return
+        target=self.continue_target(frame,hit)
+        if target is not None and not self.stop.is_set():
+            self.click_and_park(target,frame)
+            self.continue_pending=kind
+            self.continue_clicked=now
+
+    def return_to_payload(self):
+        if not self.press('Settings',self.settings,
+                          lambda after,before:self.text('Settings')(after) is not None):
+            return False
+        def teleport_target(frame):
+            row=self.teleport_row(frame)
+            if row is None:
+                return None
+            x,y,w,h=row
+            left=max(0,int(x+w*.25))
+            top=max(0,int(y-h/2))
+            crop=frame[top:int(y+h/2),left:int(x+w/2)]
+            hit=self.teleport(crop) if crop.size else None
+            return (left+hit[0],top+hit[1]) if hit is not None else None
+        from python_macro.story_verified import click_once
+        if not click_once('Teleport To Spawn',teleport_target,self.capture,self.client.direct_click,self.stop):
+            return False
+        def close_settings(frame):
+            if self.text('Settings')(frame) is None:
+                return None
+            hit=self.close_icon(frame)
+            return hit[:2] if hit is not None else None
+        return self.press('Close Settings',close_settings,
+                          lambda after,before:self.text('Settings')(after) is None)

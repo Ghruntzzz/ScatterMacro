@@ -1,0 +1,98 @@
+name: Build and publish launcher
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ui/launcher.py
+      - ui/key_access.py
+      - ui/license_gate.py
+      - python_macro/licensing.py
+      - python_macro/library.py
+      - python_macro/updater.py
+      - tools/BuildLauncher.ps1
+      - tools/LauncherBootstrap.cs
+      - tools/PublishCloudflare.py
+      - tools/launcher-version.txt
+      - main.py
+      - .github/workflows/publish-launcher.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: scattermacro-publish-launcher
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-2022
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: python -m pip install -r ui/requirements-python.txt
+      - name: Verify publishing identity metadata
+        run: python -c "from tools.PublishCloudflare import identity; identity()"
+      - name: Run unit tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -m unittest discover -s tests
+      - name: Test licensing and distribution modules
+        run: node --test cloudflare/distribution.test.mjs cloudflare/license-sessions.test.mjs
+      - name: Build and smoke-test Windows launcher
+        shell: pwsh
+        run: ./tools/BuildLauncher.ps1
+      - name: Publish verified Cloudflare launcher release
+        run: python tools/PublishCloudflare.py launcher 0.4.2
+      - name: Publish verified launcher assets
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = (python -c "from python_macro.library import VERSION; print(VERSION)").Trim()
+          $tag = "launcher-v$version"
+          $archive = "dist/ScatterLauncher-$version-windows.zip"
+          if (!(Test-Path $archive) -or !(Test-Path 'dist/ScatterMacro.exe')) { throw 'Missing packaged launcher assets.' }
+          gh release create $tag 'dist/ScatterMacro.exe' $archive --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "ScatterMacro $version" --notes "Unified launcher and macro update checks in the Updates tab. Existing per-macro configurations remain untouched."
+          if ($LASTEXITCODE -ne 0) { throw 'Publishing launcher release failed.' }
+          New-Item -ItemType Directory -Force 'dist/release-verification' | Out-Null
+          gh release download $tag --repo $env:GITHUB_REPOSITORY --pattern "ScatterLauncher-$version-windows.zip" --dir 'dist/release-verification'
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot verify uploaded launcher asset.' }
+          $actual = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          $uploaded = (Get-FileHash "dist/release-verification/ScatterLauncher-$version-windows.zip" -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $uploaded) { throw 'Uploaded launcher archive checksum mismatch.' }
+      - name: Update both new and legacy launcher feeds
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = (python -c "from python_macro.library import VERSION; print(VERSION)").Trim()
+          $archive = "dist/ScatterLauncher-$version-windows.zip"
+          $sha256 = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          $url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/launcher-v$version/ScatterLauncher-$version-windows.zip"
+          git pull --ff-only origin main
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot sync current release catalog.' }
+          $catalog = Get-Content catalog.json -Raw | ConvertFrom-Json
+          $catalog.launcher.version = $version
+          $catalog.launcher.url = $url
+          $catalog.launcher.sha256 = $sha256
+          $catalog | ConvertTo-Json -Depth 20 | Set-Content catalog.json -Encoding utf8
+          $legacy = Get-Content launcher-update.json -Raw | ConvertFrom-Json
+          $legacy.version = $version
+          $legacy.url = $url
+          $legacy.sha256 = $sha256
+          $legacy | ConvertTo-Json -Depth 10 | Set-Content launcher-update.json -Encoding utf8
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add catalog.json launcher-update.json
+          git commit -m "Publish verified launcher $version update feeds"
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot commit verified release feeds.' }
+          git push origin HEAD:main
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot push verified release feeds.' }

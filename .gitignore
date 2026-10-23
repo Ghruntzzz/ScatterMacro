@@ -1,0 +1,15 @@
+dashboard_config.ini
+configs/
+unit_configs/
+Scatter Macro/
+licensing-service/.dev.vars
+licensing-service/discord-bot/.env
+dist/
+build/
+ui/__pycache__/
+ui/*.exe
+tools/.ahk2exe/
+__pycache__/
+*.spec
+.venv/
+tests-output/

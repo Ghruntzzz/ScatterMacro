@@ -1,0 +1,201 @@
+{
+  "source": "ScatterMacro-latest.zip: embedded GetExpeditionCardCatalog in ScatterMacro.exe",
+  "priority": [
+    "Economy",
+    "Buff",
+    "DOT",
+    "Followup Attack",
+    "Payload",
+    "Summon",
+    "Elementalist"
+  ],
+  "tier_names": {
+    "1": "Rare",
+    "2": "Epic",
+    "3": "Legendary",
+    "4": "Mythic"
+  },
+  "selection_rule": "Exclude already selected names; prefer category rank, then higher tier; preserve display order on ties.",
+  "cards": [
+    {
+      "name": "Amplifier",
+      "category": "Buff",
+      "tier": 1
+    },
+    {
+      "name": "Extended Reach",
+      "category": "Buff",
+      "tier": 2
+    },
+    {
+      "name": "Razor Focus",
+      "category": "Buff",
+      "tier": 3
+    },
+    {
+      "name": "Yen Hunger",
+      "category": "Economy",
+      "tier": 1
+    },
+    {
+      "name": "Blood Money",
+      "category": "Economy",
+      "tier": 2
+    },
+    {
+      "name": "Bounty Hunter",
+      "category": "Economy",
+      "tier": 3
+    },
+    {
+      "name": "Whetstone Cache",
+      "category": "Economy",
+      "tier": 4
+    },
+    {
+      "name": "Fortified Cargo",
+      "category": "Payload",
+      "tier": 1
+    },
+    {
+      "name": "Overclocked Engine",
+      "category": "Payload",
+      "tier": 2
+    },
+    {
+      "name": "EXP Condenser",
+      "category": "Payload",
+      "tier": 3
+    },
+    {
+      "name": "EXP Collector",
+      "category": "Payload",
+      "tier": 4
+    },
+    {
+      "name": "Storm Mastery",
+      "category": "Elementalist",
+      "tier": 1
+    },
+    {
+      "name": "Flame Mastery",
+      "category": "Elementalist",
+      "tier": 1
+    },
+    {
+      "name": "Gale Mastery",
+      "category": "Elementalist",
+      "tier": 1
+    },
+    {
+      "name": "Gale Penetration",
+      "category": "Elementalist",
+      "tier": 2
+    },
+    {
+      "name": "Neutral Penetration",
+      "category": "Elementalist",
+      "tier": 2
+    },
+    {
+      "name": "Neutral Mastery",
+      "category": "Elementalist",
+      "tier": 1
+    },
+    {
+      "name": "Light Mastery",
+      "category": "Elementalist",
+      "tier": 1
+    },
+    {
+      "name": "Light Penetration",
+      "category": "Elementalist",
+      "tier": 2
+    },
+    {
+      "name": "Hydro Penetration",
+      "category": "Elementalist",
+      "tier": 2
+    },
+    {
+      "name": "Terra Penetration",
+      "category": "Elementalist",
+      "tier": 2
+    },
+    {
+      "name": "Terra Mastery",
+      "category": "Elementalist",
+      "tier": 1
+    },
+    {
+      "name": "Dark Mastery",
+      "category": "Elementalist",
+      "tier": 1
+    },
+    {
+      "name": "Dark Penetration",
+      "category": "Elementalist",
+      "tier": 2
+    },
+    {
+      "name": "Iron Flesh",
+      "category": "Summon",
+      "tier": 1
+    },
+    {
+      "name": "Vital Strikes",
+      "category": "Summon",
+      "tier": 2
+    },
+    {
+      "name": "Martyr's Blast",
+      "category": "Summon",
+      "tier": 3
+    },
+    {
+      "name": "Feral Cruelty",
+      "category": "Summon",
+      "tier": 4
+    },
+    {
+      "name": "Relentless Pursuit",
+      "category": "Followup Attack",
+      "tier": 1
+    },
+    {
+      "name": "Quickened Blade",
+      "category": "Followup Attack",
+      "tier": 2
+    },
+    {
+      "name": "Bat Cavalry",
+      "category": "Followup Attack",
+      "tier": 3
+    },
+    {
+      "name": "Momentum",
+      "category": "Followup Attack",
+      "tier": 4
+    },
+    {
+      "name": "Venomous Edge",
+      "category": "DOT",
+      "tier": 1
+    },
+    {
+      "name": "Lingering Rot",
+      "category": "DOT",
+      "tier": 2
+    },
+    {
+      "name": "Hemorrhage",
+      "category": "DOT",
+      "tier": 3
+    },
+    {
+      "name": "Infectious",
+      "category": "DOT",
+      "tier": 4
+    }
+  ]
+}
