@@ -23,7 +23,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: scattermacro-publish
+  group: scattermacro-publish-launcher
   cancel-in-progress: false
 
 jobs:

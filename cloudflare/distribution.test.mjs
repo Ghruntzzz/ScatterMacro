@@ -5,7 +5,7 @@ import {artifactKey, artifactUrl, compareVersion, distribution, storedLauncher, 
 const claims = {
   iss: 'https://token.actions.githubusercontent.com', aud: 'scatter-macro-publish',
   repository: 'Ghruntz/ScatterMacro', repository_id: '1422708794', repository_owner_id: '200452395',
-  ref: 'refs/heads/main', sub: 'repo:Ghruntz/ScatterMacro:ref:refs/heads/main',
+  ref: 'refs/heads/main', sub: 'repo:Ghruntz@200452395/ScatterMacro@1422708794:ref:refs/heads/main',
   workflow_ref: 'Ghruntz/ScatterMacro/.github/workflows/publish-launcher.yml@refs/heads/main',
   event_name: 'push', iat: 1000, nbf: 1000, exp: 1300,
 };

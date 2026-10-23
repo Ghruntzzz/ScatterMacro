@@ -19,7 +19,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: scattermacro-publish
+  group: scattermacro-publish-anime-expeditions
   cancel-in-progress: false
 
 jobs:

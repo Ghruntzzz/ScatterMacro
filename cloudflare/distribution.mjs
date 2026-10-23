@@ -20,7 +20,7 @@ export function validateClaims(claims, now = Date.now() / 1000) {
   if (claims.iss !== ISSUER || claims.aud !== AUDIENCE ||
       claims.repository_id !== '1422708794' || claims.repository_owner_id !== '200452395' ||
       claims.repository !== REPOSITORY || claims.ref !== 'refs/heads/main' ||
-      claims.sub !== `repo:${REPOSITORY}:ref:refs/heads/main` ||
+      claims.sub !== 'repo:Ghruntz@200452395/ScatterMacro@1422708794:ref:refs/heads/main' ||
       !workflows.includes(claims.workflow_ref) ||
       !['push', 'workflow_dispatch'].includes(claims.event_name) ||
       !Number.isFinite(claims.exp) || claims.exp <= now ||
