@@ -10,6 +10,13 @@ import urllib.parse
 import urllib.request
 
 ORIGIN = 'https://scatter-macro.shopscatter.workers.dev'
+USER_AGENT = 'ScatterMacro-Publisher/1.0'
+
+
+def publisher_request(url, **kwargs):
+    headers = dict(kwargs.pop('headers', {}))
+    headers['User-Agent'] = USER_AGENT
+    return urllib.request.Request(url, headers=headers, **kwargs)
 
 
 def identity():
@@ -26,14 +33,14 @@ def identity():
 
 
 def api(route, data):
-    request = urllib.request.Request(ORIGIN + route, data=json.dumps(data).encode(),
+    request = publisher_request(ORIGIN + route, data=json.dumps(data).encode(),
         headers={'Authorization': 'Bearer ' + identity(), 'Content-Type': 'application/json'})
     with urllib.request.urlopen(request, timeout=180) as response:
         return json.load(response)
 
 
 def verify_upload(route, checksum):
-    request = urllib.request.Request(ORIGIN + route, headers={'Authorization': 'Bearer ' + identity()})
+    request = publisher_request(ORIGIN + route, headers={'Authorization': 'Bearer ' + identity()})
     with urllib.request.urlopen(request, timeout=180) as response:
         actual = hashlib.file_digest(response, 'sha256').hexdigest()
     if actual != checksum:
@@ -52,7 +59,7 @@ def upload(channel, version, path):
             parts = []
             with path.open('rb') as source:
                 while block := source.read(64 * 1024 * 1024):
-                    request = urllib.request.Request(ORIGIN + route + f'?uploadId={upload_id}&partNumber={len(parts) + 1}',
+                    request = publisher_request(ORIGIN + route + f'?uploadId={upload_id}&partNumber={len(parts) + 1}',
                         data=block, method='PUT', headers={'Authorization': 'Bearer ' + identity(), 'Content-Type': 'application/octet-stream'})
                     with urllib.request.urlopen(request, timeout=180) as response:
                         parts.append(json.load(response))
@@ -63,6 +70,7 @@ def upload(channel, version, path):
     try:
         connection.putrequest('PUT', route)
         connection.putheader('Authorization', 'Bearer ' + identity())
+        connection.putheader('User-Agent', USER_AGENT)
         connection.putheader('Content-Type', 'application/octet-stream')
         connection.putheader('Content-Length', str(path.stat().st_size))
         connection.putheader('X-Content-Sha256', checksum)
@@ -90,7 +98,7 @@ def main():
     data = {'version': args.version, 'sha256': upload(args.channel, args.version, package)}
     if args.channel == 'launcher':
         data['installer_sha256'] = upload(args.channel, args.version, Path('dist/ScatterMacro.exe'))
-    request = urllib.request.Request(ORIGIN + '/v2/publish/manifest/' + args.channel,
+    request = publisher_request(ORIGIN + '/v2/publish/manifest/' + args.channel,
         data=json.dumps(data).encode(), headers={'Authorization': 'Bearer ' + identity(), 'Content-Type': 'application/json'})
     with urllib.request.urlopen(request, timeout=30) as response:
         result = json.load(response)

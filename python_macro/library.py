@@ -10,7 +10,7 @@ import tempfile
 import urllib.request
 import zipfile
 
-VERSION = "0.4.0"
+VERSION = "0.4.1"
 UPDATE_URL = "https://scatter-macro.shopscatter.workers.dev/v2/catalog"
 
 CATALOG_URL = "https://scatter-macro.shopscatter.workers.dev/v2/catalog"
@@ -78,7 +78,8 @@ def validate_update_feed(feed):
 
 def download_release(release, target):
     validate_release(release)
-    with urllib.request.urlopen(release["url"], timeout=30) as response, Path(target).open("wb") as output:
+    request = urllib.request.Request(release["url"], headers={"User-Agent": "ScatterMacro/" + VERSION})
+    with urllib.request.urlopen(request, timeout=30) as response, Path(target).open("wb") as output:
         digest, total = hashlib.sha256(), 0
         while block := response.read(1024 * 1024):
             total += len(block)
