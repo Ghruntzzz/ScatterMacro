@@ -1,8 +1,8 @@
 {
   "launcher": {
-    "version": "0.4.1",
-    "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/launcher-v0.4.1/ScatterLauncher-0.4.1-windows.zip",
-    "sha256": "0193d2f57e39fa14de7c0886e21aaf7d040f83ef7600fde161e6f781528ee60b"
+    "version": "0.4.2",
+    "url": "https://github.com/Ghruntz/ScatterMacro/releases/download/launcher-v0.4.2/ScatterLauncher-0.4.2-windows.zip",
+    "sha256": "2178a22696e51f1513b09f692e00fafb80a13f7eecd8803383270a0232ee0a31"
   },
   "macros": [
     {
