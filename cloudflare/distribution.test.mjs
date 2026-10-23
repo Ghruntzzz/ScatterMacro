@@ -1,6 +1,57 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {artifactKey, artifactUrl, compareVersion, distribution, storedLauncher, validateClaims} from './distribution.mjs';
+import {artifactKey, artifactUrl, compareVersion, distribution, storedLauncher, validateClaims, retainedVersions, cleanupReleases, publishManifest} from './distribution.mjs';
+
+test('retention keeps current and previous versions, including publication retries', () => {
+  assert.deepEqual(retainedVersions('1.2.0', {version: '1.1.0', retained_versions: ['1.1.0', '1.0.0']}), ['1.2.0', '1.1.0']);
+  assert.deepEqual(retainedVersions('1.2.0', {version: '1.2.0', retained_versions: ['1.2.0', '1.1.0']}), ['1.2.0', '1.1.0']);
+  assert.deepEqual(retainedVersions('1.10.0', {version: '1.9.0'}), ['1.10.0', '1.9.0']);
+  assert.deepEqual(retainedVersions('1.0.0', null), ['1.0.0']);
+});
+
+test('cleanup is paginated and only deletes obsolete files of its own channel', async () => {
+  const deleted = [], cursors = [];
+  const key = (v) => artifactKey('launcher', v, 'ScatterMacro.exe');
+  const pages = [
+    {objects: [key('1.0.0'), key('1.1.0'), key('1.2.0'), key('1.3.0')].map(key => ({key})), truncated: true, cursor: 'next'},
+    {objects: [{key: key('0.9.0')}, {key: 'packages/anime-expeditions/0.1.0/AnimeExpeditions-0.1.0-windows.zip'},
+      {key: 'packages/launcher/0.1.0/unrelated.txt'}], truncated: false},
+  ];
+  const env = {RELEASES: {
+    get: async () => ({json: async () => ({version: '1.2.0', retained_versions: ['1.2.0', '1.1.0']})}),
+    list: async options => {assert.equal(options.prefix, 'packages/launcher/'); cursors.push(options.cursor); return pages.shift();},
+    delete: async keys => deleted.push(...keys),
+  }};
+  assert.equal(await cleanupReleases(env, 'launcher'), 2);
+  assert.deepEqual(deleted, [key('1.0.0'), key('0.9.0')]);
+  assert.deepEqual(cursors, [undefined, 'next']);
+});
+
+test('unpublished or legacy manifests never trigger cleanup', async () => {
+  for (const manifest of [null, {version: '1.0.0'}]) {
+    const env = {RELEASES: {get: async () => manifest && ({json: async () => manifest}),
+      list: async () => {throw new Error('must not list');}}};
+    assert.equal(await cleanupReleases(env, 'launcher'), 0);
+  }
+});
+
+test('publication saves verified manifest before cleanup; failed verification never deletes', async () => {
+  const events = [];
+  let saved = {version: '1.1.0', retained_versions: ['1.1.0', '1.0.0']};
+  const env = {RELEASES: {
+    head: async () => ({customMetadata: {sha256: 'a'.repeat(64)}}),
+    get: async () => ({json: async () => saved}),
+    put: async (key, value) => {events.push('publish'); saved = JSON.parse(value);},
+    list: async () => ({objects: [{key: artifactKey('anime-expeditions', '1.0.0', 'AnimeExpeditions-1.0.0-windows.zip')}], truncated: false}),
+    delete: async () => events.push('delete'),
+  }};
+  const request = sha256 => new Request('https://example.com', {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({version: '1.2.0', sha256})});
+  await assert.rejects(publishManifest(request('b'.repeat(64)), env, 'anime-expeditions'), {status: 409});
+  assert.deepEqual(events, []);
+  await publishManifest(request('a'.repeat(64)), env, 'anime-expeditions');
+  assert.deepEqual(events, ['publish', 'delete']);
+  assert.deepEqual(saved.retained_versions, ['1.2.0', '1.1.0']);
+});
 
 const claims = {
   iss: 'https://token.actions.githubusercontent.com', aud: 'scatter-macro-publish',

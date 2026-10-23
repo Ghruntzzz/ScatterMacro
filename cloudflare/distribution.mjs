@@ -139,7 +139,39 @@ async function multipart(request, env, channel, version, filename) {
   throw new HttpError(405, 'Method not allowed.');
 }
 
-async function publishManifest(request, env, channel) {
+export function retainedVersions(version, previous) {
+  return [...new Set([version, previous?.version, ...(previous?.retained_versions || [])])]
+    .filter(v => typeof v === 'string' && VERSION.test(v) && compareVersion(v, version) <= 0)
+    .sort((a, b) => compareVersion(b, a)).slice(0, 2);
+}
+
+export async function cleanupReleases(env, channel) {
+  if (!CHANNELS.includes(channel)) throw new HttpError(400, 'Invalid release channel.');
+  const manifest = await releaseManifest(env, channel);
+  // Never prune storage before a verified release has been published.
+  if (!manifest || !VERSION.test(manifest.version) || !Array.isArray(manifest.retained_versions)) return 0;
+  const keep = new Set(retainedVersions(manifest.version, manifest));
+  const prefix = `packages/${channel}/`;
+  let cursor, deleted = 0;
+  do {
+    const page = await env.RELEASES.list({prefix, limit: 100, ...(cursor ? {cursor} : {})});
+    const obsolete = page.objects.filter(object => {
+      const parts = object.key.split('/');
+      if (parts.length !== 4 || parts[0] !== 'packages' || parts[1] !== channel) return false;
+      const version = parts[2];
+      // Leave newer in-progress uploads and unrelated objects alone.
+      if (!VERSION.test(version) || keep.has(version) || compareVersion(version, manifest.version) >= 0) return false;
+      try { return artifactKey(channel, version, parts[3]) === object.key; } catch { return false; }
+    }).map(object => object.key);
+    if (obsolete.length) await env.RELEASES.delete(obsolete);
+    deleted += obsolete.length;
+    cursor = page.truncated ? page.cursor : undefined;
+    if (page.truncated && !cursor) throw new Error('Release listing cursor missing.');
+  } while (cursor);
+  return deleted;
+}
+
+export async function publishManifest(request, env, channel) {
   const data = await body(request);
   if (!VERSION.test(data.version || '')) throw new HttpError(400, 'Invalid version.');
   const filename = channel === 'launcher' ? `ScatterLauncher-${data.version}-windows.zip` : `AnimeExpeditions-${data.version}-windows.zip`;
@@ -148,7 +180,7 @@ async function publishManifest(request, env, channel) {
   const previous = await releaseManifest(env, channel);
   if (previous && compareVersion(data.version, previous.version) < 0) throw new HttpError(409, 'Release rollback is not allowed.');
   const manifest = {version: data.version, url: artifactUrl(channel, data.version, filename), sha256: data.sha256,
-    published_at: new Date().toISOString()};
+    published_at: new Date().toISOString(), retained_versions: retainedVersions(data.version, previous)};
   if (channel === 'launcher') {
     const installer = await env.RELEASES.head(artifactKey(channel, data.version, 'ScatterMacro.exe'));
     if (!SHA256.test(data.installer_sha256 || '') || installer?.customMetadata?.sha256 !== data.installer_sha256) throw new HttpError(409, 'Verified standalone installer must be uploaded first.');
@@ -158,6 +190,7 @@ async function publishManifest(request, env, channel) {
       description: 'Licensed Anime Expeditions macro with Cloudflare updates.'});
   }
   await env.RELEASES.put(`manifests/${channel}.json`, JSON.stringify(manifest), {httpMetadata: {contentType: 'application/json'}});
+  await cleanupReleases(env, channel);
   return json({ok: true, version: manifest.version});
 }
 
