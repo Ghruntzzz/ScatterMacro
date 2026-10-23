@@ -37,7 +37,7 @@ jobs:
           QT_QPA_PLATFORM: offscreen
         run: python -m unittest discover -s tests
       - name: Build Windows macro and validate installer
-      # Publishing is restricted to this main-branch workflow by GitHub OIDC.
+      # Cloudflare verifies this workflow in Ghruntzzz/ScatterMacro via GitHub OIDC.
         shell: pwsh
         run: ./tools/BuildAnimeExpeditions.ps1
       - name: Publish verified private macro package
