@@ -1,5 +1,6 @@
 """Pure OpenCV preprocessing; no input injection or AHK dependency."""
 from dataclasses import dataclass
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -142,7 +143,7 @@ class StoryButtonLocator:
 
 
 class StartButtonLocator:
-    """Recognize the supplied green Start button and click inside its center."""
+    """Recognize normal and highlighted Start artwork at the button center."""
 
     def __init__(self, path, min_score=0.84):
         self.template = cv2.imread(str(path), cv2.IMREAD_COLOR)
@@ -151,10 +152,25 @@ class StartButtonLocator:
         self.min_score = min_score
         self.misses = 0
         self.tiles = []
-        for scale in (0.70, 0.80, 0.85, 0.90, 1.0, 1.10, 1.20, 1.30, 1.45, 1.60):
-            size = (round(self.template.shape[1] * scale), round(self.template.shape[0] * scale))
-            self.tiles.append(cv2.resize(self.template, size,
-                              interpolation=cv2.INTER_AREA if scale < 1 else cv2.INTER_LINEAR))
+        references = [self.template]
+        path = Path(path)
+        if path.name == 'start-game-template.png':
+            highlighted = path.with_name('start-game-highlighted.png')
+            if highlighted.is_file():
+                variant = cv2.imread(str(highlighted), cv2.IMREAD_COLOR)
+                if variant is not None:
+                    references.append(variant)
+        for reference in references:
+            for scale in (0.70, 0.80, 0.85, 0.90, 1.0, 1.10, 1.20, 1.30, 1.45, 1.60):
+                size = (round(reference.shape[1] * scale), round(reference.shape[0] * scale))
+                self.tiles.append(cv2.resize(reference, size,
+                                  interpolation=cv2.INTER_AREA if scale < 1 else cv2.INTER_LINEAR))
+                # Fractional UI scaling can round either the size or sampling grid.
+                sampled = cv2.resize(reference, None, fx=scale, fy=scale,
+                                     interpolation=cv2.INTER_AREA if scale < 1 else cv2.INTER_LINEAR)
+                if not np.array_equal(sampled, self.tiles[-1]):
+                    self.tiles.append(sampled)
+        self.reference_sizes = [r.shape[:2] for r in references]
 
     def __call__(self, frame):
         if frame.ndim != 3 or frame.shape[2] not in (3, 4):
@@ -167,8 +183,8 @@ class StartButtonLocator:
         best = None
         for contour in contours:
             x, y, w, h = cv2.boundingRect(contour)
-            if not (self.template.shape[1] * 0.5 <= w <= self.template.shape[1] * 2
-                    and self.template.shape[0] * 0.5 <= h <= self.template.shape[0] * 2):
+            if not any(rw * 0.5 <= w <= rw * 2 and rh * 0.5 <= h <= rh * 2
+                       for rh, rw in self.reference_sizes):
                 continue
             # Only search green button-sized regions, with a margin for borders.
             pad = max(8, round(h * 0.3))

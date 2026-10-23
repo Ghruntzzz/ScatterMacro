@@ -19,9 +19,13 @@ class ClickTests(unittest.TestCase):
         client=self.client()
         client._validated_point=Mock(return_value=(wintypes.POINT(900,680),None))
         client._move=Mock()
+        client._send_mouse=Mock()
+        client._check_cursor=Mock()
         self.assertTrue(client.park_cursor((800,1000,3)))
         client._validated_point.assert_called_once_with(900,680,(800,1000,3))
         client._move.assert_called_once_with(900,680)
+        client._send_mouse.assert_called_once_with(MOUSE_MOVE)
+        client._check_cursor.assert_called_once_with(900,680)
 
     def test_preclick_delay_keeps_brief_hover_within_fast_budget(self):
         preparation = (PRECLICK_HOVER_SECONDS + PRECLICK_SETTLE_SECONDS

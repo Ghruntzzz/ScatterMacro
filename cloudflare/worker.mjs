@@ -1,3 +1,6 @@
+import {recurringCheckout,licensePage} from './subscriptions.mjs';
+import {accountScript} from './account-ui.mjs';
+import {updateCardScript} from './update-card.mjs';
 import {syncCommands} from './commands.mjs';
 import {distribution} from './distribution.mjs';
 import {licenseSessions,authorizeMacro} from './license-sessions.mjs';
@@ -23,6 +26,7 @@ export default {
  if(request.method==='GET'&&url.pathname==='/health')return json({ok:true,service:'scatter-macro',version:'2.0.0',...(env.DISCORD_PRESENCE?{presence:await env.DISCORD_PRESENCE.getByName('scatter-macro').start()}:{} )});
  if(request.method==='GET'&&url.pathname==='/motion.js')return new Response(motionScript,{headers:{'content-type':'application/javascript; charset=utf-8','cache-control':'no-cache'}});
  if(request.method==='GET'&&url.pathname==='/navigation.js')return new Response(navigationScript,{headers:{'content-type':'application/javascript; charset=utf-8','cache-control':'no-cache'}});
+ if(request.method==='GET'&&['/account.js','/update-card.js'].includes(url.pathname))return new Response(url.pathname==='/account.js'?accountScript:updateCardScript,{headers:{'content-type':'application/javascript; charset=utf-8','cache-control':'no-cache'}});
  if(request.method==='GET'&&url.pathname==='/app.js')return new Response(appScript,{headers:{'content-type':'application/javascript; charset=utf-8','cache-control':'no-cache'}});
  if(request.method==='GET'&&url.pathname==='/')return home(await session(request,env),await readiness(env));
  if(request.method==='GET'&&url.pathname==='/dashboard'){const u=await session(request,env);if(!u)return new Response(null,{status:303,headers:{location:'/auth/discord','cache-control':'no-store'}});return dashboard(u,await readiness(env),u.discord_user_id===env.DISCORD_OWNER_ID);}
@@ -45,11 +49,12 @@ export default {
  if(url.pathname==='/purchase-success'||url.pathname==='/purchase-cancelled')return new Response(null,{status:303,headers:{location:'/dashboard','cache-control':'no-store'}});
  if(url.pathname.startsWith('/api/')||url.pathname==='/auth/logout'){
  const u=await requireSession(request,env);
+ if(request.method==='GET'&&url.pathname==='/api/licenses')return json(await licensePage(env,u,url));
  if(request.method==='GET'&&url.pathname==='/api/me'){
- const licenses=await env.DB.prepare('SELECT id,plan,status,device_label,expires_at,created_at FROM licenses WHERE discord_user_id=?1 ORDER BY id DESC').bind(u.discord_user_id).all();const subs=await env.DB.prepare('SELECT b.*,e.customer_id,e.cancel_at_period_end,e.paid_until FROM billing_subscriptions b LEFT JOIN subscription_entitlements e ON e.subscription_id=b.id WHERE b.discord_user_id=?1 AND NOT(b.status IN (\'approval_pending\',\'unavailable\') AND EXISTS(SELECT 1 FROM dismissed_billing_requests d WHERE d.subscription_id=b.id AND d.discord_user_id=b.discord_user_id)) ORDER BY b.created_at DESC').bind(u.discord_user_id).all();return json({user:u,licenses:licenses.results.map(l=>({...l,status:l.status==='active'&&l.expires_at&&Date.parse(l.expires_at)<=Date.now()?'expired':l.status})),subscriptions:subs.results});}
+ const licenses=await env.DB.prepare('SELECT id,plan,status,device_label,expires_at,created_at FROM licenses WHERE discord_user_id=?1 ORDER BY id DESC LIMIT 5').bind(u.discord_user_id).all();const subs=await env.DB.prepare('SELECT b.*,e.customer_id,e.cancel_at_period_end,e.paid_until FROM billing_subscriptions b LEFT JOIN subscription_entitlements e ON e.subscription_id=b.id WHERE b.discord_user_id=?1 AND NOT(b.status IN (\'approval_pending\',\'unavailable\') AND EXISTS(SELECT 1 FROM dismissed_billing_requests d WHERE d.subscription_id=b.id AND d.discord_user_id=b.discord_user_id)) ORDER BY b.created_at DESC').bind(u.discord_user_id).all();return json({user:u,licenses:licenses.results.map(l=>({...l,status:l.status==='active'&&l.expires_at&&Date.parse(l.expires_at)<=Date.now()?'expired':l.status})),subscriptions:subs.results});}
  if(request.method!=='POST')throw new HttpError(405,'Method not allowed.');sameOrigin(request,env);await limit(request,env,'api:'+u.discord_user_id,40);const data=await body(request);
  if(url.pathname==='/auth/logout'){await env.DB.prepare('UPDATE web_sessions SET revoked_at=?1 WHERE session_hash=?2').bind(new Date().toISOString(),await digest(cookie(request,'__Host-scatter_session'))).run();const response=json({ok:true});response.headers.set('set-cookie',cookieValue('__Host-scatter_session','',0));return response;}
- if(url.pathname==='/api/checkout')return json(await fixedCheckout(env,u,data.provider,data.plan));
+ if(url.pathname==='/api/checkout'){if(data.autoRenew!==undefined&&typeof data.autoRenew!=='boolean')throw new HttpError(400,'Choose a valid renewal preference.');return json(await(data.autoRenew===false?fixedCheckout:recurringCheckout)(env,u,data.provider,data.plan));}
  if(url.pathname==='/api/subscriptions/manage')return json(await manage(env,u,data.id,data.action));
  if(url.pathname==='/api/licenses/reveal'){
  await limit(request,env,'reveal:'+u.discord_user_id,10);const l=await env.DB.prepare("SELECT s.encrypted_key FROM licenses l JOIN license_secrets s ON s.license_id=l.id WHERE l.id=?1 AND l.discord_user_id=?2 AND l.status='active' AND (l.expires_at IS NULL OR l.expires_at>?3)").bind(Number(data.id)||0,u.discord_user_id,new Date().toISOString()).first();if(!l)throw new HttpError(404,'Active license not found.');return json({key:formatLicenseKey(await decryptRecoverableLicenseKey(l.encrypted_key,env.LICENSE_PEPPER))});}

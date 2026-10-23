@@ -376,6 +376,9 @@ class RobloxClient:
             return False
         point,_=self._validated_point(max(0,int(shape[1]*.9)),max(0,int(shape[0]*.85)),shape)
         self._move(point.x,point.y)
+        # SetCursorPos alone can leave Roblox's previous button hover active.
+        self._send_mouse(MOUSE_MOVE)
+        self._check_cursor(point.x,point.y)
         return True
 
     def _direct_click(self, x, y, shape, method, settle_seconds=None, hold_seconds=CLICK_HOLD_SECONDS):

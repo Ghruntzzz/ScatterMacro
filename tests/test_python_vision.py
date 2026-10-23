@@ -74,6 +74,35 @@ class PythonVisionTests(unittest.TestCase):
         locator = StartButtonLocator(path)
         self.assertIsNone(locator(np.zeros((220, 350, 4), dtype=np.uint8)))
 
+    def test_start_game_accepts_normal_and_highlighted_states(self):
+        from python_macro.vision import StartButtonLocator
+        assets = Path(__file__).resolve().parents[1] / 'assets'
+        locator = StartButtonLocator(assets / 'start-game-template.png')
+        for name in ('start-game-template.png', 'start-game-highlighted.png'):
+            reference = cv2.imread(str(assets / name))
+            for factor in (0.8, 1.0, 1.2, 1.6):
+                with self.subTest(name=name, factor=factor):
+                    scaled = cv2.resize(reference, None, fx=factor, fy=factor,
+                                        interpolation=cv2.INTER_AREA if factor < 1 else cv2.INTER_LINEAR)
+                    h, w = scaled.shape[:2]
+                    frame = np.full((300, 600, 4), 20, np.uint8)
+                    frame[100:100+h, 110:110+w, :3] = scaled
+                    hit = locator(frame)
+                    self.assertIsNotNone(hit)
+                    self.assertLessEqual(abs(hit[0] - (110+w//2)), 2)
+                    self.assertLessEqual(abs(hit[1] - (100+h//2)), 2)
+
+    def test_start_game_rejects_empty_and_other_button(self):
+        from python_macro.vision import StartButtonLocator
+        assets = Path(__file__).resolve().parents[1] / 'assets'
+        locator = StartButtonLocator(assets / 'start-game-template.png')
+        frame = np.full((300, 600, 3), 20, np.uint8)
+        other = cv2.imread(str(assets / 'boss-rush-continue.png'))
+        h, w = other.shape[:2]
+        frame[80:80+h, 90:90+w] = other
+        for _ in range(4):
+            self.assertIsNone(locator(frame))
+
     def test_start_reuses_scaled_tiles(self):
         from unittest.mock import patch
         from python_macro.vision import StartButtonLocator
