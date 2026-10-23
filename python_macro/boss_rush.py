@@ -29,7 +29,7 @@ class RunComplete(Exception):
 
 
 class BossRushFlow(ChallengeFlow):
-    def __init__(self,capture,client,reader,stop,log,assets,routes):
+    def __init__(self,capture,client,reader,stop,log,assets,routes,priority=()):
         super().__init__(capture,client,reader,stop,log,assets,{})
         self.assets,self.routes=assets,routes
         self.mode_button=Icon(assets/'boss-rush-button.png',threshold=.85)
@@ -38,6 +38,8 @@ class BossRushFlow(ChallengeFlow):
         self.continue_icon=Icon(assets/'boss-rush-continue.png',threshold=.87)
         self.fight_icon=Icon(assets/'boss-rush-fight.png',threshold=.87)
         self.game_start=StartButtonLocator(assets/'start-game-template.png')
+        from python_macro.boss_rush_cards import BossCardSelector
+        self.cards=BossCardSelector(assets,reader,client,capture,stop,log,priority)
 
     def navigate(self,find_play):
         mode=lambda f:self.mode_button(f)
@@ -105,7 +107,25 @@ class BossRushFlow(ChallengeFlow):
                           lambda a,b:self.choice(a) is None):
             return False
         self.client.park_cursor(self.capture().shape)
-        return gate==6 or not self.stop.wait(3)
+        return self.settle_gate(gate)
+
+    def settle_gate(self,gate):
+        # Cards may replace the decision dialog or follow its Continue click.
+        deadline=time.monotonic()+3
+        while not self.stop.is_set() and time.monotonic()<deadline:
+            frame=self.capture()
+            if self.cards.handle(frame):
+                deadline=time.monotonic()+3
+            elif self.choice(frame) is not None:
+                label='Fight Boss' if gate==6 else 'Continue'
+                if not self.press(label,lambda f:self.decision_target(f,gate),
+                                  lambda a,b:self.choice(a) is None):
+                    return False
+                self.client.park_cursor(self.capture().shape)
+                deadline=time.monotonic()+3
+            if self.stop.wait(.1):
+                return False
+        return not self.stop.is_set()
 
     def run(self,find_play,on_profile,entries_provider,status,monitor_capture,reward_dir,notifier):
         from python_macro.match_monitor import MatchMonitor
@@ -139,8 +159,11 @@ class BossRushFlow(ChallengeFlow):
                         raise RunComplete()
                     if not boss and time.monotonic()-last_poll[0]>=.15:
                         last_poll[0]=time.monotonic()
-                        if self.choice(self.capture()) is not None:
+                        frame=self.capture()
+                        if self.choice(frame) is not None:
                             raise GateComplete()
+                        if self.cards.handle(frame):
+                            raise GateComplete('cards')
                     return state.get('wave')
                 def phase(place_units):
                     entries=entries_provider()
@@ -168,9 +191,11 @@ class BossRushFlow(ChallengeFlow):
                         monitor.reset()
                         try:
                             phase(gate==1)
-                        except GateComplete:
-                            pass
-                        if self.stop.is_set() or not self.decide(gate):
+                        except GateComplete as complete:
+                            card_transition=complete.args==('cards',)
+                        if self.stop.is_set():
+                            return
+                        if not (self.settle_gate(gate) if card_transition else self.decide(gate)):
                             return
                     boss=True
                     on_profile('Boss map')

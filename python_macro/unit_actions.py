@@ -350,7 +350,7 @@ class UnitIndexer:
                     raise RuntimeError(f"Index {index+1} position is outside Roblox.")
                 continue
             self.key('0' if str(entry['unit'])=='10' else str(entry['unit']))
-            self.wait(0.04)
+            self.wait(0.02)
             self.last_place_point = point
             self.click(point, frame)
             for scan in range(4):
@@ -412,9 +412,12 @@ class UnitIndexer:
             _, panel = self.read_until(lambda panel: panel["priority"] not in (None, old))
         else:
             raise RuntimeError(f"Could not set target priority for Index {index+1}.")
+        # Ability scans are not part of the auto-upgrade fast path.
+        if not auto and not self.no_waves:
+            self.enable_ability()
         for _ in range(auto):
             self.key("K")
-            self.wait(0.04)
+            self.wait(0.02)
         if goal:
             last, stalled = None, self.clock()+120
             while not self.stop.is_set():
@@ -436,11 +439,9 @@ class UnitIndexer:
                 self.wait(0.2)
         if self.stop.is_set():
             raise InterruptedError()
-        try:
-            self.enable_ability()
-        finally:
-            if not self.stop.is_set():
-                self.close()
+        # Use the already-confirmed panel close button; do not rescan the panel
+        # or inspect abilities/auto-upgrade after applying its configured level.
+        self.click(panel['close'],self.capture())
         self.completed.add(index)
         self.active_index = None
         self.log(f"Index {index+1} complete.")

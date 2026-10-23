@@ -124,6 +124,7 @@ def read_dashboard_values() -> dict[str, str]:
         "expedition_difficulty": dashboard.get("ExpeditionDifficulty", "1"),
         "card_priority": dashboard.get("CardPriority", ""),
         "anvil_priority": dashboard.get("AnvilPriority", ""),
+        "boss_card_priority": dashboard.get("BossCardPriority", ""),
         "tower_type": dashboard.get("TowerType", "Trait Tower"),
         "private_server": roblox.get("PrivateServerLink", ""),
         "roblox_hwnd": "",  # Legacy selector values must never bind a new session.
@@ -450,9 +451,14 @@ class DashboardWindow(QWidget):
 
     def _card_priority(self):
         from ui.card_priority import CardPriorityDialog
-        dialog=CardPriorityDialog(read_dashboard_values().get('card_priority',''),self)
+        boss=self.mode_box.currentText()=='Boss Rush'
+        from python_macro.boss_rush_cards import boss_card_order
+        from python_macro.expedition_cards import priority_order
+        dialog=CardPriorityDialog(read_dashboard_values().get('boss_card_priority' if boss else 'card_priority',''),self,
+                                  normalize_order=boss_card_order if boss else priority_order,
+                                  title='Boss Rush Card Priority' if boss else 'Expedition Card Priority')
         if dialog.exec()==QDialog.DialogCode.Accepted:
-            update_config('Dashboard',{'CardPriority':'|'.join(dialog.order())})
+            update_config('Dashboard',{'BossCardPriority' if boss else 'CardPriority':'|'.join(dialog.order())})
 
     def _anvil_priority(self):
         from ui.card_priority import CardPriorityDialog
@@ -620,7 +626,7 @@ class DashboardWindow(QWidget):
         self._set_combo_items(self.act_box, acts, previous_act)
         self._set_combo_visible(self.act_box, mode in {"Story", "Raid"})
         self.challenge_panel.setVisible(mode=='Challenges')
-        self.card_priority_button.setVisible(mode=='Expeditions')
+        self.card_priority_button.setVisible(mode in ('Expeditions','Boss Rush'))
         self.anvil_priority_button.setVisible(mode=='Expeditions')
 
         if mode == "Story":

@@ -94,7 +94,8 @@ class StoryWorker(QThread):
                 from python_macro.capture import capture_client
                 route_root=active_unit_config(dict(mode='Boss Rush',map='Gate map')).parent/'GateRoutes'
                 flow=BossRushFlow(capture,client,self.reader,self.stop,self.message.emit,root/'assets',
-                                  GateRoutes(route_root,root/'assets'/'boss-rush-gate-routes'))
+                                  GateRoutes(route_root,root/'assets'/'boss-rush-gate-routes'),
+                                  priority=self.notification_settings.get('boss_card_priority',''))
                 def boss_capture():
                     if client.user.GetForegroundWindow()!=client.hwnd or client.user.IsIconic(client.hwnd):
                         return None

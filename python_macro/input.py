@@ -289,7 +289,27 @@ class RobloxClient:
         return self._direct_click(x, y, shape, method="event")
 
     def unit_click(self, x, y, shape):
-        return self._direct_click(x,y,shape,method='input',settle_seconds=.01,hold_seconds=.07)
+        # Unit controls do not need the menu hover/wiggle animation sequence.
+        if self.stop.is_set() or not self.focus_roblox():
+            return False
+        point, _ = self._validated_point(x, y, shape)
+        self._move(point.x, point.y)
+        self._send_mouse(MOUSE_MOVE)
+        if self.stop.wait(.01):
+            return False
+        self.check_focus()
+        current, _ = self._validated_point(x, y, shape)
+        if (current.x, current.y) != (point.x, point.y):
+            raise RuntimeError('Roblox client shifted before unit click.')
+        self._check_cursor(point.x, point.y)
+        if self.stop.is_set():
+            return False
+        self._send_mouse(MOUSE_LEFT_DOWN)
+        try:
+            self.stop.wait(.04)
+        finally:
+            self._send_mouse(MOUSE_LEFT_UP)
+        return not self.stop.is_set()
 
     def _prepare_click_target(self, x, y, shape, absolute=False, settle_seconds=None):
         """Hover, inject actual mouse-motion wiggle, then settle on target.

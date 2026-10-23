@@ -107,6 +107,19 @@ class ClickTests(unittest.TestCase):
         self.assertEqual(events[-2:], [("wait", CLICK_HOLD_SECONDS),
                                        ("input", MOUSE_LEFT_UP)])
 
+    def test_unit_click_uses_short_timing_without_menu_wiggles(self):
+        client = self.client()
+        self.assertTrue(client.unit_click(20, 30, (80, 100, 4)))
+        self.assertEqual([c.args[0] for c in client.stop.wait.call_args_list], [.01, .04])
+        self.assertEqual([c.args[1]._obj.data.mi.dwFlags for c in client.user.SendInput.call_args_list],
+                         [MOUSE_MOVE, MOUSE_LEFT_DOWN, MOUSE_LEFT_UP])
+
+    def test_unit_click_stops_before_pressing(self):
+        client = self.client()
+        client.stop.wait.return_value = True
+        self.assertFalse(client.unit_click(20, 30, (80, 100, 4)))
+        self.assertEqual([c.args[1]._obj.data.mi.dwFlags for c in client.user.SendInput.call_args_list], [MOUSE_MOVE])
+
     def test_direct_event_click_focuses_and_releases(self):
         client = self.client()
         client.focus_roblox = Mock(return_value=True)

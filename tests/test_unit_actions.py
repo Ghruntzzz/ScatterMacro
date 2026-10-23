@@ -86,7 +86,7 @@ class UnitActionTests(unittest.TestCase):
                 worker=UnitIndexer([entry(auto_upgrade=str(auto),upgrade=str(goal))],client,
                                    lambda:image,panel,stop,Mock())
                 worker.run(0)
-                self.assertEqual(events,["1","place","R"]+["K"]*auto+["T"]*min(goal,3)+["ability check"]*2+["close"])
+                self.assertEqual(events,["1","place","R"]+(["ability check"]*2 if not auto else [])+["K"]*auto+["T"]*min(goal,3)+["close"])
                 self.assertEqual(worker.completed,{0})
 
     def test_stop_sends_no_input(self):

@@ -60,6 +60,31 @@ class BossRushTests(unittest.TestCase):
         self.assertTrue(flow.navigate(Mock()))
         self.assertEqual([c.args[0] for c in flow.press.call_args_list],['Play','Boss Rush','Select Stage','Start'])
 
+    def test_card_transition_waits_three_seconds_and_handles_late_continue(self):
+        for show_choice in (False, True):
+            flow=self.flow()
+            state={'time':0.0,'clicked':False}
+            flow.stop=Mock()
+            flow.stop.is_set.return_value=False
+            def wait(seconds):
+                state['time']+=seconds
+                return False
+            flow.stop.wait.side_effect=wait
+            flow.cards.handle=Mock(return_value=False)
+            flow.choice=Mock(side_effect=lambda frame: (1,1) if show_choice and state['time']>=1 and not state['clicked'] else None)
+            def press(*args):
+                state['clicked']=True
+                return True
+            flow.press=Mock(side_effect=press)
+            with patch('python_macro.boss_rush.time.monotonic',side_effect=lambda:state['time']):
+                self.assertTrue(flow.settle_gate(2))
+            self.assertGreaterEqual(state['time'],4 if show_choice else 3)
+            self.assertLess(state['time'],4.3 if show_choice else 3.2)
+            if show_choice:
+                self.assertEqual(flow.press.call_args.args[0],'Continue')
+            else:
+                flow.press.assert_not_called()
+
     def test_only_gate_six_chooses_boss_and_requires_dialog(self):
         flow=self.flow()
         frame=cv2.imread('assets/boss-rush-choice.png')
@@ -99,7 +124,7 @@ class BossRushTests(unittest.TestCase):
             setup=dashboard.DashboardWindow()
             self.assertEqual(setup.mode_box.currentText(),'Boss Rush')
             self.assertFalse(hasattr(setup,'gate_routes_button'))
-            self.assertTrue(setup.card_priority_button.isHidden())
+            self.assertFalse(setup.card_priority_button.isHidden())
             setup.close()
             window=dashboard.RuntimeWindow()
             self.assertFalse(hasattr(window,'runtime_gate_routes'))
@@ -111,13 +136,22 @@ class BossRushTests(unittest.TestCase):
             window.close()
 
     def test_six_gate_flow_places_only_first_gate_and_boss(self):
+        self.six_gate_flow()
+
+    def test_cards_replace_decisions_and_gate_six_goes_straight_to_boss(self):
+        self.six_gate_flow(card_gates=(2,4,6))
+
+    def six_gate_flow(self,card_gates=()):
         flow=self.flow()
         flow.routes.names=GateRoutes.names
+        flow.cards.handle=Mock(return_value=False)
         flow.routes.load.return_value={'path':{}}
         flow.navigate=Mock(return_value=True)
         flow.wait_details=Mock(return_value=True)
         flow.client.setup_camera.return_value=True
         state={'gate':0,'boss':False,'placed':False,'started':False}
+        flow.cards.handle.side_effect=lambda frame: not state['boss'] and state['gate'] in card_gates and (state['gate']>1 or state['placed'])
+        flow.settle_gate=Mock(return_value=True)
         profiles=[]
         placements=[]
         decisions=[]
@@ -127,7 +161,7 @@ class BossRushTests(unittest.TestCase):
         flow.enter_gate=Mock(side_effect=enter)
         flow.decide=Mock(side_effect=lambda gate:decisions.append(gate) or True)
         flow.choice=Mock(side_effect=lambda frame: (1,1,20,20) if not state['boss'] and
-                         (state['gate']>1 or state['placed']) else None)
+                         state['gate'] not in card_gates and (state['gate']>1 or state['placed']) else None)
         def profile(name):
             profiles.append(name)
             state.update(boss=name=='Boss map',placed=False,started=False)
@@ -160,7 +194,8 @@ class BossRushTests(unittest.TestCase):
              patch('python_macro.story_ingame.start_game',side_effect=start), \
              patch('python_macro.story_ingame.finish_match',side_effect=finish):
             flow.run(Mock(),profile,lambda:[dict(unit='1')],Mock(),Mock(),None,Mock())
-        self.assertEqual(decisions,list(range(1,7))*2)
+        self.assertEqual(decisions,[g for g in range(1,7) if g not in card_gates]*2)
+        self.assertEqual([c.args[0] for c in flow.settle_gate.call_args_list],list(card_gates)*2)
         self.assertEqual(placements,[1,'boss',1,'boss'])
         self.assertEqual(profiles,['Gate map','Boss map']*2)
         monitor.close.assert_called_once()
